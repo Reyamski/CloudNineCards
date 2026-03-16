@@ -179,6 +179,9 @@ function BuyNowModal({ item, onClose }) {
     setSending(true);
     setSendError('');
     try {
+      if (!supabaseEnabled || !supabase) {
+        throw new Error('Live orders are not configured yet.');
+      }
       let proofHtml = 'Not provided';
       if (paymentB64) {
         try {
@@ -188,6 +191,31 @@ function BuyNowModal({ item, onClose }) {
           proofHtml = '(Screenshot could not be uploaded — buyer will email separately)';
         }
       }
+      const orderPayload = {
+        order_number: orderNumber,
+        order_type: 'on_hand',
+        status: 'pending',
+        product_id: item.id,
+        product_title: item.title,
+        product_variant: item.subtitle,
+        quantity: qty,
+        buyer_name: name,
+        buyer_email: email,
+        buyer_phone: phone,
+        buyer_address: address,
+        delivery_country: country,
+        delivery_province: province || null,
+        subtotal,
+        tax_amount: taxAmount,
+        delivery_fee: deliveryFee,
+        total_price: grandTotal,
+        payment_proof: proofHtml,
+        wise_handle: WISE_HANDLE,
+      };
+
+      const { error: orderError } = await supabase.from('orders').insert(orderPayload);
+      if (orderError) throw orderError;
+
       await emailjs.send(
         EMAILJS_SERVICE_ID,
         EMAILJS_TEMPLATE_ID,
@@ -221,8 +249,9 @@ function BuyNowModal({ item, onClose }) {
           { publicKey: EMAILJS_PUBLIC_KEY, privateKey: EMAILJS_PRIVATE_KEY }
         );
       } catch (buyerErr) { console.warn('Buyer copy failed:', buyerErr); }
-    } catch {
-      setSendError('Failed to send. Email us directly at ' + CONTACT_EMAIL);
+    } catch (error) {
+      console.error('Order submit failed:', error);
+      setSendError(error?.message || ('Failed to send. Email us directly at ' + CONTACT_EMAIL));
     } finally {
       setSending(false);
     }

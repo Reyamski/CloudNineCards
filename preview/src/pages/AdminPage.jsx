@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ShieldCheck, Save, RotateCcw, Eye, EyeOff, Youtube } from 'lucide-react';
+import { ShieldCheck, Save, RotateCcw, Eye, EyeOff, Youtube, Loader2 } from 'lucide-react';
 import { supabase, supabaseEnabled } from '../lib/supabase';
 
 const ADMIN_PASSWORD = 'REDACTED_ADMIN_PASS';
@@ -41,6 +41,10 @@ function mergeProducts(overrides) {
   });
 }
 
+function formatMoney(value) {
+  return `CAD $${Number(value || 0).toFixed(2)}`;
+}
+
 export default function AdminPage() {
   const [authed, setAuthed]   = useState(() => sessionStorage.getItem('cnc_admin') === '1');
   const [pw, setPw]           = useState('');
@@ -52,6 +56,8 @@ export default function AdminPage() {
   const [videoId, setVideoId]   = useState(DEFAULT_VIDEO_ID);
   const [videoSaved, setVideoSaved] = useState(false);
   const [dbError, setDbError]   = useState('');
+  const [orders, setOrders]     = useState([]);
+  const [confirmingId, setConfirmingId] = useState('');
 
   useEffect(() => {
     async function load() {
@@ -66,6 +72,18 @@ export default function AdminPage() {
         setDbError(`Stock load failed: ${error.message}`);
       } else if (data) {
         setProducts(mergeProducts(data));
+      }
+
+      const { data: orderRows, error: orderError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('order_type', 'on_hand')
+        .order('created_at', { ascending: false });
+
+      if (orderError) {
+        setDbError((prev) => prev || `Orders load failed: ${orderError.message}`);
+      } else if (orderRows) {
+        setOrders(orderRows);
       }
 
       const { data: vid, error: videoError } = await supabase
@@ -151,6 +169,67 @@ export default function AdminPage() {
     setTimeout(() => setVideoSaved(false), 2000);
   }
 
+  async function confirmOrder(order) {
+    if (!supabaseEnabled || !supabase) {
+      setDbError('Supabase is not configured for this deployment yet.');
+      return;
+    }
+
+    setConfirmingId(order.id);
+    setDbError('');
+
+    try {
+      const existingProduct = products.find((p) => p.id === order.product_id);
+      const fallbackQty = existingProduct?.stock ?? 0;
+
+      const { data: stockRow, error: stockError } = await supabase
+        .from('stock')
+        .select('*')
+        .eq('id', order.product_id)
+        .maybeSingle();
+
+      if (stockError) throw stockError;
+
+      const currentQty = stockRow?.quantity ?? fallbackQty;
+      const nextQty = Math.max(0, currentQty - order.quantity);
+      const nextInStock = nextQty > 0;
+
+      const { error: upsertError } = await supabase
+        .from('stock')
+        .upsert({ id: order.product_id, quantity: nextQty, in_stock: nextInStock }, { onConflict: 'id' });
+
+      if (upsertError) throw upsertError;
+
+      const confirmedAt = new Date().toISOString();
+      const { error: orderUpdateError } = await supabase
+        .from('orders')
+        .update({ status: 'confirmed', confirmed_at: confirmedAt })
+        .eq('id', order.id);
+
+      if (orderUpdateError) throw orderUpdateError;
+
+      setProducts((prev) =>
+        prev.map((product) =>
+          product.id === order.product_id
+            ? { ...product, stock: nextQty, inStock: nextInStock }
+            : product,
+        ),
+      );
+
+      setOrders((prev) =>
+        prev.map((item) =>
+          item.id === order.id
+            ? { ...item, status: 'confirmed', confirmed_at: confirmedAt }
+            : item,
+        ),
+      );
+    } catch (error) {
+      setDbError(`Confirm failed: ${error.message}`);
+    } finally {
+      setConfirmingId('');
+    }
+  }
+
   function extractVideoId(input) {
     // Handle full URLs or bare IDs
     const match = input.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
@@ -193,6 +272,8 @@ export default function AdminPage() {
 
   const inStockProducts = products.filter(p => p.inStock);
   const soldOutProducts = products.filter(p => !p.inStock);
+  const pendingOrders = orders.filter((order) => order.status === 'pending');
+  const confirmedOrders = orders.filter((order) => order.status === 'confirmed').slice(0, 8);
 
   return (
     <div className="min-h-screen bg-[#05010c] text-white">
@@ -220,6 +301,66 @@ export default function AdminPage() {
             {dbError}
           </div>
         )}
+
+        <div className="mb-10">
+          <div className="mb-3 text-xs font-black uppercase tracking-[0.24em] text-fuchsia-300">Pending Orders ({pendingOrders.length})</div>
+          {pendingOrders.length ? (
+            <div className="space-y-3">
+              {pendingOrders.map((order) => (
+                <div key={order.id} className="rounded-[24px] border border-fuchsia-400/20 bg-fuchsia-400/5 p-5">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div className="space-y-2">
+                      <div className="text-xs font-black uppercase tracking-[0.18em] text-fuchsia-200/70">
+                        {order.order_number} • Pending
+                      </div>
+                      <div className="text-lg font-black">{order.product_title}</div>
+                      <div className="text-sm text-white/50">
+                        {order.product_variant} • Qty {order.quantity} • {formatMoney(order.total_price)}
+                      </div>
+                      <div className="text-sm text-white/75">
+                        {order.buyer_name} • {order.buyer_email}
+                      </div>
+                      <div className="text-xs text-white/40">
+                        {order.delivery_country || 'No country'}{order.delivery_province ? ` • ${order.delivery_province}` : ''}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => confirmOrder(order)}
+                      disabled={confirmingId === order.id}
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 px-5 py-3 text-sm font-black uppercase tracking-[0.08em] text-black disabled:opacity-60"
+                    >
+                      {confirmingId === order.id ? <><Loader2 className="h-4 w-4 animate-spin" /> Confirming</> : 'Confirm Order'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-[24px] border border-white/10 bg-white/5 px-5 py-4 text-sm text-white/45">
+              New on-hand orders will appear here. Stock will only decrease after you click Confirm.
+            </div>
+          )}
+        </div>
+
+        <div className="mb-10">
+          <div className="mb-3 text-xs font-black uppercase tracking-[0.24em] text-white/40">Recently Confirmed ({confirmedOrders.length})</div>
+          {confirmedOrders.length ? (
+            <div className="space-y-2">
+              {confirmedOrders.map((order) => (
+                <div key={order.id} className="rounded-2xl border border-white/8 bg-white/4 px-5 py-4 text-sm text-white/70">
+                  <div className="font-black">{order.order_number} • {order.product_title}</div>
+                  <div className="mt-1 text-xs text-white/45">
+                    {order.buyer_name} • Qty {order.quantity} • {formatMoney(order.total_price)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-white/8 bg-white/4 px-5 py-4 text-sm text-white/35">
+              No confirmed on-hand orders yet.
+            </div>
+          )}
+        </div>
 
         {/* In Stock */}
         <div className="mb-8">
