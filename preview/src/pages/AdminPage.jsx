@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ShieldCheck, Save, RotateCcw, Eye, EyeOff, Youtube } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 const ADMIN_PASSWORD = 'REDACTED_ADMIN_PASS';
-const STORAGE_KEY = 'cnc_stock_overrides';
 const DEFAULT_VIDEO_ID = 'OcLL44cDh7k';
 
 const BASE_PRODUCTS = [
@@ -30,17 +30,15 @@ const BASE_PRODUCTS = [
   { id: 'prb02eng', title: 'PRB-02 Premium Best Collection Vol.2', subtitle: 'English', price: 250.00, inStock: false },
 ];
 
-function loadOverrides() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
-  catch { return {}; }
-}
-
 function mergeProducts(overrides) {
-  return BASE_PRODUCTS.map(p => ({
-    ...p,
-    inStock: overrides[p.id]?.inStock ?? p.inStock,
-    stock: overrides[p.id]?.stock ?? p.stock ?? 0,
-  }));
+  return BASE_PRODUCTS.map(p => {
+    const row = overrides.find(r => r.id === p.id);
+    return {
+      ...p,
+      inStock: row ? row.in_stock : p.inStock,
+      stock:   row ? row.quantity  : (p.stock ?? 0),
+    };
+  });
 }
 
 export default function AdminPage() {
@@ -48,10 +46,22 @@ export default function AdminPage() {
   const [pw, setPw]           = useState('');
   const [showPw, setShowPw]   = useState(false);
   const [pwError, setPwError] = useState(false);
-  const [products, setProducts] = useState(() => mergeProducts(loadOverrides()));
+  const [products, setProducts] = useState(() => mergeProducts([]));
+  const [loading, setLoading]   = useState(true);
   const [saved, setSaved]       = useState(false);
-  const [videoId, setVideoId]   = useState(() => localStorage.getItem('cnc_video_id') || DEFAULT_VIDEO_ID);
+  const [videoId, setVideoId]   = useState(DEFAULT_VIDEO_ID);
   const [videoSaved, setVideoSaved] = useState(false);
+
+  useEffect(() => {
+    async function load() {
+      const { data } = await supabase.from('stock').select('*');
+      if (data) setProducts(mergeProducts(data));
+      const { data: vid } = await supabase.from('config').select('value').eq('key', 'video_id').single();
+      if (vid) setVideoId(vid.value);
+      setLoading(false);
+    }
+    load();
+  }, []);
 
   function login() {
     if (pw === ADMIN_PASSWORD) {
@@ -72,27 +82,22 @@ export default function AdminPage() {
     setProducts(prev => prev.map(p => p.id === id ? { ...p, stock: n } : p));
   }
 
-  function save() {
-    const overrides = {};
-    BASE_PRODUCTS.forEach(base => {
-      const current = products.find(p => p.id === base.id);
-      if (current.inStock !== base.inStock || current.stock !== (base.stock ?? 0)) {
-        overrides[base.id] = { inStock: current.inStock, stock: current.stock };
-      }
-    });
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides));
+  async function save() {
+    const rows = products.map(p => ({ id: p.id, in_stock: p.inStock, quantity: p.stock }));
+    await supabase.from('stock').upsert(rows, { onConflict: 'id' });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
 
-  function reset() {
-    localStorage.removeItem(STORAGE_KEY);
-    setProducts(mergeProducts({}));
+  async function reset() {
+    const rows = BASE_PRODUCTS.map(p => ({ id: p.id, in_stock: p.inStock, quantity: p.stock ?? 0 }));
+    await supabase.from('stock').upsert(rows, { onConflict: 'id' });
+    setProducts(mergeProducts(BASE_PRODUCTS.map(p => ({ id: p.id, in_stock: p.inStock, quantity: p.stock ?? 0 }))));
   }
 
-  function saveVideo() {
+  async function saveVideo() {
     const id = videoId.trim();
-    localStorage.setItem('cnc_video_id', id);
+    await supabase.from('config').upsert({ key: 'video_id', value: id }, { onConflict: 'key' });
     setVideoSaved(true);
     setTimeout(() => setVideoSaved(false), 2000);
   }
@@ -102,6 +107,8 @@ export default function AdminPage() {
     const match = input.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
     return match ? match[1] : input.trim();
   }
+
+  if (loading) return <div className="flex min-h-screen items-center justify-center bg-[#05010c] text-white/40 text-sm">Loading...</div>;
 
   if (!authed) {
     return (

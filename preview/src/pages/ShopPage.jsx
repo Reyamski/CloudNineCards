@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 import { X, Copy, Check, Camera, Loader2, Package, Globe, ShieldCheck, Paperclip } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import emailjs from '@emailjs/browser';
@@ -482,30 +483,21 @@ function BuyNowModal({ item, onClose }) {
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
-function applyStockOverrides(products) {
-  try {
-    const overrides = JSON.parse(localStorage.getItem('cnc_stock_overrides') || '{}');
-    return products.map(p => {
-      if (!overrides[p.id]) return p;
-      const o = overrides[p.id];
-      const inStock = o.inStock ?? p.inStock;
-      const stock = o.stock ?? p.stock;
-      return { ...p, inStock, stock, badge: inStock ? 'In Stock' : 'Sold Out' };
-    });
-  } catch { return products; }
-}
-
 export default function ShopPage() {
   const [activeTag, setActiveTag] = useState('All');
   const [selected, setSelected]   = useState(null);
-  const [products, setProducts]   = useState(() => applyStockOverrides(allProducts));
+  const [products, setProducts]   = useState(allProducts);
 
-  // Re-apply overrides when returning from admin page
-  useState(() => {
-    const onFocus = () => setProducts(applyStockOverrides(allProducts));
-    window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
-  });
+  useEffect(() => {
+    supabase.from('stock').select('*').then(({ data }) => {
+      if (!data?.length) return;
+      setProducts(allProducts.map(p => {
+        const row = data.find(r => r.id === p.id);
+        if (!row) return p;
+        return { ...p, inStock: row.in_stock, stock: row.quantity, badge: row.in_stock ? 'In Stock' : 'Sold Out' };
+      }));
+    });
+  }, []);
 
   const filtered = activeTag === 'All' ? products : products.filter(p => p.tag === activeTag);
 
