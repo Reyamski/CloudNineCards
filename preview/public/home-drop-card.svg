@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1200" role="img" aria-labelledby="title desc">
+  <title id="title">Cloud Nine Cards Drop Card</title>
+  <desc id="desc">Stylized trading card box art panel for homepage support imagery.</desc>
+  <defs>
+    <linearGradient id="panel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#14305d"/>
+      <stop offset="45%" stop-color="#27479b"/>
+      <stop offset="100%" stop-color="#111423"/>
+    </linearGradient>
+    <linearGradient id="flare" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#72f0ff"/>
+      <stop offset="100%" stop-color="#4f62ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="900" height="1200" rx="36" fill="url(#panel)"/>
+  <circle cx="320" cy="250" r="180" fill="#67e6ff" opacity="0.24"/>
+  <circle cx="700" cy="920" r="200" fill="#ff63da" opacity="0.18"/>
+  <rect x="70" y="70" width="210" height="56" rx="28" fill="#ffffff" opacity="0.95"/>
+  <text x="175" y="107" text-anchor="middle" fill="#1a2c53" font-family="Arial, sans-serif" font-size="34" font-weight="700">English Ver.</text>
+  <rect x="78" y="148" width="180" height="58" rx="18" fill="#1a2c53"/>
+  <text x="168" y="186" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="38" font-weight="800">OP-08</text>
+  <path d="M130 980c70-170 210-330 388-487 57 78 82 196 62 298-26 128-113 218-251 251-80 20-146 2-199-62z" fill="url(#flare)" opacity="0.92"/>
+  <path d="M552 393c112 40 190 118 221 243 30 119 11 238-65 347-81 116-197 170-349 163 179-83 282-224 309-425 16-119-18-229-116-328z" fill="#0b1326" opacity="0.72"/>
+  <circle cx="545" cy="392" r="92" fill="#1d2e59"/>
+  <circle cx="545" cy="392" r="56" fill="#d6efff"/>
+  <rect x="612" y="1030" width="170" height="88" rx="16" fill="#0d1224"/>
+  <text x="697" y="1084" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="44" font-weight="700">6+</text>
+  <text x="92" y="1120" fill="#f2f7ff" font-family="Arial, sans-serif" font-size="44" font-weight="800">CLOUD NINE CARDS</text>
+</svg>

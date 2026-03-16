@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Cloud Nine Cards Hero Backdrop</title>
+  <desc id="desc">Neon anime trading card inspired backdrop for the homepage.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#14041f"/>
+      <stop offset="45%" stop-color="#2f0f56"/>
+      <stop offset="100%" stop-color="#071a2f"/>
+    </linearGradient>
+    <linearGradient id="glowA" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#51ddff" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#ff62dc" stop-opacity="0.75"/>
+    </linearGradient>
+    <filter id="blur" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="32"/>
+    </filter>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <g opacity="0.28">
+    <circle cx="220" cy="180" r="170" fill="#4bdcff" filter="url(#blur)"/>
+    <circle cx="1320" cy="210" r="190" fill="#ff5cd6" filter="url(#blur)"/>
+    <circle cx="1140" cy="760" r="220" fill="#4d7cff" filter="url(#blur)"/>
+  </g>
+  <g stroke="rgba(255,255,255,0.12)" stroke-width="1" opacity="0.22">
+    <path d="M0 140h1600"/>
+    <path d="M0 280h1600"/>
+    <path d="M0 420h1600"/>
+    <path d="M0 560h1600"/>
+    <path d="M0 700h1600"/>
+    <path d="M240 0v900"/>
+    <path d="M480 0v900"/>
+    <path d="M720 0v900"/>
+    <path d="M960 0v900"/>
+    <path d="M1200 0v900"/>
+    <path d="M1440 0v900"/>
+  </g>
+  <g transform="translate(820 170)">
+    <rect x="0" y="0" width="290" height="430" rx="30" fill="rgba(13, 17, 37, 0.82)" stroke="url(#glowA)" stroke-width="3"/>
+    <rect x="28" y="24" width="110" height="28" rx="14" fill="#ff4b7a"/>
+    <text x="83" y="43" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="14" font-weight="700">NOW LIVE</text>
+    <text x="30" y="110" fill="#ffffff" font-family="Arial, sans-serif" font-size="52" font-weight="800">TWO</text>
+    <text x="30" y="168" fill="#ffffff" font-family="Arial, sans-serif" font-size="52" font-weight="800">LEGENDS</text>
+    <text x="30" y="218" fill="#ffe36e" font-family="Arial, sans-serif" font-size="34" font-weight="700">OP-08</text>
+    <text x="30" y="290" fill="#b8bfd7" font-family="Arial, sans-serif" font-size="18">Main-character energy with</text>
+    <text x="30" y="318" fill="#b8bfd7" font-family="Arial, sans-serif" font-size="18">stronger contrast and full</text>
+    <text x="30" y="346" fill="#b8bfd7" font-family="Arial, sans-serif" font-size="18">reveal-event drama.</text>
+  </g>
+  <g transform="translate(1145 135)">
+    <rect x="0" y="0" width="300" height="200" rx="28" fill="rgba(13, 24, 49, 0.84)" stroke="#5de2ff" stroke-opacity="0.45" stroke-width="3"/>
+    <rect x="24" y="24" width="88" height="26" rx="13" fill="#3d7cff"/>
+    <text x="68" y="41" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="13" font-weight="700">ARC 02</text>
+    <text x="24" y="102" fill="#f2f6ff" font-family="Arial, sans-serif" font-size="20" font-weight="700">ROYAL BLOOD OP-10</text>
+    <text x="24" y="136" fill="#9fb5df" font-family="Arial, sans-serif" font-size="17">SIDE QUEST CARD</text>
+  </g>
+  <g transform="translate(1100 390)">
+    <rect x="0" y="0" width="345" height="230" rx="28" fill="rgba(37, 30, 76, 0.86)" stroke="#9f86ff" stroke-opacity="0.35" stroke-width="3"/>
+    <rect x="24" y="24" width="140" height="26" rx="13" fill="#291a4e"/>
+    <text x="94" y="42" text-anchor="middle" fill="#ffe36e" font-family="Arial, sans-serif" font-size="13" font-weight="700">POWER-UP MODE</text>
+    <text x="24" y="102" fill="#ffffff" font-family="Arial, sans-serif" font-size="34" font-weight="800">NOW THIS FEELS</text>
+    <text x="24" y="142" fill="#ffffff" font-family="Arial, sans-serif" font-size="34" font-weight="800">LIKE A TRAILER.</text>
+    <text x="24" y="186" fill="#aeb1d7" font-family="Arial, sans-serif" font-size="16">Bigger headlines, punchier</text>
+    <text x="24" y="210" fill="#aeb1d7" font-family="Arial, sans-serif" font-size="16">shapes, and layered effects make</text>
+  </g>
+</svg>

@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 600" role="img" aria-labelledby="title desc">
+  <title id="title">One Piece OP-17 Teaser Banner</title>
+  <desc id="desc">Local teaser banner for the OP-17 preorder section.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a0930"/>
+      <stop offset="50%" stop-color="#411a71"/>
+      <stop offset="100%" stop-color="#122344"/>
+    </linearGradient>
+    <linearGradient id="strip" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#52ddff"/>
+      <stop offset="50%" stop-color="#a996ff"/>
+      <stop offset="100%" stop-color="#ff67d9"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="600" rx="40" fill="url(#bg)"/>
+  <circle cx="230" cy="190" r="160" fill="#51ddff" opacity="0.16"/>
+  <circle cx="1340" cy="170" r="190" fill="#ff67d9" opacity="0.18"/>
+  <rect x="86" y="88" width="290" height="62" rx="31" fill="#ffffff" opacity="0.96"/>
+  <text x="231" y="129" text-anchor="middle" fill="#1c1746" font-family="Arial, sans-serif" font-size="34" font-weight="800">ONE PIECE OP-17</text>
+  <text x="86" y="248" fill="#ffffff" font-family="Arial, sans-serif" font-size="116" font-weight="800">PRE-ORDERS</text>
+  <text x="86" y="350" fill="#ffffff" font-family="Arial, sans-serif" font-size="116" font-weight="800">OPENING SOON</text>
+  <rect x="88" y="410" width="540" height="12" rx="6" fill="url(#strip)"/>
+  <text x="88" y="476" fill="#bfc7eb" font-family="Arial, sans-serif" font-size="34">Local static banner for a more reliable storefront experience.</text>
+  <g transform="translate(1070 110)">
+    <rect x="0" y="0" width="360" height="380" rx="28" fill="rgba(6, 10, 24, 0.64)" stroke="#65e0ff" stroke-opacity="0.4" stroke-width="4"/>
+    <rect x="26" y="28" width="134" height="32" rx="16" fill="#10234d"/>
+    <text x="93" y="50" text-anchor="middle" fill="#66e0ff" font-family="Arial, sans-serif" font-size="16" font-weight="700">TEASER DROP</text>
+    <text x="32" y="144" fill="#ffffff" font-family="Arial, sans-serif" font-size="48" font-weight="800">SECURE YOUR</text>
+    <text x="32" y="198" fill="#ffffff" font-family="Arial, sans-serif" font-size="48" font-weight="800">SPOT EARLY.</text>
+    <text x="32" y="262" fill="#bcc5e9" font-family="Arial, sans-serif" font-size="24">30% DP via Wise</text>
+    <text x="32" y="296" fill="#bcc5e9" font-family="Arial, sans-serif" font-size="24">International shipping ready</text>
+  </g>
+</svg>

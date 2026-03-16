@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1200" role="img" aria-labelledby="title desc">
+  <title id="title">Cloud Nine Cards Feature Card</title>
+  <desc id="desc">Stylized gold and black feature box graphic for homepage support imagery.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#16111b"/>
+      <stop offset="55%" stop-color="#25253c"/>
+      <stop offset="100%" stop-color="#09070c"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff0a6"/>
+      <stop offset="45%" stop-color="#f6bf3d"/>
+      <stop offset="100%" stop-color="#8a5d13"/>
+    </linearGradient>
+  </defs>
+  <rect width="900" height="1200" rx="36" fill="url(#bg)"/>
+  <rect x="70" y="72" width="255" height="76" rx="18" fill="#0a0b10" stroke="url(#gold)" stroke-width="4"/>
+  <text x="198" y="121" text-anchor="middle" fill="#f8e39a" font-family="Arial, sans-serif" font-size="38" font-weight="800">ROYAL BLOOD</text>
+  <text x="450" y="290" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="160" font-weight="800" opacity="0.1">OP-10</text>
+  <path d="M184 338h500l84 689H100z" fill="url(#gold)" opacity="0.94"/>
+  <path d="M237 422c164-130 297-129 426-14-35 43-53 100-53 171 0 96 32 192 91 287-79 32-142 79-189 143-63-84-126-149-221-214 71-76 106-168 106-276 0-38-5-71-16-97-53 24-101 27-144 0z" fill="#0b0b11" opacity="0.87"/>
+  <path d="M473 500c56 72 85 135 85 190 0 70-36 134-108 191-16-74-45-141-86-201 44-74 81-135 109-180z" fill="#182034"/>
+  <text x="452" y="1114" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="66" font-weight="800">SIDE QUEST CARD</text>
+</svg>
