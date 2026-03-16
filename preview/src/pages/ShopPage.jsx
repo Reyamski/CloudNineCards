@@ -356,8 +356,7 @@ function BuyNowModal({ item, onClose }) {
                 <select
                   value={country}
                   onChange={e => { setCountry(e.target.value); setProvince(''); }}
-                  className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none focus:border-cyan-300/40 appearance-none"
-                  style={{ colorScheme: 'dark' }}
+                  className="w-full rounded-2xl border border-white/10 bg-white px-4 py-3 text-sm text-black outline-none focus:border-cyan-300/40 appearance-none"
                 >
                   <option value="" disabled>Select destination…</option>
                   <option value="Canada">🇨🇦 Canada</option>
@@ -371,8 +370,7 @@ function BuyNowModal({ item, onClose }) {
                   <select
                     value={province}
                     onChange={e => setProvince(e.target.value)}
-                    className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none focus:border-cyan-300/40 appearance-none"
-                    style={{ colorScheme: 'dark' }}
+                    className="mt-2 w-full rounded-2xl border border-white/10 bg-white px-4 py-3 text-sm text-black outline-none focus:border-cyan-300/40 appearance-none"
                   >
                     <option value="" disabled>Select province / territory…</option>
                     {Object.keys(PROVINCE_TAX).map(p => (
