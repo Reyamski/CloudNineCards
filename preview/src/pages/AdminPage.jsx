@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ShieldCheck, Save, RotateCcw, Eye, EyeOff, Youtube } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabase, supabaseEnabled } from '../lib/supabase';
 
 const ADMIN_PASSWORD = 'REDACTED_ADMIN_PASS';
 const DEFAULT_VIDEO_ID = 'OcLL44cDh7k';
@@ -51,13 +51,35 @@ export default function AdminPage() {
   const [saved, setSaved]       = useState(false);
   const [videoId, setVideoId]   = useState(DEFAULT_VIDEO_ID);
   const [videoSaved, setVideoSaved] = useState(false);
+  const [dbError, setDbError]   = useState('');
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase.from('stock').select('*');
-      if (data) setProducts(mergeProducts(data));
-      const { data: vid } = await supabase.from('config').select('value').eq('key', 'video_id').single();
-      if (vid) setVideoId(vid.value);
+      if (!supabaseEnabled || !supabase) {
+        setDbError('Supabase is not configured for this deployment yet.');
+        setLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabase.from('stock').select('*');
+      if (error) {
+        setDbError(`Stock load failed: ${error.message}`);
+      } else if (data) {
+        setProducts(mergeProducts(data));
+      }
+
+      const { data: vid, error: videoError } = await supabase
+        .from('config')
+        .select('value')
+        .eq('key', 'video_id')
+        .single();
+
+      if (videoError && videoError.code !== 'PGRST116') {
+        setDbError((prev) => prev || `Config load failed: ${videoError.message}`);
+      } else if (vid) {
+        setVideoId(vid.value);
+      }
+
       setLoading(false);
     }
     load();
@@ -83,21 +105,48 @@ export default function AdminPage() {
   }
 
   async function save() {
+    if (!supabaseEnabled || !supabase) {
+      setDbError('Supabase is not configured for this deployment yet.');
+      return;
+    }
     const rows = products.map(p => ({ id: p.id, in_stock: p.inStock, quantity: p.stock }));
-    await supabase.from('stock').upsert(rows, { onConflict: 'id' });
+    const { error } = await supabase.from('stock').upsert(rows, { onConflict: 'id' });
+    if (error) {
+      setDbError(`Save failed: ${error.message}`);
+      return;
+    }
+    setDbError('');
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
 
   async function reset() {
+    if (!supabaseEnabled || !supabase) {
+      setDbError('Supabase is not configured for this deployment yet.');
+      return;
+    }
     const rows = BASE_PRODUCTS.map(p => ({ id: p.id, in_stock: p.inStock, quantity: p.stock ?? 0 }));
-    await supabase.from('stock').upsert(rows, { onConflict: 'id' });
+    const { error } = await supabase.from('stock').upsert(rows, { onConflict: 'id' });
+    if (error) {
+      setDbError(`Reset failed: ${error.message}`);
+      return;
+    }
+    setDbError('');
     setProducts(mergeProducts(BASE_PRODUCTS.map(p => ({ id: p.id, in_stock: p.inStock, quantity: p.stock ?? 0 }))));
   }
 
   async function saveVideo() {
+    if (!supabaseEnabled || !supabase) {
+      setDbError('Supabase is not configured for this deployment yet.');
+      return;
+    }
     const id = videoId.trim();
-    await supabase.from('config').upsert({ key: 'video_id', value: id }, { onConflict: 'key' });
+    const { error } = await supabase.from('config').upsert({ key: 'video_id', value: id }, { onConflict: 'key' });
+    if (error) {
+      setDbError(`Video save failed: ${error.message}`);
+      return;
+    }
+    setDbError('');
     setVideoSaved(true);
     setTimeout(() => setVideoSaved(false), 2000);
   }
@@ -165,6 +214,12 @@ export default function AdminPage() {
             </button>
           </div>
         </div>
+
+        {dbError && (
+          <div className="mb-6 rounded-2xl border border-red-400/25 bg-red-400/10 px-4 py-3 text-sm text-red-200">
+            {dbError}
+          </div>
+        )}
 
         {/* In Stock */}
         <div className="mb-8">
@@ -256,7 +311,7 @@ export default function AdminPage() {
           </div>
         </div>
 
-        <p className="mt-8 text-center text-xs text-white/25">Changes apply immediately to the preview. For the live site, update via Claude.</p>
+        <p className="mt-8 text-center text-xs text-white/25">Changes apply to the live shop only when this deployment can read and write Supabase successfully.</p>
       </div>
     </div>
   );

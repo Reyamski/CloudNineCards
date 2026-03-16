@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { supabase, supabaseEnabled } from '../lib/supabase';
 import { X, Copy, Check, Camera, Loader2, Package, Globe, ShieldCheck, Paperclip } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import emailjs from '@emailjs/browser';
@@ -487,10 +487,24 @@ export default function ShopPage() {
   const [activeTag, setActiveTag] = useState('All');
   const [selected, setSelected]   = useState(null);
   const [products, setProducts]   = useState(allProducts);
+  const [stockSyncError, setStockSyncError] = useState('');
 
   useEffect(() => {
-    supabase.from('stock').select('*').then(({ data }) => {
-      if (!data?.length) return;
+    if (!supabaseEnabled || !supabase) {
+      setStockSyncError('Live stock sync is not configured for this deployment yet.');
+      return;
+    }
+
+    supabase.from('stock').select('*').then(({ data, error }) => {
+      if (error) {
+        setStockSyncError(`Live stock sync failed: ${error.message}`);
+        return;
+      }
+      if (!data?.length) {
+        setStockSyncError('No live stock rows found yet. Using default catalog values.');
+        return;
+      }
+      setStockSyncError('');
       setProducts(allProducts.map(p => {
         const row = data.find(r => r.id === p.id);
         if (!row) return p;
@@ -519,6 +533,12 @@ export default function ShopPage() {
       </section>
 
       <section className="mx-auto max-w-7xl px-6 py-8">
+        {stockSyncError && (
+          <div className="mb-6 rounded-2xl border border-yellow-400/20 bg-yellow-400/10 px-4 py-3 text-sm text-yellow-100">
+            {stockSyncError}
+          </div>
+        )}
+
         <div className="mb-8 flex flex-wrap gap-3">
           {tags.map((tag) => (
             <button key={tag} onClick={() => setActiveTag(tag)}
