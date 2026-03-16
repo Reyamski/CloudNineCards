@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1120" viewBox="0 0 800 1120" fill="none">
+  <rect width="800" height="1120" fill="#080311"/>
+  <rect x="28" y="28" width="744" height="1064" rx="36" fill="url(#bg)" stroke="rgba(255,255,255,0.12)"/>
+  <circle cx="654" cy="146" r="170" fill="#31d7ff" fill-opacity="0.12"/>
+  <circle cx="125" cy="1010" r="210" fill="#ff4fd8" fill-opacity="0.12"/>
+  <rect x="84" y="148" width="632" height="420" rx="28" fill="#0f1726" stroke="rgba(255,255,255,0.08)"/>
+  <path d="M310 397L387 320C396 311 411 311 420 320L462 362C471 371 486 371 495 362L562 295C575 282 598 291 598 309V494C598 510 585 523 569 523H231C215 523 202 510 202 494V419C202 403 215 390 231 390H294C300 390 306 392 310 397Z" fill="#1c2940"/>
+  <circle cx="296" cy="284" r="46" fill="#243652"/>
+  <text x="84" y="690" fill="#7EE7FF" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700" letter-spacing="6">CLOUD NINE CARDS</text>
+  <text x="84" y="758" fill="white" font-family="Arial, Helvetica, sans-serif" font-size="68" font-weight="800">Image Unavailable</text>
+  <text x="84" y="814" fill="#B8C0D3" font-family="Arial, Helvetica, sans-serif" font-size="30">The product card is still valid.</text>
+  <text x="84" y="858" fill="#B8C0D3" font-family="Arial, Helvetica, sans-serif" font-size="30">Some devices or networks block the remote photo host.</text>
+  <defs>
+    <linearGradient id="bg" x1="58" y1="64" x2="740" y2="1068" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#170722"/>
+      <stop offset="1" stop-color="#0B1022"/>
+    </linearGradient>
+  </defs>
+</svg>

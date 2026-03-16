@@ -91,7 +91,7 @@ export default function NewArrivalsPage() {
             >
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-yellow-300 via-cyan-300 to-fuchsia-400" />
               <div className="relative overflow-hidden">
-                <img src={item.image} alt={item.title} className="h-[240px] w-full object-cover saturate-[1.35] transition duration-500 group-hover:scale-105" />
+                <img src={item.image} alt={item.title} onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/product-fallback.svg'; }} className="h-[240px] w-full object-cover saturate-[1.35] transition duration-500 group-hover:scale-105" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                 <div className="absolute left-4 top-4 rounded-full border border-yellow-300/25 bg-black/70 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-yellow-200 backdrop-blur">
                   {item.badge}
