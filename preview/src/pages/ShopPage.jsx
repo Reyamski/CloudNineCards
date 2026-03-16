@@ -1,0 +1,586 @@
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { X, Copy, Check, Camera, Loader2, Package, Globe, ShieldCheck, Paperclip } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import emailjs from '@emailjs/browser';
+import Nav from '../components/Nav';
+
+// ── EmailJS — reuse same service, separate template for on-hand orders ───────
+const EMAILJS_SERVICE_ID   = 'service_495o229';
+const EMAILJS_TEMPLATE_ID  = 'template_3ickzxu';
+const EMAILJS_PUBLIC_KEY  = 'REDACTED_EMAILJS_PUBLIC';
+const EMAILJS_PRIVATE_KEY = 'REDACTED_EMAILJS_PRIVATE';
+
+// ── imgbb — free image hosting so payment proof renders in email ──────────────
+// Get free API key at: https://api.imgbb.com
+const IMGBB_API_KEY = 'REDACTED_IMGBB_KEY';
+
+async function uploadProofImage(base64DataUrl) {
+  const base64 = base64DataUrl.split(',')[1];
+  const body = new FormData();
+  body.append('image', base64);
+  const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method: 'POST', body });
+  const json = await res.json();
+  if (!json.success) throw new Error('imgbb upload failed');
+  return json.data.url;
+}
+
+const WISE_HANDLE    = '@cloudninecards';
+const CONTACT_EMAIL  = 'papspective@gmail.com';
+
+// ── Products ─────────────────────────────────────────────────────────────────
+const allProducts = [
+  // ── IN STOCK ────────────────────────────────────────────────────────────────
+  {id: 'op15jp',   title: "One Piece Card Game Adventure on Kami's Island OP-15 Booster Box", subtitle: 'Japanese', price: 129.00, badge: 'In Stock', inStock: true,  stock: 12, image: 'https://i.ibb.co/4R6DL8Vt/8cc175339fbf.webp', tag: 'One Piece'},
+  {id: 'eb03jp',   title: 'One Piece Card Game Extra Booster Heroines Edition EB-03',           subtitle: 'Japanese', price: 259.00, badge: 'In Stock', inStock: true,  stock: 7,  image: 'https://i.ibb.co/cS1CLgXf/259dbef5f466.webp', tag: 'One Piece'},
+  {id: 'ac1',      title: 'One Piece Card Game Admirable Collection Vol.1 Vinsmoke Reiju AC-01', subtitle: 'Japanese', price: 279.00, badge: 'In Stock', inStock: true,  stock: 5,  image: 'https://i.ibb.co/ZzmyRcFX/aac4c203bf03.webp', tag: 'One Piece'},
+  {id: 'poke-ah',  title: 'Pokemon TCG Mega Evolution Ascended Heroes Elite Trainer Box',        subtitle: 'English',  price: 279.00, badge: 'In Stock', inStock: true,  stock: 10, image: 'https://i.ibb.co/5WbMqZTR/41faa72453fe.jpg',  tag: 'Pokemon'},
+  // ── SOLD OUT ────────────────────────────────────────────────────────────────
+  {id: 'op01eng',  title: 'One Piece Card Game Romance Dawn OP-01 Booster Box',                 subtitle: 'English',  price: 850.00, badge: 'Sold Out', inStock: false, image: 'https://i.ibb.co/KjvKb3Vv/28e46fc98ddd.jpg',  tag: 'One Piece'},
+  {id: 'op02eng',  title: 'One Piece Card Game Paramount War OP-02 Booster Box',                subtitle: 'English',  price: 280.00, badge: 'Sold Out', inStock: false, image: 'https://i.ibb.co/KpXHTFdw/41e98c6cdef5.webp', tag: 'One Piece'},
+  {id: 'op03eng',  title: 'One Piece Card Game Pillars of Strength OP-03 Booster Box',          subtitle: 'English',  price: 240.00, badge: 'Sold Out', inStock: false, image: 'https://i.ibb.co/LXq6C0Lm/aea2dc1404bb.jpg',  tag: 'One Piece'},
+  {id: 'op04eng',  title: 'One Piece Card Game Kingdoms of Intrigue OP-04 Booster Box',         subtitle: 'English',  price: 190.00, badge: 'Sold Out', inStock: false, image: 'https://i.ibb.co/Lhb11tSC/a403f77df496.jpg',  tag: 'One Piece'},
+  {id: 'op05eng',  title: 'One Piece Card Game Awakening of the New Era OP-05 Booster Box',     subtitle: 'English',  price: 650.00, badge: 'Sold Out', inStock: false, image: 'https://i.ibb.co/GQvCdfp6/c9dc9e2d68a2.webp', tag: 'One Piece'},
+  {id: 'op06eng',  title: 'One Piece Card Game Wings of the Captain OP-06 Booster Box',         subtitle: 'English',  price: 210.00, badge: 'Sold Out', inStock: false, image: 'https://i.ibb.co/7dG2qR3T/44485c447433.webp', tag: 'One Piece'},
+  {id: 'op07eng',  title: 'One Piece Card Game 500 Years in the Future OP-07 Booster Box',      subtitle: 'English',  price: 180.00, badge: 'Sold Out', inStock: false, image: 'https://i.ibb.co/wZJ5LnbW/afee0c241bd8.webp', tag: 'One Piece'},
+  {id: 'op08eng',  title: 'One Piece Card Game Two Legends OP-08 Booster Box',                  subtitle: 'English',  price: 150.00, badge: 'Sold Out', inStock: false, image: 'https://i.ibb.co/WpgmFXMS/98764cd9d974.jpg',  tag: 'One Piece'},
+  {id: 'op09eng',  title: 'One Piece Card Game Emperors in the New World OP-09 Booster Box',    subtitle: 'English',  price: 150.00, badge: 'Sold Out', inStock: false, image: 'https://i.ibb.co/KzxPHrXd/93fa23eebfe9.avif', tag: 'One Piece'},
+  {id: 'op10eng',  title: 'One Piece Card Game Royal Blood OP-10 Booster Box',                  subtitle: 'English',  price: 140.00, badge: 'Sold Out', inStock: false, image: 'https://i.ibb.co/tTGLk1Hk/30cfe42bbb8e.webp', tag: 'One Piece'},
+  {id: 'op11eng',  title: 'One Piece Card Game A Fist of Divine Speed OP-11 Booster Box',       subtitle: 'English',  price: 140.00, badge: 'Sold Out', inStock: false, image: 'https://i.ibb.co/BVgRgKMv/64df998b3578.jpg',  tag: 'One Piece'},
+  {id: 'op12eng',  title: 'One Piece Card Game Legacy of the Master OP-12 Booster Box',         subtitle: 'English',  price: 135.00, badge: 'Sold Out', inStock: false, image: 'https://i.ibb.co/KcQ3VB8s/ba4a3a57ef4b.webp', tag: 'One Piece'},
+  {id: 'op13eng',  title: 'One Piece Card Game Carrying on His Will OP-13 Booster Box',         subtitle: 'English',  price: 135.00, badge: 'Sold Out', inStock: false, image: 'https://i.ibb.co/1xvX6R8/c04d97987fe7.webp',  tag: 'One Piece'},
+  {id: 'op14eng',  title: "One Piece Card Game The Azure Sea's Seven OP-14 Booster Box",        subtitle: 'English',  price: 130.00, badge: 'Sold Out', inStock: false, image: 'https://i.ibb.co/q3Y2y816/e1d736d3aa3f.webp', tag: 'One Piece'},
+  {id: 'eb01eng',  title: 'One Piece Card Game Extra Booster Memorial Collection EB-01',         subtitle: 'English',  price: 140.00, badge: 'Sold Out', inStock: false, image: 'https://placehold.co/400x560/0d0020/555555?text=Photo+Soon', tag: 'One Piece'},
+  {id: 'eb02eng',  title: 'One Piece Card Game Extra Booster Anime 25th Collection EB-02',       subtitle: 'English',  price: 300.00, badge: 'Sold Out', inStock: false, image: 'https://placehold.co/400x560/0d0020/555555?text=Photo+Soon', tag: 'One Piece'},
+  {id: 'prb01eng', title: 'One Piece Card Game Premium Best Collection PRB-01',                  subtitle: 'English',  price: 200.00, badge: 'Sold Out', inStock: false, image: 'https://placehold.co/400x560/0d0020/555555?text=Photo+Soon', tag: 'One Piece'},
+  {id: 'prb02eng', title: 'One Piece Card Game Premium Best Collection Vol.2 PRB-02',            subtitle: 'English',  price: 250.00, badge: 'Sold Out', inStock: false, image: 'https://placehold.co/400x560/0d0020/555555?text=Photo+Soon', tag: 'One Piece'},
+];
+
+const tags = ['All', 'One Piece', 'Dragon Ball', 'Pokemon', 'Pre-orders'];
+
+// ── Province tax rates (Canada) ───────────────────────────────────────────────
+const PROVINCE_TAX = {
+  'Alberta':                  { rate: 0.05,    label: 'GST'       },
+  'British Columbia':         { rate: 0.12,    label: 'GST + PST' },
+  'Manitoba':                 { rate: 0.12,    label: 'GST + PST' },
+  'New Brunswick':            { rate: 0.15,    label: 'HST'       },
+  'Newfoundland & Labrador':  { rate: 0.15,    label: 'HST'       },
+  'Nova Scotia':              { rate: 0.15,    label: 'HST'       },
+  'Ontario':                  { rate: 0.13,    label: 'HST'       },
+  'Prince Edward Island':     { rate: 0.15,    label: 'HST'       },
+  'Quebec':                   { rate: 0.14975, label: 'GST + QST' },
+  'Saskatchewan':             { rate: 0.11,    label: 'GST + PST' },
+  'Northwest Territories':    { rate: 0.05,    label: 'GST'       },
+  'Nunavut':                  { rate: 0.05,    label: 'GST'       },
+  'Yukon':                    { rate: 0.05,    label: 'GST'       },
+};
+
+// ── Canada-origin shipping rates (CAD) ───────────────────────────────────────
+// Ships from Vancouver, BC via Canada Post / DHL
+// On-hand items ship from Canadian stock
+
+const WEIGHT_PER_BOX = 1.91; // kg — DHL volumetric weight: 29×22×15cm ÷ 5000
+
+const CANADA_SHIP_RATES = [
+  { maxKg:  2.0, domestic: 15,  usa: 35,  asia: 65,  europe: 70,  other: 75  },
+  { maxKg:  4.0, domestic: 22,  usa: 50,  asia: 85,  europe: 90,  other: 100 },
+  { maxKg:  6.0, domestic: 30,  usa: 65,  asia: 105, europe: 115, other: 125 },
+  { maxKg:  8.0, domestic: 38,  usa: 80,  asia: 125, europe: 135, other: 150 },
+  { maxKg: 10.0, domestic: 45,  usa: 95,  asia: 145, europe: 155, other: 175 },
+  { maxKg: 15.0, domestic: 55,  usa: 115, asia: 175, europe: 190, other: 210 },
+  { maxKg: 20.0, domestic: 65,  usa: 135, asia: 205, europe: 220, other: 245 },
+];
+
+const COUNTRY_ZONE = {
+  'Canada':                         'domestic',
+  'United States':                  'usa',
+  'Japan / Korea / HK / Singapore': 'asia',
+  'Australia / NZ / SE Asia':       'asia',
+  'Europe / Middle East':           'europe',
+  'Other International':            'other',
+};
+
+function calcDeliveryFee(country, qty) {
+  if (!country) return 0;
+  const totalWeight = qty * WEIGHT_PER_BOX;
+  const zone = COUNTRY_ZONE[country] || 'other';
+  const tier = CANADA_SHIP_RATES.find(t => totalWeight <= t.maxKg) ?? CANADA_SHIP_RATES[CANADA_SHIP_RATES.length - 1];
+  return Math.ceil(tier[zone] * 1.10); // +10% buffer, rounded up
+}
+
+// ── Buy Now Modal ─────────────────────────────────────────────────────────────
+function BuyNowModal({ item, onClose }) {
+  const [step, setStep]           = useState(1);
+  const [qty, setQty]             = useState(1);
+  const [country, setCountry]     = useState('');
+  const [province, setProvince]   = useState('');
+  const [name, setName]           = useState('');
+  const [email, setEmail]         = useState('');
+  const [phone, setPhone]         = useState('');
+  const [address, setAddress]     = useState('');
+  const [copied, setCopied]       = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [sending, setSending]     = useState(false);
+  const [sendError, setSendError] = useState('');
+  const [paymentFile, setPaymentFile] = useState(null);
+  const [paymentB64, setPaymentB64]   = useState('');
+  const [orderNumber] = useState(() => {
+    const n = parseInt(localStorage.getItem('cnc_order_counter') || '0', 10) + 1;
+    return `CNC-${String(n).padStart(6, '0')}`;
+  });
+
+  function handleFileChange(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { setSendError('Screenshot must be under 2MB.'); return; }
+    setPaymentFile(file);
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX = 300;
+        const ratio = Math.min(MAX / img.width, MAX / img.height, 1);
+        canvas.width  = Math.round(img.width  * ratio);
+        canvas.height = Math.round(img.height * ratio);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        // Reduce quality until base64 fits under EmailJS 50KB variable limit
+        let quality = 0.5;
+        let dataUrl = canvas.toDataURL('image/jpeg', quality);
+        while (dataUrl.length > 36000 && quality > 0.1) {
+          quality -= 0.1;
+          dataUrl = canvas.toDataURL('image/jpeg', quality);
+        }
+        setPaymentB64(dataUrl);
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  const subtotal      = item.price * qty;
+  const freeShipping  = country === 'Canada' && subtotal >= 300;
+  const deliveryFee   = freeShipping ? 0 : calcDeliveryFee(country, qty);
+  const taxRate     = country === 'Canada' && province ? (PROVINCE_TAX[province]?.rate ?? 0) : 0;
+  const taxLabel    = country === 'Canada' && province ? (PROVINCE_TAX[province]?.label ?? '') : '';
+  const taxAmount   = subtotal * taxRate;
+  const grandTotal  = subtotal + taxAmount + deliveryFee;
+  const total       = grandTotal.toFixed(2);
+
+  function copyWise() {
+    navigator.clipboard.writeText(WISE_HANDLE);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setSending(true);
+    setSendError('');
+    try {
+      let proofHtml = 'Not provided';
+      if (paymentB64) {
+        try {
+          const imgUrl = await uploadProofImage(paymentB64);
+          proofHtml = `<img src="${imgUrl}" style="max-width:320px;border-radius:8px;">`;
+        } catch {
+          proofHtml = '(Screenshot could not be uploaded — buyer will email separately)';
+        }
+      }
+      await emailjs.send(
+        EMAILJS_SERVICE_ID,
+        EMAILJS_TEMPLATE_ID,
+        {
+          order_number:      orderNumber,
+          buyer_name:        name,
+          buyer_email:       email,
+          buyer_phone:       phone,
+          buyer_address:     address,
+          item_title:        item.title,
+          item_variant:      item.subtitle,
+          quantity:          qty,
+          subtotal:          `CAD $${subtotal.toFixed(2)}`,
+          tax_amount:        taxAmount > 0 ? `CAD $${taxAmount.toFixed(2)} (${taxLabel})` : 'N/A',
+          delivery_fee:      freeShipping ? 'FREE (Canada $300+)' : `CAD $${deliveryFee.toFixed(2)} (Canada Post / DHL)`,
+          delivery_country:  country,
+          delivery_province: province || 'N/A',
+          total_price:       `CAD $${total}`,
+          payment_proof:     proofHtml,
+          wise_handle:       WISE_HANDLE,
+          to_email:          CONTACT_EMAIL,
+        },
+        { publicKey: EMAILJS_PUBLIC_KEY, privateKey: EMAILJS_PRIVATE_KEY }
+      );
+      const next = parseInt(localStorage.getItem('cnc_order_counter') || '0', 10) + 1;
+      localStorage.setItem('cnc_order_counter', String(next));
+      setSubmitted(true);
+      try {
+        await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID,
+          { order_number: orderNumber, buyer_name: name, buyer_email: email, buyer_phone: phone, buyer_address: address, item_title: item.title, item_variant: item.subtitle, quantity: qty, subtotal: `CAD $${subtotal.toFixed(2)}`, tax_amount: taxAmount > 0 ? `CAD $${taxAmount.toFixed(2)} (${taxLabel})` : 'N/A', delivery_fee: freeShipping ? 'FREE (Canada $300+)' : `CAD $${deliveryFee.toFixed(2)} (Canada Post / DHL)`, delivery_country: country, delivery_province: province || 'N/A', total_price: `CAD $${total}`, payment_proof: proofHtml, wise_handle: WISE_HANDLE, to_email: email },
+          { publicKey: EMAILJS_PUBLIC_KEY, privateKey: EMAILJS_PRIVATE_KEY }
+        );
+      } catch (buyerErr) { console.warn('Buyer copy failed:', buyerErr); }
+    } catch {
+      setSendError('Failed to send. Email us directly at ' + CONTACT_EMAIL);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center px-4 pb-4 sm:pb-0">
+      <motion.div
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+      />
+      <motion.div
+        initial={{ opacity: 0, y: 40, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 40, scale: 0.97 }}
+        transition={{ duration: 0.28 }}
+        className="relative w-full max-w-md rounded-[32px] border border-cyan-400/20 bg-[#07030f] overflow-hidden max-h-[90vh] overflow-y-auto"
+      >
+        <div className="h-1 w-full bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400" />
+        <div className="p-6">
+          <button onClick={onClose} className="absolute right-5 top-5 rounded-xl border border-white/10 bg-white/5 p-1.5 hover:bg-white/10">
+            <X className="h-4 w-4 text-white/60" />
+          </button>
+
+          {submitted ? (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center gap-4 py-8 text-center">
+              <div className="rounded-full border border-cyan-300/30 bg-cyan-300/10 p-5">
+                <Check className="h-10 w-10 text-cyan-300" />
+              </div>
+              <div className="text-2xl font-black uppercase">Order Sent!</div>
+              <div className="rounded-xl border border-cyan-300/30 bg-cyan-300/8 px-5 py-2 text-center">
+                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300/60 mb-0.5">Order Number</div>
+                <div className="text-lg font-black text-cyan-200 tracking-widest">{orderNumber}</div>
+              </div>
+              <p className="max-w-xs text-sm text-white/60 leading-6">
+                We'll verify your Wise payment and confirm to <span className="text-cyan-300">{email}</span> within 24h.
+              </p>
+              <div className="w-full rounded-2xl border border-white/10 bg-white/5 p-4 text-left text-sm text-white/60 space-y-1">
+                <div><span className="text-white/35">Order #:</span> <span className="text-white/80 font-bold">{orderNumber}</span></div>
+                <div><span className="text-white/35">Item:</span> {item.title}</div>
+                <div><span className="text-white/35">Qty:</span> {qty}</div>
+                {taxAmount > 0 && <div><span className="text-white/35">Tax:</span> CAD ${taxAmount.toFixed(2)}</div>}
+                <div><span className="text-white/35">Delivery:</span> CAD ${deliveryFee.toFixed(2)}</div>
+                <div><span className="text-white/35">Total paid via Wise:</span> <span className="text-cyan-300 font-bold">CAD ${total}</span></div>
+              </div>
+              <button onClick={onClose} className="rounded-2xl border border-white/10 bg-white/5 px-6 py-2.5 text-sm font-black uppercase text-white/65 hover:bg-white/10">Done</button>
+            </motion.div>
+
+          ) : step === 1 ? (
+            <>
+              <div className="mb-4">
+                <div className="text-xs font-black uppercase tracking-[0.2em] text-cyan-300/70 mb-1">Buy Now — On Hand</div>
+                <div className="text-xl font-black leading-snug">{item.title}</div>
+                <div className="mt-1 text-sm text-white/45">{item.subtitle}</div>
+              </div>
+
+              {/* Qty */}
+              <div className="mb-4">
+                <div className="text-xs font-black uppercase tracking-[0.14em] text-white/40 mb-2">Quantity</div>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => setQty(q => Math.max(1, q - 1))} className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-lg font-black hover:bg-white/10">−</button>
+                  <span className="text-2xl font-black w-8 text-center">{qty}</span>
+                  <button onClick={() => setQty(q => Math.min(item.stock, q + 1))} className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-lg font-black hover:bg-white/10">+</button>
+                </div>
+              </div>
+
+              {/* Country / Province */}
+              <div className="mb-4">
+                <div className="text-xs font-black uppercase tracking-[0.14em] text-white/40 mb-2">Shipping Destination</div>
+                <select
+                  value={country}
+                  onChange={e => { setCountry(e.target.value); setProvince(''); }}
+                  className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none focus:border-cyan-300/40 appearance-none"
+                >
+                  <option value="" disabled>Select destination…</option>
+                  <option value="Canada">🇨🇦 Canada</option>
+                  <option value="United States">🇺🇸 United States</option>
+                  <option value="Japan / Korea / HK / Singapore">🇯🇵 Japan / Korea / HK / Singapore</option>
+                  <option value="Australia / NZ / SE Asia">🇦🇺 Australia / NZ / SE Asia</option>
+                  <option value="Europe / Middle East">🌍 Europe / Middle East</option>
+                  <option value="Other International">🌏 Other International</option>
+                </select>
+                {country === 'Canada' && (
+                  <select
+                    value={province}
+                    onChange={e => setProvince(e.target.value)}
+                    className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none focus:border-cyan-300/40 appearance-none"
+                  >
+                    <option value="" disabled>Select province / territory…</option>
+                    {Object.keys(PROVINCE_TAX).map(p => (
+                      <option key={p} value={p}>{p} — {PROVINCE_TAX[p].label}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* Price Breakdown */}
+              <div className="mb-4 rounded-2xl border border-cyan-300/20 bg-cyan-300/6 p-4 space-y-1.5">
+                <div className="text-xs font-black uppercase tracking-[0.16em] text-cyan-300/60 mb-2">Price Breakdown</div>
+                <div className="flex justify-between text-sm text-white/70">
+                  <span>Subtotal ({qty}×)</span>
+                  <span>CAD ${subtotal.toFixed(2)}</span>
+                </div>
+                {country === 'Canada' && province && (
+                  <div className="flex justify-between text-sm text-white/70">
+                    <span>Tax ({taxLabel} — {province})</span>
+                    <span>CAD ${taxAmount.toFixed(2)}</span>
+                  </div>
+                )}
+                {country && (
+                  <div className="flex justify-between text-sm text-white/70">
+                    <span>Delivery — {freeShipping ? 'FREE Shipping 🎉' : `Canada Post / DHL (${(qty * WEIGHT_PER_BOX).toFixed(2)}kg)`}</span>
+                    <span className={freeShipping ? 'text-green-400 font-bold' : ''}>{freeShipping ? 'CAD $0.00' : `CAD $${deliveryFee.toFixed(2)}`}</span>
+                  </div>
+                )}
+                {freeShipping && (
+                  <div className="text-xs text-green-400 font-black text-center py-1">FREE SHIPPING on Canadian orders over CAD $300</div>
+                )}
+                <div className="border-t border-cyan-300/20 pt-2 flex justify-between">
+                  <span className="font-black text-sm">Total — send via Wise</span>
+                  <span className="text-2xl font-black text-cyan-200">CAD ${country ? total : '—'}</span>
+                </div>
+                {!country && <div className="text-xs text-white/35 text-center">Select destination to see total</div>}
+              </div>
+
+              {/* Wise handle */}
+              <div className="mb-4">
+                <div className="text-xs font-black uppercase tracking-[0.14em] text-white/40 mb-2">Send to</div>
+                <div className="flex items-center gap-3 rounded-2xl border border-cyan-300/20 bg-cyan-300/8 p-4">
+                  <div className="flex-1">
+                    <div className="text-2xl font-black text-cyan-200">{WISE_HANDLE}</div>
+                    <div className="text-xs text-white/35 mt-0.5">Cloud Nine Cards — Wise</div>
+                  </div>
+                  <button onClick={copyWise} className="rounded-xl border border-white/10 bg-white/5 p-2.5 hover:bg-white/10">
+                    {copied ? <Check className="h-4 w-4 text-cyan-300" /> : <Copy className="h-4 w-4 text-white/50" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Steps */}
+              <div className="mb-4 space-y-2">
+                {[
+                  { n: '1', text: country ? `Send CAD $${total} to ${WISE_HANDLE} via Wise.` : `Select your destination above, then send the total via Wise.` },
+                  { n: '2', text: 'Include your name + item in the Wise reference/note.' },
+                  { n: '3', text: 'Take a screenshot of the completed payment.' },
+                  { n: '4', text: `Fill in the next step — we'll confirm within 24h.` },
+                ].map(({ n, text }) => (
+                  <div key={n} className="flex gap-3 items-start rounded-xl border border-white/8 bg-white/4 p-3">
+                    <div className="h-5 w-5 rounded-full bg-cyan-500/50 text-xs font-black flex items-center justify-center shrink-0 mt-0.5">{n}</div>
+                    <p className="text-xs text-white/60 leading-5">{text}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Terms */}
+              <div className="mb-5 space-y-2">
+                {[
+                  { icon: Globe,       text: 'International shipping & customs taxes are covered by the buyer.' },
+                  { icon: Package,     text: 'Item ships within 3–5 business days after payment is confirmed.' },
+                  { icon: ShieldCheck, text: 'All items are inspected before shipment. Photos sent on request.' },
+                ].map(({ icon: Icon, text }) => (
+                  <div key={text} className="flex gap-2.5 rounded-xl border border-white/8 bg-white/4 p-3">
+                    <Icon className="h-4 w-4 text-cyan-300/60 shrink-0 mt-0.5" />
+                    <p className="text-xs text-white/55 leading-5">{text}</p>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={() => setStep(2)}
+                disabled={!country || (country === 'Canada' && !province)}
+                className="w-full rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 py-3.5 text-sm font-black uppercase tracking-[0.1em] text-black hover:opacity-95 transition disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                I've Sent the Payment →
+              </button>
+            </>
+
+          ) : (
+            <form onSubmit={handleSubmit}>
+              <div className="mb-5">
+                <div className="text-xs font-black uppercase tracking-[0.2em] text-cyan-300/70 mb-1">Confirm Your Order</div>
+                <div className="text-xl font-black">Tell us who you are</div>
+                <p className="text-xs text-white/45 mt-1 leading-5">We'll match your details with the Wise payment and send confirmation.</p>
+              </div>
+
+              <div className="mb-3">
+                <label className="mb-1.5 block text-xs font-black uppercase tracking-[0.14em] text-white/40">Full name</label>
+                <input required value={name} onChange={e => setName(e.target.value)}
+                  placeholder="Name used on Wise" className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder-white/25 outline-none focus:border-cyan-300/40" />
+              </div>
+
+              <div className="mb-3">
+                <label className="mb-1.5 block text-xs font-black uppercase tracking-[0.14em] text-white/40">Email</label>
+                <input required type="email" value={email} onChange={e => setEmail(e.target.value)}
+                  placeholder="Confirmation sent here" className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder-white/25 outline-none focus:border-cyan-300/40" />
+              </div>
+
+              <div className="mb-3">
+                <label className="mb-1.5 block text-xs font-black uppercase tracking-[0.14em] text-white/40">Phone / WhatsApp</label>
+                <input required type="tel" value={phone} onChange={e => setPhone(e.target.value)}
+                  placeholder="+1 234 567 8900" className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder-white/25 outline-none focus:border-cyan-300/40" />
+              </div>
+
+              <div className="mb-4">
+                <label className="mb-1.5 block text-xs font-black uppercase tracking-[0.14em] text-white/40">Delivery Address</label>
+                <textarea required rows={3} value={address} onChange={e => setAddress(e.target.value)}
+                  placeholder="Full delivery address (street, city, province/state, country, postal code)"
+                  className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder-white/25 outline-none focus:border-cyan-300/40 resize-none" />
+              </div>
+
+              {/* Payment screenshot */}
+              <div className="mb-4">
+                <label className="mb-1.5 block text-xs font-black uppercase tracking-[0.14em] text-white/40">
+                  Payment Screenshot <span className="normal-case font-normal text-white/25">(optional · max 2MB)</span>
+                </label>
+                <div className="flex items-center gap-3 w-full rounded-2xl border border-dashed border-white/10 bg-white/2 px-4 py-3 opacity-40 cursor-not-allowed select-none">
+                  <Paperclip className="h-4 w-4 text-white/40 shrink-0" />
+                  <span className="text-sm text-white/45 truncate">Reply to your confirmation email instead</span>
+                </div>
+              </div>
+
+              <div className="mb-4 flex gap-2.5 rounded-2xl border border-yellow-400/20 bg-yellow-400/6 px-4 py-3">
+                <span className="text-yellow-300 text-sm shrink-0">📸</span>
+                <p className="text-xs text-yellow-200/80 leading-5">
+                  After submitting, <strong>reply to your confirmation email within 24 hours</strong> with your Wise payment screenshot. We cannot process your order without proof of payment.
+                </p>
+              </div>
+
+              <div className="mb-5 rounded-2xl border border-white/8 bg-white/4 p-4 text-xs text-white/50 space-y-1.5">
+                <div className="font-black text-white/70 uppercase tracking-[0.12em] text-[10px] mb-2">Order Summary</div>
+                <div className="flex justify-between"><span>{item.title}</span><span>× {qty}</span></div>
+                <div className="flex justify-between"><span>Subtotal</span><span>CAD ${subtotal.toFixed(2)}</span></div>
+                {taxAmount > 0 && <div className="flex justify-between"><span>Tax ({taxLabel})</span><span>CAD ${taxAmount.toFixed(2)}</span></div>}
+                <div className="flex justify-between"><span>Delivery {freeShipping ? '(Free!)' : `(Canada Post / DHL — ${country})`}</span><span className={freeShipping ? 'text-green-400' : ''}>{freeShipping ? 'FREE' : `CAD $${deliveryFee.toFixed(2)}`}</span></div>
+                <div className="flex justify-between text-cyan-300 font-bold border-t border-white/8 pt-1.5"><span>Total sent via Wise</span><span>CAD ${total}</span></div>
+                <div className="flex items-start gap-2 text-white/35 border-t border-white/8 pt-2">
+                  <Camera className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                  <span>Email your Wise screenshot to <span className="text-cyan-300">{CONTACT_EMAIL}</span></span>
+                </div>
+              </div>
+
+              {sendError && <div className="mb-3 rounded-xl border border-red-400/25 bg-red-400/10 px-4 py-3 text-xs text-red-300">{sendError}</div>}
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setStep(1)} disabled={sending}
+                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black uppercase text-white/55 hover:bg-white/10 disabled:opacity-40">Back</button>
+                <button type="submit" disabled={sending}
+                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 py-3 text-sm font-black uppercase tracking-[0.1em] text-black hover:opacity-95 disabled:opacity-60">
+                  {sending ? <><Loader2 className="h-4 w-4 animate-spin" /> Sending...</> : 'Submit Order'}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+function applyStockOverrides(products) {
+  try {
+    const overrides = JSON.parse(localStorage.getItem('cnc_stock_overrides') || '{}');
+    return products.map(p => {
+      if (!overrides[p.id]) return p;
+      const o = overrides[p.id];
+      const inStock = o.inStock ?? p.inStock;
+      const stock = o.stock ?? p.stock;
+      return { ...p, inStock, stock, badge: inStock ? 'In Stock' : 'Sold Out' };
+    });
+  } catch { return products; }
+}
+
+export default function ShopPage() {
+  const [activeTag, setActiveTag] = useState('All');
+  const [selected, setSelected]   = useState(null);
+  const [products, setProducts]   = useState(() => applyStockOverrides(allProducts));
+
+  // Re-apply overrides when returning from admin page
+  useState(() => {
+    const onFocus = () => setProducts(applyStockOverrides(allProducts));
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  });
+
+  const filtered = activeTag === 'All' ? products : products.filter(p => p.tag === activeTag);
+
+  return (
+    <div className="min-h-screen bg-[#05010c] text-white">
+      <AnimatePresence>
+        {selected && <BuyNowModal item={selected} onClose={() => setSelected(null)} />}
+      </AnimatePresence>
+
+      <section className="relative border-b border-fuchsia-500/20 bg-[#07030f] px-6 pb-6 pt-6">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(244,63,94,0.15),transparent_40%),radial-gradient(circle_at_left,rgba(168,85,247,0.12),transparent_40%)]" />
+        <div className="relative mx-auto max-w-7xl">
+          <Nav />
+          <div className="mt-4">
+            <div className="text-sm font-black uppercase tracking-[0.24em] text-cyan-300/75">All products</div>
+            <h1 className="mt-2 text-4xl font-black uppercase md:text-6xl">Shop</h1>
+          </div>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-6 py-8">
+        <div className="mb-8 flex flex-wrap gap-3">
+          {tags.map((tag) => (
+            <button key={tag} onClick={() => setActiveTag(tag)}
+              className={`rounded-full border px-5 py-2 text-xs font-black uppercase tracking-[0.18em] transition ${
+                activeTag === tag ? 'border-cyan-300/60 bg-cyan-300/15 text-cyan-100' : 'border-white/10 bg-white/5 text-white/65 hover:border-white/20 hover:text-white/85'
+              }`}>
+              {tag}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-3">
+          {filtered.map((item) => (
+            <div key={item.id} className="group relative overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,#0b1022,#14081d)]">
+              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-yellow-300" />
+              <div className="relative overflow-hidden">
+                <img src={item.image} alt={item.title} className="h-[260px] w-full object-cover saturate-[1.35] transition duration-500 group-hover:scale-105" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                <div className="absolute left-4 top-4 rounded-full border border-white/10 bg-black/72 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-white backdrop-blur">
+                  {item.badge}
+                </div>
+                {!item.inStock && (
+                  <div className="absolute right-4 top-4 rounded-full border border-white/10 bg-black/60 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-white/40 backdrop-blur">
+                    Sold Out
+                  </div>
+                )}
+              </div>
+              <div className="p-5">
+                <div className="text-sm font-black uppercase tracking-[0.18em] text-cyan-300/75">{item.subtitle}</div>
+                <div className="mt-2 text-lg font-black leading-snug">{item.title}</div>
+                <div className="mt-4 text-3xl font-black">CAD ${item.price.toFixed(2)}</div>
+                <div className="mt-1 text-xs text-white/30">+ shipping & tax calculated at checkout</div>
+                <div className="mt-4">
+                  {item.isPreorder ? (
+                    <Link to="/pre-orders"
+                      className="flex w-full items-center justify-center rounded-2xl border border-fuchsia-400/30 bg-fuchsia-400/10 px-4 py-3 text-sm font-black uppercase tracking-[0.08em] text-fuchsia-200 transition hover:bg-fuchsia-400/15">
+                      Pre-order →
+                    </Link>
+                  ) : item.inStock ? (
+                    <button onClick={() => setSelected(item)}
+                      className="w-full rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 px-4 py-3 text-sm font-black uppercase tracking-[0.08em] text-black transition hover:opacity-95">
+                      Buy Now — Wise
+                    </button>
+                  ) : (
+                    <button disabled className="w-full rounded-2xl border border-white/8 bg-white/4 px-4 py-3 text-sm font-black uppercase tracking-[0.08em] text-white/25 cursor-not-allowed">
+                      Sold Out
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
