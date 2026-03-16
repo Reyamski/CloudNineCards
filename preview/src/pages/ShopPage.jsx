@@ -113,6 +113,7 @@ function calcDeliveryFee(country, qty) {
 function BuyNowModal({ item, onClose }) {
   const [step, setStep]           = useState(1);
   const [qty, setQty]             = useState(1);
+  const [liveStock, setLiveStock] = useState(item.stock ?? 0);
   const [country, setCountry]     = useState('');
   const [province, setProvince]   = useState('');
   const [name, setName]           = useState('');
@@ -129,6 +130,32 @@ function BuyNowModal({ item, onClose }) {
     const n = parseInt(localStorage.getItem('cnc_order_counter') || '0', 10) + 1;
     return `CNC-${String(n).padStart(6, '0')}`;
   });
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadLiveStock() {
+      if (!supabaseEnabled || !supabase) return;
+
+      const { data, error } = await supabase
+        .from('stock')
+        .select('quantity,in_stock')
+        .eq('id', item.id)
+        .maybeSingle();
+
+      if (ignore || error || !data) return;
+
+      const nextStock = data.in_stock ? Math.max(0, data.quantity ?? 0) : 0;
+      setLiveStock(nextStock);
+      setQty((currentQty) => Math.max(1, Math.min(currentQty, nextStock || 1)));
+    }
+
+    loadLiveStock();
+
+    return () => {
+      ignore = true;
+    };
+  }, [item.id]);
 
   function handleFileChange(e) {
     const file = e.target.files[0];
@@ -181,6 +208,9 @@ function BuyNowModal({ item, onClose }) {
     try {
       if (!supabaseEnabled || !supabase) {
         throw new Error('Live orders are not configured yet.');
+      }
+      if (qty > liveStock) {
+        throw new Error(`Only ${liveStock} box${liveStock === 1 ? '' : 'es'} left in stock.`);
       }
       let proofHtml = 'Not provided';
       if (paymentB64) {
@@ -315,8 +345,9 @@ function BuyNowModal({ item, onClose }) {
                 <div className="flex items-center gap-3">
                   <button onClick={() => setQty(q => Math.max(1, q - 1))} className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-lg font-black hover:bg-white/10">−</button>
                   <span className="text-2xl font-black w-8 text-center">{qty}</span>
-                  <button onClick={() => setQty(q => Math.min(item.stock, q + 1))} className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-lg font-black hover:bg-white/10">+</button>
+                  <button onClick={() => setQty(q => Math.min(liveStock, q + 1))} className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-lg font-black hover:bg-white/10">+</button>
                 </div>
+                <div className="mt-2 text-xs text-white/35">Live stock available: {liveStock}</div>
               </div>
 
               {/* Country / Province */}
@@ -326,6 +357,7 @@ function BuyNowModal({ item, onClose }) {
                   value={country}
                   onChange={e => { setCountry(e.target.value); setProvince(''); }}
                   className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none focus:border-cyan-300/40 appearance-none"
+                  style={{ colorScheme: 'dark' }}
                 >
                   <option value="" disabled>Select destination…</option>
                   <option value="Canada">🇨🇦 Canada</option>
@@ -340,6 +372,7 @@ function BuyNowModal({ item, onClose }) {
                     value={province}
                     onChange={e => setProvince(e.target.value)}
                     className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none focus:border-cyan-300/40 appearance-none"
+                    style={{ colorScheme: 'dark' }}
                   >
                     <option value="" disabled>Select province / territory…</option>
                     {Object.keys(PROVINCE_TAX).map(p => (
