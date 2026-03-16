@@ -1,60 +1,78 @@
-import { Flame, ChevronRight } from 'lucide-react';
-import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import {useEffect, useState} from 'react';
+import {Flame, ChevronRight} from 'lucide-react';
+import {motion} from 'framer-motion';
+import {Link} from 'react-router-dom';
 import Nav from '../components/Nav';
+import {supabase, supabaseEnabled} from '../lib/supabase';
 
-const newArrivals = [
+const BASE_NEW_ARRIVALS = [
   {
-    title: 'One Piece Two Legends OP-08 Booster Box',
-    subtitle: 'English • Just Dropped',
-    price: '$50.00',
-    badge: 'New',
-    daysAgo: '2 days ago',
-    image: 'https://cloudninecards.ca/cdn/shop/files/71qBWvl1uRL._AC_SL1500.jpg?v=1771572122&width=3840',
+    id: 'op15jp',
+    title: "One Piece Card Game Adventure on Kami's Island OP-15 Booster Box",
+    subtitle: 'Japanese',
+    price: 129.0,
+    badge: 'In Stock',
+    daysAgo: 'Live now',
+    image: 'https://i.ibb.co/4R6DL8Vt/8cc175339fbf.webp',
   },
   {
-    title: 'One Piece Heroines Edition EB-03 Booster Box',
-    subtitle: 'Japanese • Just Dropped',
-    price: '$131.00',
-    badge: 'New',
-    daysAgo: '3 days ago',
-    image: 'https://cloudninecards.ca/cdn/shop/files/61X1xcYYFCL._AC_SL1088.jpg?v=1771571570&width=500',
+    id: 'eb03jp',
+    title: 'One Piece Card Game Extra Booster Heroines Edition EB-03',
+    subtitle: 'Japanese',
+    price: 259.0,
+    badge: 'In Stock',
+    daysAgo: 'Live now',
+    image: 'https://i.ibb.co/cS1CLgXf/259dbef5f466.webp',
   },
   {
-    title: 'Dragon Ball Super Fusion World FB-04 Booster Box',
-    subtitle: 'English • This Week',
-    price: '$109.99',
-    badge: 'Fresh',
-    daysAgo: '5 days ago',
-    image: 'https://cloudninecards.ca/cdn/shop/files/61VDeW8QgNL._AC_SL1200.jpg?v=1771571417&width=500',
+    id: 'ac1',
+    title: 'One Piece Card Game Admirable Collection Vol.1 Vinsmoke Reiju AC-01',
+    subtitle: 'Japanese',
+    price: 279.0,
+    badge: 'In Stock',
+    daysAgo: 'Live now',
+    image: 'https://i.ibb.co/ZzmyRcFX/aac4c203bf03.webp',
   },
   {
-    title: 'Pokémon TCG Prismatic Evolutions Booster Bundle',
-    subtitle: 'English • This Week',
-    price: '$44.99',
-    badge: 'Fresh',
-    daysAgo: '6 days ago',
-    image: 'https://cloudninecards.ca/cdn/shop/files/61_FxpqROpL._AC_SL1200.jpg?v=1771571401&width=500',
-  },
-  {
-    title: 'One Piece OP-11 Fist of God Speed Booster Box',
-    subtitle: 'Japanese • This Month',
-    price: '$139.28',
-    badge: 'Hot',
-    daysAgo: '10 days ago',
-    image: 'https://cloudninecards.ca/cdn/shop/files/61X1xcYYFCL._AC_SL1088.jpg?v=1771571570&width=500',
-  },
-  {
-    title: 'Dragon Ball Super Fusion World FS06 Starter Deck',
-    subtitle: 'English • This Month',
-    price: '$24.99',
-    badge: 'Hot',
-    daysAgo: '12 days ago',
-    image: 'https://cloudninecards.ca/cdn/shop/files/71qBWvl1uRL._AC_SL1500.jpg?v=1771572122&width=3840',
+    id: 'poke-ah',
+    title: 'Pokemon TCG Mega Evolution Ascended Heroes Elite Trainer Box',
+    subtitle: 'English',
+    price: 279.0,
+    badge: 'In Stock',
+    daysAgo: 'Live now',
+    image: 'https://i.ibb.co/5WbMqZTR/41faa72453fe.jpg',
   },
 ];
 
 export default function NewArrivalsPage() {
+  const [items, setItems] = useState(BASE_NEW_ARRIVALS);
+
+  useEffect(() => {
+    async function loadLiveStock() {
+      if (!supabaseEnabled || !supabase) return;
+
+      const {data, error} = await supabase.from('stock').select('*');
+      if (error || !data?.length) return;
+
+      const nextItems = BASE_NEW_ARRIVALS
+        .map((item) => {
+          const row = data.find((stock) => stock.id === item.id);
+          const quantity = row?.quantity ?? 0;
+          const inStock = row?.in_stock ?? true;
+          return {
+            ...item,
+            quantity,
+            inStock,
+          };
+        })
+        .filter((item) => item.inStock && item.quantity > 0);
+
+      if (nextItems.length) setItems(nextItems);
+    }
+
+    loadLiveStock();
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#05010c] text-white">
       <section className="relative overflow-hidden border-b border-yellow-400/15 bg-[#07030f] px-6 pb-12 pt-6">
@@ -62,7 +80,7 @@ export default function NewArrivalsPage() {
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:30px_30px]" />
         <div className="relative mx-auto max-w-7xl">
           <Nav />
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="mt-6">
+          <motion.div initial={{opacity: 0, y: 16}} animate={{opacity: 1, y: 0}} transition={{duration: 0.5}} className="mt-6">
             <div className="inline-flex items-center gap-2 rounded-full border border-yellow-300/35 bg-yellow-300/12 px-4 py-2 text-xs font-black uppercase tracking-[0.24em] text-yellow-100">
               <Flame className="h-4 w-4" /> Fresh drops
             </div>
@@ -73,37 +91,46 @@ export default function NewArrivalsPage() {
               </span>
             </h1>
             <p className="mt-4 max-w-xl text-base text-white/65">
-              Latest sets and singles just landed. Updated every week — bookmark this page.
+              Showing the products that are actually in stock right now. This page follows your live inventory.
             </p>
           </motion.div>
         </div>
       </section>
 
       <section className="mx-auto max-w-7xl px-6 py-10">
-        <div className="grid gap-6 md:grid-cols-3">
-          {newArrivals.map((item, idx) => (
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+          {items.map((item, idx) => (
             <motion.div
-              key={item.title}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.45, delay: idx * 0.08 }}
+              key={item.id}
+              initial={{opacity: 0, y: 20}}
+              animate={{opacity: 1, y: 0}}
+              transition={{duration: 0.45, delay: idx * 0.08}}
               className="group relative overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,#0b1022,#14081d)]"
             >
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-yellow-300 via-cyan-300 to-fuchsia-400" />
               <div className="relative overflow-hidden">
-                <img src={item.image} alt={item.title} onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/product-fallback.svg'; }} className="h-[240px] w-full object-cover saturate-[1.35] transition duration-500 group-hover:scale-105" />
+                <img
+                  src={item.image}
+                  alt={item.title}
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = '/product-fallback.svg';
+                  }}
+                  className="h-[240px] w-full object-cover saturate-[1.35] transition duration-500 group-hover:scale-105"
+                />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                 <div className="absolute left-4 top-4 rounded-full border border-yellow-300/25 bg-black/70 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-yellow-200 backdrop-blur">
                   {item.badge}
                 </div>
-                <div className="absolute right-4 top-4 rounded-full border border-white/10 bg-black/70 px-3 py-1 text-[11px] font-black text-white/60 backdrop-blur">
-                  {item.daysAgo}
+                <div className="absolute right-4 top-4 rounded-full border border-white/10 bg-black/70 px-3 py-1 text-[11px] font-black text-white/75 backdrop-blur">
+                  {item.quantity ?? 0} left
                 </div>
               </div>
               <div className="p-5">
                 <div className="text-sm font-black uppercase tracking-[0.18em] text-yellow-300/75">{item.subtitle}</div>
                 <div className="mt-2 text-lg font-black leading-snug">{item.title}</div>
-                <div className="mt-4 text-3xl font-black">{item.price}</div>
+                <div className="mt-4 text-3xl font-black">CAD ${item.price.toFixed(2)}</div>
+                <div className="mt-1 text-xs text-white/35">{item.daysAgo}</div>
                 <Link
                   to="/shop"
                   className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-yellow-300 via-cyan-300 to-fuchsia-400 px-4 py-3 text-sm font-black uppercase tracking-[0.08em] text-black transition hover:opacity-95"
