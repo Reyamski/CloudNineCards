@@ -3,6 +3,8 @@ create table if not exists public.orders (
   order_number text not null,
   order_type text not null default 'on_hand',
   status text not null default 'pending',
+  payment_status text not null default 'payment_submitted'
+    check (payment_status in ('awaiting_payment', 'payment_submitted', 'payment_verified', 'payment_rejected')),
   product_id text not null,
   product_title text not null,
   product_variant text,
@@ -19,7 +21,13 @@ create table if not exists public.orders (
   total_price numeric(10, 2) not null default 0,
   payment_proof text,
   wise_handle text,
+  payment_submitted_at timestamptz,
+  payment_verified_at timestamptz,
+  payment_rejected_at timestamptz,
+  paid_at timestamptz,
+  payment_notes text,
   confirmed_at timestamptz,
+  updated_at timestamptz not null default timezone('utc', now()),
   created_at timestamptz not null default timezone('utc', now())
 );
 
@@ -31,3 +39,6 @@ create index if not exists orders_product_id_idx
 
 create index if not exists orders_order_number_idx
   on public.orders (order_number);
+
+create index if not exists orders_payment_status_created_at_idx
+  on public.orders (payment_status, created_at desc);
