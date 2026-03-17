@@ -13,6 +13,7 @@ _Updated by: Codex (GPT-5)_
 - **Root domain:** `https://cloudninecards.ca` is configured correctly in Vercel/Shopify, but some ISPs still cache old Shopify DNS answers
 - **Shopify Hydrogen:** legacy/stale workspace only, not current production path
 - **Database:** Supabase is now active for live stock, admin updates, homepage video config, and pending on-hand orders
+- **Required delivery workflow:** branch first -> local QA/build first -> push branch first -> merge/push to `main` only after approval
 - **Admin URL:** `/admin`
 - **Admin password:** `REDACTED_ADMIN_PASS`
 
@@ -96,6 +97,8 @@ Current entries:
 
 - OP-17 JP teaser banner is still present and should not be removed
 - Homepage video is now admin-configurable through Supabase `config`
+- Homepage stock spotlight now uses in-stock products only
+- Homepage stock cards can now deep-link into `/shop?product=...` and open the matching product modal
 
 ### New Arrivals
 
@@ -203,6 +206,8 @@ Used for:
 
 Recent live commits pushed to `main`:
 
+- `cc659dc5` - make homepage stock cards clickable
+- `4390782e` - restore customer homepage and live stock media
 - `cea8543e` - surface Supabase sync errors in preview admin and shop
 - `5aa3d42c` - update preview favicon to Cloud Nine Cards logo
 - `f7f593f4` - add pending order confirmation workflow
@@ -225,20 +230,27 @@ Recent live commits pushed to `main`:
   - mark paid / shipped
   - search / filter orders
 - Optionally add pre-order tracking into admin as a separate workflow
+- Add branch-preview deployment if you want a shareable QA URL before merging to `main`
 
 ## Resume Instructions For Any AI
 
 1. Read this file first
 2. Treat `preview/` as the active production app
-3. Check `preview/src/pages/AdminPage.jsx` and `preview/src/pages/ShopPage.jsx` before changing stock/order logic
-4. Check `scripts/supabase-orders-schema.sql` before proposing DB changes
-5. Verify latest deployed state from Vercel GitHub `main`
-6. If user reports root-domain inconsistency, remember ISP cache was already confirmed as a real factor
+3. Create or switch to a feature branch before editing production paths
+4. Run local QA/build in `preview/` before any production push
+5. Push the feature branch first and keep `main` for approved changes only
+6. Check `preview/src/pages/AdminPage.jsx` and `preview/src/pages/ShopPage.jsx` before changing stock/order logic
+7. Check `scripts/supabase-orders-schema.sql` before proposing DB changes
+8. Verify latest deployed state from Vercel GitHub `main`
+9. If user reports root-domain inconsistency, remember ISP cache was already confirmed as a real factor
 
 ## Rules For Future AI Work
 
 - Do not assume Hydrogen is live
 - For production website changes, prioritize `preview/`
+- Always create a branch before making a production-facing change
+- Always run local QA/build before asking to ship or pushing to `main`
+- Prefer branch push/review before production merge when time allows
 - Do not remove the OP-17 JP teaser banner unless explicitly asked
 - Keep province tax labels human-readable
 - Preserve the pending-order -> confirm-order stock workflow
