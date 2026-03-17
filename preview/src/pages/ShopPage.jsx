@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { supabase, supabaseEnabled } from '../lib/supabase';
 import { X, Copy, Check, Camera, Loader2, Package, Globe, ShieldCheck, Paperclip } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -544,10 +544,31 @@ function BuyNowModal({ item, onClose }) {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function ShopPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeTag, setActiveTag] = useState('All');
   const [selected, setSelected]   = useState(null);
   const [products, setProducts]   = useState(allProducts);
   const [stockSyncError, setStockSyncError] = useState('');
+
+  useEffect(() => {
+    const productId = searchParams.get('product');
+    if (!productId) return;
+
+    const match = products.find((product) => product.id === productId);
+    if (!match || !match.inStock) return;
+
+    setSelected((current) => (current?.id === match.id ? current : match));
+  }, [products, searchParams]);
+
+  function openProduct(item) {
+    setSelected(item);
+    setSearchParams({product: item.id});
+  }
+
+  function closeProduct() {
+    setSelected(null);
+    setSearchParams({});
+  }
 
   useEffect(() => {
     if (!supabaseEnabled || !supabase) {
@@ -578,7 +599,7 @@ export default function ShopPage() {
   return (
     <div className="min-h-screen bg-[#05010c] text-white">
       <AnimatePresence>
-        {selected && <BuyNowModal item={selected} onClose={() => setSelected(null)} />}
+        {selected && <BuyNowModal item={selected} onClose={closeProduct} />}
       </AnimatePresence>
 
       <section className="relative border-b border-fuchsia-500/20 bg-[#07030f] px-6 pb-6 pt-6">
@@ -638,7 +659,7 @@ export default function ShopPage() {
                       Pre-order →
                     </Link>
                   ) : item.inStock ? (
-                    <button onClick={() => setSelected(item)}
+                    <button onClick={() => openProduct(item)}
                       className="w-full rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 px-4 py-3 text-sm font-black uppercase tracking-[0.08em] text-black transition hover:opacity-95">
                       Buy Now — Wise
                     </button>

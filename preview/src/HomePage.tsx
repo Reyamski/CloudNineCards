@@ -9,6 +9,7 @@ const DEFAULT_VIDEO_ID = 'OcLL44cDh7k';
 const BASE_STOCK_SPOTLIGHT = [
   {
     id: 'op15jp',
+    link: '/shop?product=op15jp',
     badge: 'Live Stock',
     title: "Adventure on Kami's Island OP-15",
     body: 'Fresh One Piece stock that stays aligned with the live storefront inventory.',
@@ -18,6 +19,7 @@ const BASE_STOCK_SPOTLIGHT = [
   },
   {
     id: 'eb03jp',
+    link: '/shop?product=eb03jp',
     badge: 'Hot Drop',
     title: 'Heroines Edition EB-03',
     body: 'Current on-hand One Piece release, shown here only while inventory is actually available.',
@@ -27,6 +29,7 @@ const BASE_STOCK_SPOTLIGHT = [
   },
   {
     id: 'ac1',
+    link: '/shop?product=ac1',
     badge: 'Featured',
     title: 'Admirable Collection AC-01',
     body: 'Collector-focused premium stock with live quantity awareness on the storefront.',
@@ -36,6 +39,7 @@ const BASE_STOCK_SPOTLIGHT = [
   },
   {
     id: 'poke-ah',
+    link: '/shop?product=poke-ah',
     badge: 'Pokemon',
     title: 'Ascended Heroes ETB',
     body: 'Pokemon stock joins the homepage only when it is really available for buyers.',
@@ -259,7 +263,10 @@ export default function HomePage() {
             <motion.div initial={{opacity: 0, scale: 0.96}} animate={{opacity: 1, scale: 1}} transition={{duration: 0.65, delay: 0.1}} className="grid gap-4">
               <div className="grid grid-cols-[1.06fr_0.94fr] gap-4">
                 {heroCard ? (
-                  <div className="relative overflow-hidden rounded-[34px] border border-fuchsia-400/20 bg-white/5 shadow-[0_28px_90px_rgba(0,0,0,0.48)]">
+                  <Link
+                    to={heroCard.link}
+                    className="relative block overflow-hidden rounded-[34px] border border-fuchsia-400/20 bg-white/5 shadow-[0_28px_90px_rgba(0,0,0,0.48)] transition hover:scale-[1.01] hover:border-cyan-300/35"
+                  >
                     <img src={heroCard.image} alt={heroCard.title} className="h-[420px] w-full object-cover saturate-[1.35] contrast-[1.04]" />
                     <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.95),rgba(0,0,0,0.34),transparent)]" />
                     <div className="absolute bottom-0 left-0 right-0 p-5 md:p-6">
@@ -272,19 +279,23 @@ export default function HomePage() {
                         {heroCard.subtitle} | {heroCard.price}
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 ) : null}
 
                 <div className="grid gap-4">
                   {sideCards.map((card) => (
-                    <div key={card.id} className="relative overflow-hidden rounded-[24px] border border-cyan-300/20 bg-white/5 shadow-xl">
+                    <Link
+                      key={card.id}
+                      to={card.link}
+                      className="relative block overflow-hidden rounded-[24px] border border-cyan-300/20 bg-white/5 shadow-xl transition hover:scale-[1.01] hover:border-cyan-300/35"
+                    >
                       <img src={card.image} alt={card.title} className="h-[196px] w-full object-cover saturate-[1.35]" />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/88 via-black/30 to-transparent" />
                       <div className="absolute bottom-0 p-4">
                         <div className="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-200">{card.badge}</div>
                         <div className="mt-1 text-lg font-black uppercase leading-tight">{card.title}</div>
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               </div>
@@ -376,7 +387,7 @@ export default function HomePage() {
                 <div className="mt-2 text-xl font-black leading-snug">{item.title}</div>
                 <div className="mt-4 text-3xl font-black">{item.price}</div>
                 <div className="mt-5 flex gap-3">
-                  <Link to="/shop" className="flex-1 rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 px-4 py-3 text-center text-sm font-black uppercase tracking-[0.08em] text-black transition hover:opacity-95">
+                  <Link to={item.link} className="flex-1 rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 px-4 py-3 text-center text-sm font-black uppercase tracking-[0.08em] text-black transition hover:opacity-95">
                     View Product
                   </Link>
                 </div>
