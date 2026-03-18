@@ -1,79 +1,68 @@
-# Cloud Nine Cards — Shopify TCG Store Redesign
+# Cloud Nine Cards — Shopify TCG Store
 
-## Overview
+## What This Is
 
-Redesign and improve the existing Shopify store at cloudninecards.ca from a generic,
-plain white/black layout into a visually striking **Dark & Epic anime TCG** experience.
-The store sells trading card game products and needs to feel like a premium destination
-for collectors and TCG enthusiasts.
+A redesigned storefront for cloudninecards.ca — a Canadian TCG card shop (One Piece, Dragon Ball Super, Pokémon). Built as a Vite + React preview app with "Dark & Epic" anime TCG theme. Customers browse on-hand products and pre-orders, pay via Wise, and submit payment proof through an order modal. Will be ported to Shopify Hydrogen.
 
-## The Problem
+## Core Value
 
-Current store uses the Horizon theme with a plain white background and zero personality.
-It looks like a generic Shopify store — not like a specialized anime TCG shop.
-Customers don't feel the excitement of opening a booster pack when they land on the site.
+Customers can order TCG products with clear CAD pricing (tax + shipping shown upfront) and submit Wise payment proof without emailing manually.
 
-## The Vision
+## Requirements
 
-A dark, immersive storefront that makes customers feel like they've entered an anime card
-battle arena. Deep navy/black backgrounds, gold + red neon accents, dramatic typography,
-and card-forward layouts that showcase the products as collectibles — not just items.
+### Validated
 
-## Store Details
+- ✓ Dark & Epic anime TCG theme — Vite + React + Tailwind CSS v4 + framer-motion
+- ✓ ShopPage — on-hand Buy Now modal, Wise payment flow, country/province selector
+- ✓ PreOrdersPage — 30% DP flow, 3-step modal
+- ✓ EmailJS notifications — store owner + buyer copy (both templates)
+- ✓ Sequential order numbers: CNC-000001 format via localStorage
+- ✓ Canada-origin shipping (Vancouver BC, Canada Post / DHL, 7-tier weight table)
+- ✓ WEIGHT_PER_BOX = 1.91kg (DHL volumetric: 29×22×15cm ÷ 5000)
+- ✓ Free shipping for Canada orders ≥ CAD $300
+- ✓ Provincial tax (GST/HST/PST/QST) per province — shown as label, not raw %
+- ✓ Canvas image compression (MAX=300px, iterative quality until <36KB)
+- ✓ imgbb upload for payment proof — bypasses Gmail base64 block
 
-- **URL:** cloudninecards.ca
-- **Platform:** Shopify (Horizon theme v3.3.1 — to be replaced)
-- **Owner:** CEO / Store Owner
+### Active
 
-## Products
+- [ ] imgbb API key — plug into IMGBB_API_KEY constant in ShopPage.jsx + PreOrdersPage.jsx (get at api.imgbb.com)
+- [ ] EmailJS templates — confirm `{{{payment_proof}}}` triple braces + `{{to_email}}` in To field
+- [ ] Shopify Hydrogen integration — port preview into hydrogen-quickstart/
+- [ ] Shopify Admin API agent — product/order management via GraphQL
 
-- One Piece TCG (primary — already listed)
-- Dragon Ball Super Card Game
-- Pokemon TCG
-- Other Anime TCG (Naruto, Demon Slayer, etc.)
+### Out of Scope
 
-## Design Direction
+- Philippine DHL rates — store ships from Vancouver, not Philippines
+- Mock DB tests — always hit live EmailJS API in QA
+- Shopify Admin password apps — use Storefront API / Hydrogen instead
 
-- **Vibe:** Dark & Epic — anime battle arena meets premium card shop
-- **Colors:** Deep navy/black background, gold + red neon accents
-- **Typography:** Bold, dramatic — not generic sans-serif
-- **Feel:** Collector's premium + anime energy
+## Context
 
-## Goals
+- **Stack:** Vite + React 19, Tailwind CSS v4, framer-motion, lucide-react, react-router-dom v7
+- **EmailJS:** service_495o229 | keys in preview/.env (VITE_EMAILJS_PUBLIC_KEY / VITE_EMAILJS_PRIVATE_KEY)
+  - Pass `{ publicKey, privateKey }` as 4th param — "Use Private Key" is ON
+  - template_3ickzxu = on-hand (ShopPage) | template_cp3un7s = pre-orders (PreOrdersPage)
+- **Payment:** Wise @cloudninecards | Contact: papspective@gmail.com
+- **Shopify:** cloudninecards.myshopify.com | hydrogen-quickstart/ ready, needs `shopify hydrogen link`
+- **Agents:** C:/Users/Reyam/inbox/*.md — run with `claude --dangerously-skip-permissions`
+- **GSD:** installed locally at .claude/ (v1.22.4)
 
-1. Replace current theme with a dark, anime-suitable Shopify theme
-2. Redesign homepage: hero banner, featured products, collections grid
-3. Make the store feel like THE destination for anime TCG in Canada
-4. Improve visual hierarchy so products are the star
+## Constraints
 
-## Priority Order
-
-1. **Homepage redesign** — first impression matters most
-2. Theme selection and installation
-3. Collections page layout
-4. Product page improvements
-
-## Success Criteria
-
-- Homepage feels dramatically different — dark, epic, anime TCG vibe
-- Hero banner is immersive and brand-aligned
-- Products are showcased with proper visual weight
-- Store is clearly identifiable as a premium anime TCG shop at first glance
+- **EmailJS 50KB limit:** compress image first, upload to imgbb, send URL only
+- **Tailwind v4:** no tailwind.config.js — config lives in CSS
+- **Windows shell:** inbox file writes use Windows paths, not /mnt/c/
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| New theme over customization | More design flexibility, better anime-ready layouts | Pending selection |
-| Dark & Epic over colorful | Matches collector/premium market positioning | Confirmed |
-| Homepage first | Highest customer impact, immediate visual improvement | Confirmed |
-
-## Out of Scope (v1)
-
-- Backend changes (inventory, pricing logic)
-- New product uploads
-- Payment/checkout flow changes
-- Mobile-only optimizations (will be responsive by default)
+| Vite + React preview before Hydrogen | No Shopify credentials at start | ✓ Good |
+| EmailJS private key mode | Security — public key alone is exposed | ✓ Good |
+| imgbb for payment proof images | Gmail blocks base64 data URLs in img tags | — Pending test |
+| Canada Post / DHL from Vancouver | Store ships from Canada, not Philippines | ✓ Good |
+| Province label not % in dropdown | Users shouldn't see raw tax numbers | ✓ Good |
 
 ---
-*Last updated: 2026-03-12 after initialization*
+*Last updated: 2026-03-16 — Phase 2 in progress: Hydrogen scaffolded, agent team set up, inbox tasks ready for data-engineer + developer agents*

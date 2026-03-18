@@ -15,7 +15,7 @@ _Updated by: Codex (GPT-5)_
 - **Database:** Supabase is now active for live stock, admin updates, homepage video config, and pending on-hand orders
 - **Required delivery workflow:** branch first -> local QA/build first -> push branch first -> merge/push to `main` only after approval
 - **Admin URL:** `/admin`
-- **Admin password:** `REDACTED_ADMIN_PASS`
+- **Admin password:** see `preview/.env` → `VITE_ADMIN_PASSWORD`
 
 ## Store Info
 
@@ -180,7 +180,7 @@ Used for:
 - Service: `service_495o229`
 - On-hand template: `template_3ickzxu`
 - Pre-order template: `template_cp3un7s`
-- Public key: `REDACTED_EMAILJS_PUBLIC`
+- Public key: see `preview/.env` → `VITE_EMAILJS_PUBLIC_KEY`
 
 ## Domain / DNS Status
 

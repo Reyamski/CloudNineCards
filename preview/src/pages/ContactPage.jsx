@@ -4,11 +4,11 @@ import { useState } from 'react';
 import emailjs from '@emailjs/browser';
 import Nav from '../components/Nav';
 
-const EMAILJS_SERVICE_ID = 'service_495o229';
-const EMAILJS_TEMPLATE_ID = 'template_cp3un7s';
-const EMAILJS_PUBLIC_KEY  = 'REDACTED_EMAILJS_PUBLIC';
-const EMAILJS_PRIVATE_KEY = 'REDACTED_EMAILJS_PRIVATE';
-const CONTACT_EMAIL = 'papspective@gmail.com';
+const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_PREORDER;
+const EMAILJS_PUBLIC_KEY  = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
+const EMAILJS_PRIVATE_KEY = import.meta.env.VITE_EMAILJS_PRIVATE_KEY;
+const CONTACT_EMAIL = import.meta.env.VITE_CONTACT_EMAIL;
 
 const topics = ['Order Issue', 'Pre-order Question', 'Damaged Card / Missing Item', 'General Inquiry', 'Wholesale / Bulk'];
 

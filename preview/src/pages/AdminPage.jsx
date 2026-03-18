@@ -2,7 +2,7 @@ import {useEffect, useState} from 'react';
 import {ShieldCheck, Save, RotateCcw, Eye, EyeOff, Youtube, Loader2} from 'lucide-react';
 import {supabase, supabaseEnabled} from '../lib/supabase';
 
-const ADMIN_PASSWORD = 'REDACTED_ADMIN_PASS';
+const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD;
 const DEFAULT_VIDEO_ID = 'OcLL44cDh7k';
 
 const PAYMENT_STATUS_META = {
@@ -97,6 +97,9 @@ export default function AdminPage() {
   const [pw, setPw] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [pwError, setPwError] = useState(false);
+  const [activeTab, setActiveTab] = useState('orders');
+  const [orderFilter, setOrderFilter] = useState('pending');
+  const [selectedOrderId, setSelectedOrderId] = useState('');
   const [products, setProducts] = useState(() => mergeProducts([]));
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
@@ -151,6 +154,29 @@ export default function AdminPage() {
 
     load();
   }, []);
+
+  useEffect(() => {
+    if (!orders.length) {
+      setSelectedOrderId('');
+      return;
+    }
+
+    const nextVisibleOrders = orders.filter((order) => {
+      if (orderFilter === 'pending') return order.status === 'pending';
+      if (orderFilter === 'confirmed') return order.status === 'confirmed';
+      return true;
+    });
+
+    if (!nextVisibleOrders.length) {
+      setSelectedOrderId('');
+      return;
+    }
+
+    const stillVisible = nextVisibleOrders.some((order) => order.id === selectedOrderId);
+    if (!stillVisible) {
+      setSelectedOrderId(nextVisibleOrders[0].id);
+    }
+  }, [orders, orderFilter, selectedOrderId]);
 
   function login() {
     if (pw === ADMIN_PASSWORD) {
@@ -449,20 +475,97 @@ export default function AdminPage() {
   const inStockProducts = products.filter((product) => product.inStock);
   const soldOutProducts = products.filter((product) => !product.inStock);
   const pendingOrders = orders.filter((order) => order.status === 'pending');
-  const confirmedOrders = orders.filter((order) => order.status === 'confirmed').slice(0, 8);
+  const confirmedOrders = orders.filter((order) => order.status === 'confirmed');
+  const visibleOrders = orders.filter((order) => {
+    if (orderFilter === 'pending') return order.status === 'pending';
+    if (orderFilter === 'confirmed') return order.status === 'confirmed';
+    return true;
+  });
+  const selectedOrder = visibleOrders.find((order) => order.id === selectedOrderId) || visibleOrders[0] || null;
+
+  function renderOrderRow(order) {
+    const paymentMeta = PAYMENT_STATUS_META[order.payment_status] || PAYMENT_STATUS_META.payment_submitted;
+    const orderMeta = order.status === 'confirmed'
+      ? {label: 'Confirmed', className: 'border-emerald-400/25 bg-emerald-400/10 text-emerald-200'}
+      : {label: 'Pending', className: 'border-fuchsia-400/25 bg-fuchsia-400/10 text-fuchsia-200'};
+    const selected = selectedOrder?.id === order.id;
+
+    return (
+      <button
+        key={order.id}
+        onClick={() => setSelectedOrderId(order.id)}
+        className={`w-full rounded-[22px] border p-4 text-left transition ${
+          selected
+            ? 'border-cyan-300/45 bg-cyan-300/10 shadow-[0_0_0_1px_rgba(34,211,238,0.18)]'
+            : 'border-white/10 bg-white/4 hover:border-white/20 hover:bg-white/6'
+        }`}
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-black uppercase tracking-[0.08em] text-white">
+              {order.order_number}
+            </div>
+            <div className="mt-1 line-clamp-2 text-sm text-white/80">
+              {order.product_title}
+            </div>
+            <div className="mt-2 text-xs text-white/45">
+              {order.buyer_name} | Qty {order.quantity} | {formatMoney(order.total_price)}
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${orderMeta.className}`}>
+              {orderMeta.label}
+            </span>
+            <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${paymentMeta.badge}`}>
+              {paymentMeta.label}
+            </span>
+          </div>
+        </div>
+      </button>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#05010c] text-white">
-      <div className="mx-auto max-w-4xl px-6 py-10">
+      <div className="mx-auto max-w-6xl px-6 py-10">
         <div className="mb-8 flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2 text-cyan-300">
               <ShieldCheck className="h-4 w-4" />
               <span className="text-xs font-black uppercase tracking-[0.24em]">Admin Panel</span>
             </div>
-            <h1 className="mt-1 text-3xl font-black uppercase">Stock Manager</h1>
+            <h1 className="mt-1 text-3xl font-black uppercase">Store Operations</h1>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={() => setActiveTab('orders')}
+              className={`rounded-2xl px-4 py-2.5 text-sm font-black uppercase tracking-[0.08em] transition ${
+                activeTab === 'orders' ? 'bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 text-black' : 'border border-white/15 bg-white/5 text-white/70 hover:bg-white/10'
+              }`}
+            >
+              Orders
+            </button>
+            <button
+              onClick={() => setActiveTab('inventory')}
+              className={`rounded-2xl px-4 py-2.5 text-sm font-black uppercase tracking-[0.08em] transition ${
+                activeTab === 'inventory' ? 'bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 text-black' : 'border border-white/15 bg-white/5 text-white/70 hover:bg-white/10'
+              }`}
+            >
+              Inventory
+            </button>
+            <button
+              onClick={() => setActiveTab('homepage')}
+              className={`rounded-2xl px-4 py-2.5 text-sm font-black uppercase tracking-[0.08em] transition ${
+                activeTab === 'homepage' ? 'bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 text-black' : 'border border-white/15 bg-white/5 text-white/70 hover:bg-white/10'
+              }`}
+            >
+              Homepage
+            </button>
+          </div>
+        </div>
+
+        {activeTab === 'inventory' ? (
+          <div className="mb-6 flex flex-wrap gap-3">
             <button onClick={reset} className="flex items-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-black uppercase tracking-[0.08em] text-white/70 hover:bg-white/10">
               <RotateCcw className="h-4 w-4" /> Reset All
             </button>
@@ -470,7 +573,7 @@ export default function AdminPage() {
               <Save className="h-4 w-4" /> {saved ? 'Saved!' : 'Save Changes'}
             </button>
           </div>
-        </div>
+        ) : null}
 
         {dbError ? (
           <div className="mb-6 rounded-2xl border border-red-400/25 bg-red-400/10 px-4 py-3 text-sm text-red-200">
@@ -478,172 +581,218 @@ export default function AdminPage() {
           </div>
         ) : null}
 
-        <div className="mb-10 rounded-[24px] border border-cyan-400/15 bg-cyan-400/5 p-5">
-          <div className="text-xs font-black uppercase tracking-[0.2em] text-cyan-300">Payment Verification Guide</div>
-          <div className="mt-2 grid gap-2 text-sm text-white/65 md:grid-cols-2">
-            <div>`Payment Submitted` means the buyer says money was sent and needs review.</div>
-            <div>`Paid Verified` means you have manually confirmed payment and can treat the order as paid.</div>
-          </div>
-        </div>
+        {activeTab === 'orders' ? (
+          <>
+            <div className="mb-6 rounded-[24px] border border-cyan-400/15 bg-cyan-400/5 p-5">
+              <div className="text-xs font-black uppercase tracking-[0.2em] text-cyan-300">Orders Workspace</div>
+              <div className="mt-2 grid gap-3 text-sm text-white/65 md:grid-cols-4">
+                <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+                  <div className="text-[10px] font-black uppercase tracking-[0.16em] text-white/40">All Orders</div>
+                  <div className="mt-1 text-2xl font-black text-white">{orders.length}</div>
+                </div>
+                <div className="rounded-2xl border border-fuchsia-400/20 bg-fuchsia-400/10 px-4 py-3">
+                  <div className="text-[10px] font-black uppercase tracking-[0.16em] text-fuchsia-200/70">Pending</div>
+                  <div className="mt-1 text-2xl font-black text-white">{pendingOrders.length}</div>
+                </div>
+                <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3">
+                  <div className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-200/70">Confirmed</div>
+                  <div className="mt-1 text-2xl font-black text-white">{confirmedOrders.length}</div>
+                </div>
+                <div className="rounded-2xl border border-yellow-400/20 bg-yellow-400/10 px-4 py-3">
+                  <div className="text-[10px] font-black uppercase tracking-[0.16em] text-yellow-200/70">Payment Review</div>
+                  <div className="mt-1 text-xs leading-5 text-white/70">
+                    Keep payment review in the detail pane, not on every order card.
+                  </div>
+                </div>
+              </div>
+            </div>
 
-        <div className="mb-10">
-          <div className="mb-3 text-xs font-black uppercase tracking-[0.24em] text-fuchsia-300">Pending Orders ({pendingOrders.length})</div>
-          {pendingOrders.length ? (
-            <div className="space-y-3">
-              {pendingOrders.map((order) => (
-                <div key={order.id} className="rounded-[24px] border border-fuchsia-400/20 bg-fuchsia-400/5 p-5">
-                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                    <div className="space-y-2">
-                      <div className="text-xs font-black uppercase tracking-[0.18em] text-fuchsia-200/70">
-                        {order.order_number} | Pending Order
+            <div className="mb-5 flex flex-wrap gap-3">
+              {[
+                {id: 'pending', label: `Pending (${pendingOrders.length})`},
+                {id: 'confirmed', label: `Confirmed (${confirmedOrders.length})`},
+                {id: 'all', label: `All (${orders.length})`},
+              ].map((filter) => (
+                <button
+                  key={filter.id}
+                  onClick={() => setOrderFilter(filter.id)}
+                  className={`rounded-2xl px-4 py-2.5 text-sm font-black uppercase tracking-[0.08em] transition ${
+                    orderFilter === filter.id ? 'bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 text-black' : 'border border-white/15 bg-white/5 text-white/70 hover:bg-white/10'
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+
+            {visibleOrders.length ? (
+              <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+                <div className="space-y-3">
+                  {visibleOrders.map(renderOrderRow)}
+                </div>
+
+                <div className="rounded-[28px] border border-white/10 bg-white/5 p-5">
+                  {selectedOrder ? (
+                    <>
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <div className="text-xs font-black uppercase tracking-[0.18em] text-cyan-300/75">
+                            {selectedOrder.order_number} | {selectedOrder.status === 'confirmed' ? 'Confirmed Order' : 'Pending Order'}
+                          </div>
+                          <div className="mt-2 text-2xl font-black leading-tight">{selectedOrder.product_title}</div>
+                          <div className="mt-2 text-sm text-white/55">
+                            {selectedOrder.product_variant} | Qty {selectedOrder.quantity} | {formatMoney(selectedOrder.total_price)}
+                          </div>
+                        </div>
+                        {selectedOrder.status === 'pending' ? (
+                          <button
+                            onClick={() => confirmOrder(selectedOrder)}
+                            disabled={confirmingId === selectedOrder.id}
+                            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 px-5 py-3 text-sm font-black uppercase tracking-[0.08em] text-black disabled:opacity-60"
+                          >
+                            {confirmingId === selectedOrder.id ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin" /> Confirming
+                              </>
+                            ) : (
+                              'Confirm Order'
+                            )}
+                          </button>
+                        ) : null}
                       </div>
-                      <div className="text-lg font-black">{order.product_title}</div>
-                      <div className="text-sm text-white/50">
-                        {order.product_variant} | Qty {order.quantity} | {formatMoney(order.total_price)}
+
+                      <div className="mt-5 grid gap-3 md:grid-cols-2">
+                        <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-white/40">Buyer</div>
+                          <div className="mt-2 text-sm font-black text-white">{selectedOrder.buyer_name}</div>
+                          <div className="mt-1 text-sm text-white/65">{selectedOrder.buyer_email}</div>
+                          <div className="mt-1 text-xs text-white/45">{selectedOrder.buyer_phone}</div>
+                        </div>
+                        <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-white/40">Shipping</div>
+                          <div className="mt-2 text-sm text-white/70">
+                            {selectedOrder.delivery_country || 'No country'}{selectedOrder.delivery_province ? ` | ${selectedOrder.delivery_province}` : ''}
+                          </div>
+                          <div className="mt-1 text-xs text-white/45">{selectedOrder.buyer_address}</div>
+                        </div>
                       </div>
-                      <div className="text-sm text-white/75">
-                        {order.buyer_name} | {order.buyer_email}
+
+                      <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
+                        <div className="grid gap-2 text-xs text-white/45 md:grid-cols-2">
+                          <div>Created: {formatDate(selectedOrder.created_at)}</div>
+                          <div>Confirmed: {formatDate(selectedOrder.confirmed_at)}</div>
+                        </div>
                       </div>
-                      <div className="text-xs text-white/40">
-                        {order.delivery_country || 'No country'}{order.delivery_province ? ` | ${order.delivery_province}` : ''}
-                      </div>
-                      {renderPaymentControls(order)}
+
+                      {renderPaymentControls(selectedOrder)}
+                    </>
+                  ) : (
+                    <div className="rounded-2xl border border-white/8 bg-white/4 px-5 py-8 text-center text-sm text-white/40">
+                      Select an order from the list to manage payment and fulfillment details.
                     </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-[24px] border border-white/10 bg-white/5 px-5 py-4 text-sm text-white/45">
+                No orders found for the current filter.
+              </div>
+            )}
+          </>
+        ) : null}
 
-                    <button
-                      onClick={() => confirmOrder(order)}
-                      disabled={confirmingId === order.id}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 px-5 py-3 text-sm font-black uppercase tracking-[0.08em] text-black disabled:opacity-60"
-                    >
-                      {confirmingId === order.id ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" /> Confirming
-                        </>
-                      ) : (
-                        'Confirm Order'
-                      )}
+        {activeTab === 'inventory' ? (
+          <>
+            <div className="mb-8">
+              <div className="mb-3 text-xs font-black uppercase tracking-[0.24em] text-cyan-300">In Stock ({inStockProducts.length})</div>
+              <div className="space-y-2">
+                {inStockProducts.map((product) => (
+                  <div key={product.id} className="flex items-center gap-4 rounded-2xl border border-cyan-400/20 bg-cyan-400/5 px-5 py-4">
+                    <div className="flex-1">
+                      <div className="text-sm font-black">{product.title}</div>
+                      <div className="text-xs text-white/45">{product.subtitle} | CAD ${product.price.toFixed(2)}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black uppercase tracking-[0.1em] text-white/50">Stock</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={product.stock}
+                        onChange={(event) => setStock(product.id, event.target.value)}
+                        className="w-16 rounded-xl border border-white/15 bg-black/30 px-3 py-1.5 text-center text-sm font-black text-white outline-none focus:border-cyan-300/50"
+                      />
+                    </div>
+                    <button onClick={() => toggleInStock(product.id)} className="rounded-2xl border border-cyan-400/30 bg-cyan-400/20 px-4 py-2 text-xs font-black uppercase tracking-[0.1em] text-cyan-200 transition hover:border-red-400/30 hover:bg-red-400/20 hover:text-red-200">
+                      Mark Sold Out
                     </button>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-[24px] border border-white/10 bg-white/5 px-5 py-4 text-sm text-white/45">
-              New on-hand orders will appear here. Stock will only decrease after you click Confirm.
-            </div>
-          )}
-        </div>
-
-        <div className="mb-10">
-          <div className="mb-3 text-xs font-black uppercase tracking-[0.24em] text-white/40">Recently Confirmed ({confirmedOrders.length})</div>
-          {confirmedOrders.length ? (
-            <div className="space-y-3">
-              {confirmedOrders.map((order) => (
-                <div key={order.id} className="rounded-2xl border border-white/8 bg-white/4 px-5 py-4 text-sm text-white/70">
-                  <div className="font-black">{order.order_number} | {order.product_title}</div>
-                  <div className="mt-1 text-xs text-white/45">
-                    {order.buyer_name} | Qty {order.quantity} | {formatMoney(order.total_price)}
-                  </div>
-                  <div className="mt-1 text-xs text-white/35">
-                    Confirmed: {formatDate(order.confirmed_at)}
-                  </div>
-                  {renderPaymentControls(order)}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-white/8 bg-white/4 px-5 py-4 text-sm text-white/35">
-              No confirmed on-hand orders yet.
-            </div>
-          )}
-        </div>
-
-        <div className="mb-8">
-          <div className="mb-3 text-xs font-black uppercase tracking-[0.24em] text-cyan-300">In Stock ({inStockProducts.length})</div>
-          <div className="space-y-2">
-            {inStockProducts.map((product) => (
-              <div key={product.id} className="flex items-center gap-4 rounded-2xl border border-cyan-400/20 bg-cyan-400/5 px-5 py-4">
-                <div className="flex-1">
-                  <div className="text-sm font-black">{product.title}</div>
-                  <div className="text-xs text-white/45">{product.subtitle} | CAD ${product.price.toFixed(2)}</div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-black uppercase tracking-[0.1em] text-white/50">Stock</span>
-                  <input
-                    type="number"
-                    min="0"
-                    value={product.stock}
-                    onChange={(event) => setStock(product.id, event.target.value)}
-                    className="w-16 rounded-xl border border-white/15 bg-black/30 px-3 py-1.5 text-center text-sm font-black text-white outline-none focus:border-cyan-300/50"
-                  />
-                </div>
-                <button onClick={() => toggleInStock(product.id)} className="rounded-2xl border border-cyan-400/30 bg-cyan-400/20 px-4 py-2 text-xs font-black uppercase tracking-[0.1em] text-cyan-200 transition hover:border-red-400/30 hover:bg-red-400/20 hover:text-red-200">
-                  Mark Sold Out
-                </button>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <div className="mb-3 text-xs font-black uppercase tracking-[0.24em] text-white/40">Sold Out ({soldOutProducts.length})</div>
-          <div className="space-y-2">
-            {soldOutProducts.map((product) => (
-              <div key={product.id} className="flex items-center gap-4 rounded-2xl border border-white/8 bg-white/3 px-5 py-4 opacity-60">
-                <div className="flex-1">
-                  <div className="text-sm font-black text-white/70">{product.title}</div>
-                  <div className="text-xs text-white/35">{product.subtitle} | CAD ${product.price.toFixed(2)}</div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-black uppercase tracking-[0.1em] text-white/30">Stock</span>
-                  <input
-                    type="number"
-                    min="0"
-                    value={product.stock || 0}
-                    onChange={(event) => setStock(product.id, event.target.value)}
-                    className="w-16 rounded-xl border border-white/10 bg-black/20 px-3 py-1.5 text-center text-sm font-black text-white/50 outline-none focus:border-cyan-300/50"
-                  />
-                </div>
-                <button onClick={() => toggleInStock(product.id)} className="rounded-2xl border border-white/15 bg-white/8 px-4 py-2 text-xs font-black uppercase tracking-[0.1em] text-white/50 transition hover:border-cyan-400/25 hover:bg-cyan-400/15 hover:text-cyan-200">
-                  Mark In Stock
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="mt-10">
-          <div className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-[0.24em] text-fuchsia-300/75">
-            <Youtube className="h-4 w-4" /> Homepage Video
-          </div>
-          <div className="rounded-[24px] border border-fuchsia-400/20 bg-fuchsia-400/5 p-5">
-            <p className="mb-3 text-xs text-white/50">Paste a YouTube URL or video ID below. It will appear on the homepage.</p>
-            <div className="flex gap-3">
-              <input
-                type="text"
-                value={videoId}
-                onChange={(event) => setVideoId(extractVideoId(event.target.value))}
-                placeholder="e.g. OcLL44cDh7k or full YouTube URL"
-                className="flex-1 rounded-2xl border border-white/15 bg-black/30 px-4 py-2.5 text-sm text-white outline-none focus:border-fuchsia-300/50"
-              />
-              <button onClick={saveVideo} className={`flex items-center gap-2 rounded-2xl px-5 py-2.5 text-sm font-black uppercase tracking-[0.08em] transition ${videoSaved ? 'bg-green-400 text-black' : 'border border-fuchsia-400/40 bg-fuchsia-500/30 text-fuchsia-200 hover:bg-fuchsia-500/45'}`}>
-                <Save className="h-4 w-4" /> {videoSaved ? 'Saved!' : 'Save'}
-              </button>
             </div>
-            <div className="mt-4 overflow-hidden rounded-[18px] border border-white/10 bg-black shadow-xl">
-              <div className="aspect-video w-full">
-                <iframe
-                  key={videoId}
-                  src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`}
-                  title="Homepage Hype Video"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                  className="h-full w-full"
+
+            <div>
+              <div className="mb-3 text-xs font-black uppercase tracking-[0.24em] text-white/40">Sold Out ({soldOutProducts.length})</div>
+              <div className="space-y-2">
+                {soldOutProducts.map((product) => (
+                  <div key={product.id} className="flex items-center gap-4 rounded-2xl border border-white/8 bg-white/3 px-5 py-4 opacity-60">
+                    <div className="flex-1">
+                      <div className="text-sm font-black text-white/70">{product.title}</div>
+                      <div className="text-xs text-white/35">{product.subtitle} | CAD ${product.price.toFixed(2)}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black uppercase tracking-[0.1em] text-white/30">Stock</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={product.stock || 0}
+                        onChange={(event) => setStock(product.id, event.target.value)}
+                        className="w-16 rounded-xl border border-white/10 bg-black/20 px-3 py-1.5 text-center text-sm font-black text-white/50 outline-none focus:border-cyan-300/50"
+                      />
+                    </div>
+                    <button onClick={() => toggleInStock(product.id)} className="rounded-2xl border border-white/15 bg-white/8 px-4 py-2 text-xs font-black uppercase tracking-[0.1em] text-white/50 transition hover:border-cyan-400/25 hover:bg-cyan-400/15 hover:text-cyan-200">
+                      Mark In Stock
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        ) : null}
+
+        {activeTab === 'homepage' ? (
+          <div className="mt-2">
+            <div className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-[0.24em] text-fuchsia-300/75">
+              <Youtube className="h-4 w-4" /> Homepage Video
+            </div>
+            <div className="rounded-[24px] border border-fuchsia-400/20 bg-fuchsia-400/5 p-5">
+              <p className="mb-3 text-xs text-white/50">Paste a YouTube URL or video ID below. It will appear on the homepage.</p>
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  value={videoId}
+                  onChange={(event) => setVideoId(extractVideoId(event.target.value))}
+                  placeholder="e.g. OcLL44cDh7k or full YouTube URL"
+                  className="flex-1 rounded-2xl border border-white/15 bg-black/30 px-4 py-2.5 text-sm text-white outline-none focus:border-fuchsia-300/50"
                 />
+                <button onClick={saveVideo} className={`flex items-center gap-2 rounded-2xl px-5 py-2.5 text-sm font-black uppercase tracking-[0.08em] transition ${videoSaved ? 'bg-green-400 text-black' : 'border border-fuchsia-400/40 bg-fuchsia-500/30 text-fuchsia-200 hover:bg-fuchsia-500/45'}`}>
+                  <Save className="h-4 w-4" /> {videoSaved ? 'Saved!' : 'Save'}
+                </button>
+              </div>
+              <div className="mt-4 overflow-hidden rounded-[18px] border border-white/10 bg-black shadow-xl">
+                <div className="aspect-video w-full">
+                  <iframe
+                    key={videoId}
+                    src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`}
+                    title="Homepage Hype Video"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    className="h-full w-full"
+                  />
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        ) : null}
 
         <p className="mt-8 text-center text-xs text-white/25">Changes apply to the live shop only when this deployment can read and write Supabase successfully.</p>
       </div>

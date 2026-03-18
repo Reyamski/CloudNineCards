@@ -7,14 +7,13 @@ import emailjs from '@emailjs/browser';
 import Nav from '../components/Nav';
 
 // ── EmailJS — reuse same service, separate template for on-hand orders ───────
-const EMAILJS_SERVICE_ID   = 'service_495o229';
-const EMAILJS_TEMPLATE_ID  = 'template_3ickzxu';
-const EMAILJS_PUBLIC_KEY  = 'REDACTED_EMAILJS_PUBLIC';
-const EMAILJS_PRIVATE_KEY = 'REDACTED_EMAILJS_PRIVATE';
+const EMAILJS_SERVICE_ID   = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+const EMAILJS_TEMPLATE_ID  = import.meta.env.VITE_EMAILJS_TEMPLATE_ONHAND;
+const EMAILJS_PUBLIC_KEY  = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
+const EMAILJS_PRIVATE_KEY = import.meta.env.VITE_EMAILJS_PRIVATE_KEY;
 
 // ── imgbb — free image hosting so payment proof renders in email ──────────────
-// Get free API key at: https://api.imgbb.com
-const IMGBB_API_KEY = 'REDACTED_IMGBB_KEY';
+const IMGBB_API_KEY = import.meta.env.VITE_IMGBB_API_KEY;
 
 async function uploadProofImage(base64DataUrl) {
   const base64 = base64DataUrl.split(',')[1];
