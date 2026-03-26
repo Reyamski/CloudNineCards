@@ -76,4 +76,4 @@ and card-forward layouts that showcase the products as collectibles — not just
 - Mobile-only optimizations (will be responsive by default)
 
 ---
-*Last updated: 2026-03-12 after initialization*
+*Last updated: 2026-03-19 — Auth/account schema designed on feature/user-auth-schema. .env secured. Admin payment verification live. Next: run SQL, build login/signup UI, account page.*
