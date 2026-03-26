@@ -1,7 +1,6 @@
 import {useEffect, useState} from 'react';
 import {ShieldCheck, Save, RotateCcw, Eye, EyeOff, Youtube, Loader2} from 'lucide-react';
 import {supabase, supabaseEnabled} from '../lib/supabase';
-import PriceChecker from '../components/PriceChecker';
 
 const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD;
 const DEFAULT_VIDEO_ID = 'OcLL44cDh7k';
@@ -805,10 +804,7 @@ export default function AdminPage() {
 
         {activeTab === 'prices' ? (
           <div className="mt-2">
-            <PriceChecker />
-            <p className="mt-4 text-center text-xs text-white/25">
-              eBay + TCGPlayer auto-fetch requires <code className="text-yellow-300">EBAY_APP_ID</code> in .env and running via <code className="text-cyan-300">vercel dev</code>. Mercari/Collectr/FB — use manual entry.
-            </p>
+            <p className="text-center text-sm text-white/40 py-8">Price Research tool coming soon.</p>
           </div>
         ) : null}
 
