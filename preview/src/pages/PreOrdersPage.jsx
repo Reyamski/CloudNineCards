@@ -78,6 +78,27 @@ function calcPoShipping(country, qty) {
 
 const preorders = [
   {
+    id: 'op17jp',
+    title: 'One Piece Card Game OP-17 Booster Box [Japanese]',
+    subtitle: '4th Anniversary Set – "World\'s Strongest Warrior"',
+    soldOut: false,
+    priceTba: false,
+    price: 93,
+    usdPrice: 68,
+    audPrice: 96,
+    currency: 'CAD',
+    eta: 'Est. Aug 31, 2026',
+    deadline: new Date('2026-04-13T11:00:00'),
+    image: '/OP-17-JP.png',
+    hype: '4th Anniversary Set',
+    notes: [
+      'Per Box — Case (12 Boxes): CAD $1,113 | USD $810 | AUD $1,148.',
+      'Pre-orders are not guaranteed and subject to allocation.',
+      'If allocation is cut, down payment will be refunded.',
+      'Buyer shoulders shipping fees, taxes, and import duties.',
+    ],
+  },
+  {
     id: 'ygo-cg2122ae',
     title: 'Yu-Gi-Oh! Creation Pack 12 [CG2122AE]',
     subtitle: 'Asian English · Per Case (24 Boxes)',
@@ -100,27 +121,6 @@ const preorders = [
   {id: 'op17eng', title: 'One Piece Card Game OP-17 Booster Box',  subtitle: 'English',  soldOut: true,  priceTba: false, currency: 'CAD', eta: 'TBD', image: 'https://placehold.co/400x560/0d0020/9333ea?text=OP-17%0AEnglish%0ABooster+Box&font=montserrat', hype: 'Stay tuned for updates.'},
   {id: 'op16eng', title: 'One Piece Card Game OP-16 Booster Box',  subtitle: 'English',  soldOut: true,  priceTba: false, currency: 'CAD', eta: 'TBD', image: 'https://placehold.co/400x560/0d0020/9333ea?text=OP-16%0AEnglish%0ABooster+Box&font=montserrat', hype: 'Stay tuned for updates.'},
   {id: 'op16jp',  title: 'One Piece Card Game OP-16 Booster Box',  subtitle: 'Japanese', soldOut: true,  priceTba: false, currency: 'CAD', eta: 'TBD', image: 'https://placehold.co/400x560/0d0020/c084fc?text=OP-16%0AJapanese%0ABooster+Box&font=montserrat', hype: 'Stay tuned for updates.'},
-  {
-    id: 'op17jp',
-    title: 'One Piece Card Game OP-17 Booster Box [Japanese]',
-    subtitle: '4th Anniversary Set – "World\'s Strongest Warrior"',
-    soldOut: false,
-    priceTba: false,
-    price: 93,
-    usdPrice: 68,
-    audPrice: 96,
-    currency: 'CAD',
-    eta: 'Est. Aug 31, 2026',
-    deadline: new Date('2026-04-13T11:00:00'),
-    image: '/OP-17-JP.png',
-    hype: '4th Anniversary Set',
-    notes: [
-      'Per Box — Case (12 Boxes): CAD $1,113 | USD $810 | AUD $1,148.',
-      'Pre-orders are not guaranteed and subject to allocation.',
-      'If allocation is cut, down payment will be refunded.',
-      'Buyer shoulders shipping fees, taxes, and import duties.',
-    ],
-  },
 ];
 
 // ── Modal ────────────────────────────────────────────────────────────────────
