@@ -7,6 +7,7 @@ import PreOrdersPage from './pages/PreOrdersPage';
 import NewArrivalsPage from './pages/NewArrivalsPage';
 import ContactPage from './pages/ContactPage';
 import AdminPage from './pages/AdminPage';
+import ProductPage from './pages/ProductPage';
 import NotFoundPage from './pages/NotFoundPage';
 import AccountLoginPage from './pages/AccountLoginPage';
 import AccountOrdersPage from './pages/AccountOrdersPage';
@@ -24,6 +25,7 @@ export default function App() {
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/account" element={<AccountLoginPage />} />
         <Route path="/account/orders" element={<AccountOrdersPage />} />
+        <Route path="/shop/:id" element={<ProductPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>

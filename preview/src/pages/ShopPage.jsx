@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import emailjs from '@emailjs/browser';
 import Nav from '../components/Nav';
 import Footer from '../components/Footer';
+import { allProducts } from '../data/products';
 
 // ── EmailJS — reuse same service, separate template for on-hand orders ───────
 const EMAILJS_SERVICE_ID   = import.meta.env.VITE_EMAILJS_SERVICE_ID;
@@ -27,34 +28,6 @@ async function uploadProofImage(base64DataUrl) {
 
 const WISE_HANDLE    = '@cloudninecards';
 const CONTACT_EMAIL  = 'papspective@gmail.com';
-
-// ── Products ─────────────────────────────────────────────────────────────────
-const allProducts = [
-  // ── IN STOCK ────────────────────────────────────────────────────────────────
-  {id: 'op15jp',   title: "One Piece Card Game Adventure on Kami's Island OP-15 Booster Box", subtitle: 'Japanese', price: 129.00, badge: 'In Stock', inStock: true,  stock: 12, image: 'https://i.ibb.co/4R6DL8Vt/8cc175339fbf.webp', tag: 'One Piece'},
-  {id: 'eb03jp',   title: 'One Piece Card Game Extra Booster Heroines Edition EB-03',           subtitle: 'Japanese', price: 259.00, badge: 'In Stock', inStock: true,  stock: 7,  image: 'https://i.ibb.co/cS1CLgXf/259dbef5f466.webp', tag: 'One Piece'},
-  {id: 'ac1',      title: 'One Piece Card Game Admirable Collection Vol.1 Vinsmoke Reiju AC-01', subtitle: 'Japanese', price: 279.00, badge: 'In Stock', inStock: true,  stock: 5,  image: 'https://i.ibb.co/ZzmyRcFX/aac4c203bf03.webp', tag: 'One Piece'},
-  {id: 'poke-ah',  title: 'Pokemon TCG Mega Evolution Ascended Heroes Elite Trainer Box',        subtitle: 'English',  price: 279.00, badge: 'In Stock', inStock: true,  stock: 10, image: 'https://i.ibb.co/5WbMqZTR/41faa72453fe.jpg',  tag: 'Pokemon'},
-  // ── SOLD OUT ────────────────────────────────────────────────────────────────
-  {id: 'op01eng',  title: 'One Piece Card Game Romance Dawn OP-01 Booster Box',                 subtitle: 'English',  price: 850.00, badge: 'Sold Out', inStock: false, image: 'https://i.ibb.co/KjvKb3Vv/28e46fc98ddd.jpg',  tag: 'One Piece'},
-  {id: 'op02eng',  title: 'One Piece Card Game Paramount War OP-02 Booster Box',                subtitle: 'English',  price: 280.00, badge: 'Sold Out', inStock: false, image: 'https://i.ibb.co/KpXHTFdw/41e98c6cdef5.webp', tag: 'One Piece'},
-  {id: 'op03eng',  title: 'One Piece Card Game Pillars of Strength OP-03 Booster Box',          subtitle: 'English',  price: 240.00, badge: 'Sold Out', inStock: false, image: 'https://i.ibb.co/LXq6C0Lm/aea2dc1404bb.jpg',  tag: 'One Piece'},
-  {id: 'op04eng',  title: 'One Piece Card Game Kingdoms of Intrigue OP-04 Booster Box',         subtitle: 'English',  price: 190.00, badge: 'Sold Out', inStock: false, image: 'https://i.ibb.co/Lhb11tSC/a403f77df496.jpg',  tag: 'One Piece'},
-  {id: 'op05eng',  title: 'One Piece Card Game Awakening of the New Era OP-05 Booster Box',     subtitle: 'English',  price: 650.00, badge: 'Sold Out', inStock: false, image: 'https://i.ibb.co/GQvCdfp6/c9dc9e2d68a2.webp', tag: 'One Piece'},
-  {id: 'op06eng',  title: 'One Piece Card Game Wings of the Captain OP-06 Booster Box',         subtitle: 'English',  price: 210.00, badge: 'Sold Out', inStock: false, image: 'https://i.ibb.co/7dG2qR3T/44485c447433.webp', tag: 'One Piece'},
-  {id: 'op07eng',  title: 'One Piece Card Game 500 Years in the Future OP-07 Booster Box',      subtitle: 'English',  price: 180.00, badge: 'Sold Out', inStock: false, image: 'https://i.ibb.co/wZJ5LnbW/afee0c241bd8.webp', tag: 'One Piece'},
-  {id: 'op08eng',  title: 'One Piece Card Game Two Legends OP-08 Booster Box',                  subtitle: 'English',  price: 150.00, badge: 'Sold Out', inStock: false, image: 'https://i.ibb.co/WpgmFXMS/98764cd9d974.jpg',  tag: 'One Piece'},
-  {id: 'op09eng',  title: 'One Piece Card Game Emperors in the New World OP-09 Booster Box',    subtitle: 'English',  price: 150.00, badge: 'Sold Out', inStock: false, image: 'https://i.ibb.co/KzxPHrXd/93fa23eebfe9.avif', tag: 'One Piece'},
-  {id: 'op10eng',  title: 'One Piece Card Game Royal Blood OP-10 Booster Box',                  subtitle: 'English',  price: 140.00, badge: 'Sold Out', inStock: false, image: 'https://i.ibb.co/tTGLk1Hk/30cfe42bbb8e.webp', tag: 'One Piece'},
-  {id: 'op11eng',  title: 'One Piece Card Game A Fist of Divine Speed OP-11 Booster Box',       subtitle: 'English',  price: 140.00, badge: 'Sold Out', inStock: false, image: 'https://i.ibb.co/BVgRgKMv/64df998b3578.jpg',  tag: 'One Piece'},
-  {id: 'op12eng',  title: 'One Piece Card Game Legacy of the Master OP-12 Booster Box',         subtitle: 'English',  price: 135.00, badge: 'Sold Out', inStock: false, image: 'https://i.ibb.co/KcQ3VB8s/ba4a3a57ef4b.webp', tag: 'One Piece'},
-  {id: 'op13eng',  title: 'One Piece Card Game Carrying on His Will OP-13 Booster Box',         subtitle: 'English',  price: 135.00, badge: 'Sold Out', inStock: false, image: 'https://i.ibb.co/1xvX6R8/c04d97987fe7.webp',  tag: 'One Piece'},
-  {id: 'op14eng',  title: "One Piece Card Game The Azure Sea's Seven OP-14 Booster Box",        subtitle: 'English',  price: 130.00, badge: 'Sold Out', inStock: false, image: 'https://i.ibb.co/q3Y2y816/e1d736d3aa3f.webp', tag: 'One Piece'},
-  {id: 'eb01eng',  title: 'One Piece Card Game Extra Booster Memorial Collection EB-01',         subtitle: 'English',  price: 140.00, badge: 'Sold Out', inStock: false, image: 'https://placehold.co/400x560/0d0020/555555?text=Photo+Soon', tag: 'One Piece'},
-  {id: 'eb02eng',  title: 'One Piece Card Game Extra Booster Anime 25th Collection EB-02',       subtitle: 'English',  price: 300.00, badge: 'Sold Out', inStock: false, image: 'https://placehold.co/400x560/0d0020/555555?text=Photo+Soon', tag: 'One Piece'},
-  {id: 'prb01eng', title: 'One Piece Card Game Premium Best Collection PRB-01',                  subtitle: 'English',  price: 200.00, badge: 'Sold Out', inStock: false, image: 'https://placehold.co/400x560/0d0020/555555?text=Photo+Soon', tag: 'One Piece'},
-  {id: 'prb02eng', title: 'One Piece Card Game Premium Best Collection Vol.2 PRB-02',            subtitle: 'English',  price: 250.00, badge: 'Sold Out', inStock: false, image: 'https://placehold.co/400x560/0d0020/555555?text=Photo+Soon', tag: 'One Piece'},
-];
 
 const tags = ['All', 'One Piece', 'Dragon Ball', 'Pokemon', 'Pre-orders'];
 
@@ -746,16 +719,16 @@ export default function ShopPage() {
           {filtered.map((item) => (
             <div key={item.id} className="group relative overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,#0b1022,#14081d)]">
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-yellow-300" />
-              <div className="relative overflow-hidden">
+              <Link to={`/shop/${item.id}`} className="relative overflow-hidden block">
                 <img src={item.image} alt={item.title} onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/product-fallback.svg'; }} className="h-[260px] w-full object-cover saturate-[1.35] transition duration-500 group-hover:scale-105" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                 <div className="absolute left-4 top-4 rounded-full border border-white/10 bg-black/72 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-white backdrop-blur">
                   {item.badge}
                 </div>
-              </div>
+              </Link>
               <div className="p-5">
                 <div className="text-sm font-black uppercase tracking-[0.18em] text-cyan-300/75">{item.subtitle}</div>
-                <div className="mt-2 text-lg font-black leading-snug">{item.title}</div>
+                <Link to={`/shop/${item.id}`} className="mt-2 block text-lg font-black leading-snug hover:text-cyan-200 transition">{item.title}</Link>
                 <div className="mt-4 text-3xl font-black">CAD ${item.price.toFixed(2)}</div>
                 <div className="mt-1 text-xs text-white/30">+ shipping & tax calculated at checkout</div>
                 <div className="mt-4">
