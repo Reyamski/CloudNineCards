@@ -262,7 +262,6 @@ function BuyNowModal({ item, onClose }) {
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center px-4 pb-4 sm:pb-0">
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        onClick={onClose}
         className="absolute inset-0 bg-black/80 backdrop-blur-sm"
       />
       <motion.div
@@ -549,7 +548,6 @@ function NotifyMeModal({ item, onClose }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        onClick={onClose}
         className="absolute inset-0 bg-black/80 backdrop-blur-sm"
       />
       <motion.div
