@@ -15,7 +15,7 @@ export default function AnnouncementBar() {
         style={{backgroundSize: '200% 100%', animation: 'shimmer 2.5s infinite linear'}}
       />
       <style>{'@keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }'}</style>
-      <Link to="/pre-orders" className="relative inline-flex items-center gap-2 transition hover:opacity-85">
+      <Link to={isOpen ? '/pre-orders' : '/contact'} className="relative inline-flex items-center gap-2 transition hover:opacity-85">
         <BellRing className="h-3.5 w-3.5 animate-pulse" />
         {isOpen ? (
           <>
