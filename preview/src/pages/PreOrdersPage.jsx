@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import emailjs from '@emailjs/browser';
 import Nav from '../components/Nav';
 import Footer from '../components/Footer';
+import { supabase } from '../lib/supabase';
 
 // ── EmailJS config ───────────────────────────────────────────────────────────
 const EMAILJS_SERVICE_ID  = import.meta.env.VITE_EMAILJS_SERVICE_ID;
@@ -284,6 +285,29 @@ function PreOrderModal({ item, onClose }) {
         { publicKey: EMAILJS_PUBLIC_KEY }
       );
       setSubmitted(true);
+      // Write to Supabase so it appears in buyer order history
+      try {
+        if (supabase) {
+          await supabase.from('orders').insert({
+            order_number:     orderNumber,
+            order_type:       'pre_order',
+            buyer_email:      email.trim().toLowerCase(),
+            buyer_name:       name,
+            buyer_phone:      phone,
+            buyer_address:    address,
+            delivery_country: country,
+            item_title:       item.title,
+            quantity:         qty,
+            full_price:       `CAD $${totalPrice}`,
+            dp_amount:        `CAD $${totalDp}`,
+            balance_due:      `CAD $${totalRemaining}`,
+            eta:              item.eta,
+            payment_status:   'awaiting_payment',
+          });
+        }
+      } catch (dbErr) {
+        console.warn('Supabase order record failed (non-blocking):', dbErr);
+      }
       try {
         await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID,
           { order_number: orderNumber, buyer_name: name, buyer_email: email, buyer_phone: phone, buyer_address: address, item_title: item.title, item_subtitle: item.subtitle, quantity: qty, full_price: `CAD $${totalPrice}`, dp_amount: `CAD $${totalDp}`, balance_due: `CAD $${totalRemaining}`, eta: item.eta, payment_proof: proofHtml, wise_handle: WISE_HANDLE, to_email: email },
@@ -484,15 +508,24 @@ function PreOrderModal({ item, onClose }) {
 
               {/* Wise handle */}
               <div className="mb-4">
-                <div className="text-xs font-black uppercase tracking-[0.16em] text-white/40 mb-2">Send to Wise account</div>
-                <div className="flex items-center gap-3 rounded-2xl border border-cyan-300/20 bg-cyan-300/8 p-4">
-                  <div className="flex-1">
-                    <div className="text-2xl font-black text-cyan-200">{WISE_HANDLE}</div>
-                    <div className="text-xs text-white/40 mt-0.5">Cloud Nine Cards — Wise</div>
+                <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/8 p-4">
+                  <div className="flex items-center gap-4">
+                    <img
+                      src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&format=png&bgcolor=ffffff&data=https%3A%2F%2Fwise.com%2Fpay%2Fme%2Fcloudninecards"
+                      alt="Scan to pay on Wise"
+                      className="h-[80px] w-[80px] rounded-xl flex-shrink-0"
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs text-white/40 mb-1">Send to Wise account</div>
+                      <div className="text-xl font-black text-cyan-200">{WISE_HANDLE}</div>
+                      <div className="text-xs text-white/40 mt-0.5">Cloud Nine Cards — Wise</div>
+                      <div className="text-[10px] text-white/30 mt-1">Or scan QR code with your Wise app</div>
+                    </div>
+                    <button onClick={copyWise} className="rounded-xl border border-white/10 bg-white/5 p-2.5 hover:bg-white/10 transition flex-shrink-0">
+                      {copied ? <Check className="h-4 w-4 text-cyan-300" /> : <Copy className="h-4 w-4 text-white/50" />}
+                    </button>
                   </div>
-                  <button onClick={copyWise} className="rounded-xl border border-white/10 bg-white/5 p-2.5 hover:bg-white/10 transition">
-                    {copied ? <Check className="h-4 w-4 text-cyan-300" /> : <Copy className="h-4 w-4 text-white/50" />}
-                  </button>
                 </div>
               </div>
 
