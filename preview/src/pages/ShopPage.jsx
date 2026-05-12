@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { supabase, supabaseEnabled } from '../lib/supabase';
-import { X, Copy, Check, Camera, Loader2, Package, Globe, ShieldCheck, Paperclip } from 'lucide-react';
+import { X, Copy, Check, Camera, Loader2, Package, Globe, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import emailjs from '@emailjs/browser';
 import Nav from '../components/Nav';
+import Footer from '../components/Footer';
 
 // ── EmailJS — reuse same service, separate template for on-hand orders ───────
 const EMAILJS_SERVICE_ID   = import.meta.env.VITE_EMAILJS_SERVICE_ID;
@@ -492,22 +493,14 @@ function BuyNowModal({ item, onClose }) {
                   className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder-white/25 outline-none focus:border-cyan-300/40 resize-none" />
               </div>
 
-              {/* Payment screenshot */}
-              <div className="mb-4">
-                <label className="mb-1.5 block text-xs font-black uppercase tracking-[0.14em] text-white/40">
-                  Payment Screenshot <span className="normal-case font-normal text-white/25">(optional · max 2MB)</span>
-                </label>
-                <div className="flex items-center gap-3 w-full rounded-2xl border border-dashed border-white/10 bg-white/2 px-4 py-3 opacity-40 cursor-not-allowed select-none">
-                  <Paperclip className="h-4 w-4 text-white/40 shrink-0" />
-                  <span className="text-sm text-white/45 truncate">Reply to your confirmation email instead</span>
+              <div className="mb-4 flex gap-3 rounded-2xl border border-yellow-400/25 bg-yellow-400/8 px-4 py-4">
+                <Camera className="h-4 w-4 text-yellow-300 shrink-0 mt-0.5" />
+                <div>
+                  <div className="text-xs font-black uppercase tracking-[0.14em] text-yellow-200 mb-1">Payment Screenshot Required</div>
+                  <p className="text-xs text-yellow-100/70 leading-5">
+                    After submitting, <strong>email your Wise screenshot to <span className="text-cyan-300">{CONTACT_EMAIL}</span></strong> with your name and order details. Orders cannot be processed without proof of payment.
+                  </p>
                 </div>
-              </div>
-
-              <div className="mb-4 flex gap-2.5 rounded-2xl border border-yellow-400/20 bg-yellow-400/6 px-4 py-3">
-                <span className="text-yellow-300 text-sm shrink-0">📸</span>
-                <p className="text-xs text-yellow-200/80 leading-5">
-                  After submitting, <strong>reply to your confirmation email within 24 hours</strong> with your Wise payment screenshot. We cannot process your order without proof of payment.
-                </p>
               </div>
 
               <div className="mb-5 rounded-2xl border border-white/8 bg-white/4 p-4 text-xs text-white/50 space-y-1.5">
@@ -679,6 +672,7 @@ export default function ShopPage() {
           ))}
         </div>
       </section>
+      <Footer />
     </div>
   );
 }

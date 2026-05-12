@@ -47,8 +47,12 @@ export default function Nav() {
         {/* Account link */}
         <Link
           to={user ? '/account/orders' : '/account'}
-          className={`hidden items-center gap-1.5 rounded-full border px-4 py-1.5 text-xs font-black uppercase tracking-[0.14em] transition md:flex ${
-            pathname.startsWith('/account') ? 'border-cyan-300/50 bg-cyan-300/15 text-cyan-300' : 'border-white/15 bg-white/5 text-white/65 hover:border-white/25 hover:text-white/85'
+          className={`hidden items-center gap-1.5 rounded-full border px-4 py-2 text-xs font-black uppercase tracking-[0.14em] transition md:flex ${
+            pathname.startsWith('/account')
+              ? 'border-cyan-300/60 bg-cyan-300/20 text-cyan-200'
+              : user
+                ? 'border-fuchsia-400/40 bg-fuchsia-400/15 text-fuchsia-200 hover:border-fuchsia-400/60 hover:bg-fuchsia-400/25'
+                : 'border-cyan-300/35 bg-cyan-300/10 text-cyan-200 hover:border-cyan-300/55 hover:bg-cyan-300/18'
           }`}
         >
           <User className="h-3.5 w-3.5" />
@@ -90,8 +94,12 @@ export default function Nav() {
             <Link
               to={user ? '/account/orders' : '/account'}
               onClick={() => setIsOpen(false)}
-              className={`rounded-lg px-3 py-2 text-sm font-bold uppercase tracking-[0.14em] transition hover:bg-white/10 hover:text-cyan-300 ${
-                pathname.startsWith('/account') ? 'text-cyan-300' : 'text-white/75'
+              className={`rounded-lg px-3 py-2 text-sm font-bold uppercase tracking-[0.14em] transition hover:bg-white/10 ${
+                pathname.startsWith('/account')
+                  ? 'text-cyan-300'
+                  : user
+                    ? 'text-fuchsia-300 hover:text-fuchsia-200'
+                    : 'text-cyan-300 hover:text-cyan-200'
               }`}
             >
               {user ? 'My Orders' : 'Login'}

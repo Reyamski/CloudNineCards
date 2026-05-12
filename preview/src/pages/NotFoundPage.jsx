@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Nav from '../components/Nav';
+import Footer from '../components/Footer';
 
 export default function NotFoundPage() {
   useEffect(() => { document.title = '404 | CloudNineCards'; }, []);
@@ -44,6 +45,7 @@ export default function NotFoundPage() {
           </div>
         </motion.div>
       </section>
+      <Footer />
     </div>
   );
 }

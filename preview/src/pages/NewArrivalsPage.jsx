@@ -3,6 +3,7 @@ import {Flame, ChevronRight} from 'lucide-react';
 import {motion} from 'framer-motion';
 import {Link} from 'react-router-dom';
 import Nav from '../components/Nav';
+import Footer from '../components/Footer';
 import {supabase, supabaseEnabled} from '../lib/supabase';
 
 const BASE_NEW_ARRIVALS = [
@@ -146,6 +147,7 @@ export default function NewArrivalsPage() {
           ))}
         </div>
       </section>
+      <Footer />
     </div>
   );
 }

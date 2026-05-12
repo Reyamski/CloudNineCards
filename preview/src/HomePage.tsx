@@ -3,6 +3,7 @@ import {Link} from 'react-router-dom';
 import {BellRing, ChevronRight, Flame, Quote, ShieldCheck, Sparkles, Star, Truck, Zap} from 'lucide-react';
 import {motion} from 'framer-motion';
 import {supabase, supabaseEnabled} from './lib/supabase';
+import Footer from './components/Footer';
 
 const DEFAULT_VIDEO_ID = 'OcLL44cDh7k';
 
@@ -512,6 +513,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      <Footer />
     </div>
   );
 }

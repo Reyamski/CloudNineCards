@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Package, LogOut, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import Nav from '../components/Nav';
+import Footer from '../components/Footer';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/useAuth';
 
@@ -141,6 +142,7 @@ export default function AccountOrdersPage() {
           </div>
         )}
       </section>
+      <Footer />
     </div>
   );
 }
