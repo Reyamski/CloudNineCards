@@ -1,6 +1,7 @@
 import { BellRing, ChevronRight, Zap, X, Copy, Check, AlertTriangle, Truck, Globe, CreditCard, Camera, Mail, Loader2, Calculator } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/useAuth';
 import emailjs from '@emailjs/browser';
 import Nav from '../components/Nav';
@@ -697,6 +698,7 @@ function PreOrderModal({ item, onClose, userEmail }) {
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function PreOrdersPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [selected, setSelected] = useState(null);
   const [showCalc, setShowCalc] = useState(false);
 
@@ -910,7 +912,7 @@ export default function PreOrdersPage() {
                   return (
                     <button
                       disabled={!canReserve}
-                      onClick={() => setSelected(item)}
+                      onClick={() => { if (!user) { navigate('/account', { state: { redirect: '/pre-orders' } }); return; } setSelected(item); }}
                       className={`mt-4 flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black uppercase tracking-[0.08em] transition ${
                         canReserve
                           ? 'bg-gradient-to-r from-fuchsia-500 via-pink-400 to-cyan-400 text-white hover:opacity-95'

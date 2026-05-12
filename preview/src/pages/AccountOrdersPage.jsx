@@ -46,7 +46,7 @@ export default function AccountOrdersPage() {
 
     supabase
       .from('orders')
-      .select('order_number, item_title, product_title, quantity, full_price, total_price, dp_amount, balance_due, payment_status, status, order_type, eta, delivery_country, created_at')
+      .select('order_number, item_title, product_title, quantity, full_price, total_price, dp_amount, balance_due, payment_status, status, order_type, eta, delivery_country, delivery_fee, tax_amount, address, buyer_name, created_at')
       .ilike('buyer_email', user.email)
       .order('created_at', { ascending: false })
       .then(({ data }) => {
@@ -124,26 +124,68 @@ export default function AccountOrdersPage() {
                 transition={{ duration: 0.35, delay: idx * 0.05 }}
                 className="rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,#0b1022,#14081d)] p-6"
               >
+                {/* Header row */}
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-xs font-black uppercase tracking-[0.18em] text-white/40">#{order.order_number ?? '—'}</span>
                       <OrderTypeBadge type={order.order_type} />
                     </div>
-                    <div className="mt-1.5 text-lg font-black leading-snug">{order.item_title ?? order.product_title}</div>
+                    <div className="mt-1.5 text-xl font-black leading-snug">{order.item_title ?? order.product_title}</div>
                     <div className="mt-1 text-sm text-white/45">Qty: {order.quantity} · {order.delivery_country ?? 'Canada'}</div>
-                    {order.eta && <div className="mt-0.5 text-xs text-white/35">ETA: {order.eta}</div>}
+                    {order.eta && <div className="mt-1 text-xs font-black text-cyan-300/70">ETA: {order.eta}</div>}
                   </div>
                   <div className="text-right">
                     <StatusBadge status={order.payment_status ?? order.status} />
-                    <div className="mt-2 text-2xl font-black">CAD ${Number(order.full_price ?? order.total_price ?? 0).toFixed(2)}</div>
-                    {order.dp_amount > 0 && (
-                      <div className="text-xs text-white/40">DP paid: CAD ${Number(order.dp_amount).toFixed(2)} · Balance: CAD ${Number(order.balance_due ?? 0).toFixed(2)}</div>
-                    )}
+                    <div className="mt-2 text-3xl font-black">CAD ${Number(order.full_price ?? order.total_price ?? 0).toFixed(2)}</div>
                   </div>
                 </div>
-                <div className="mt-4 border-t border-white/5 pt-3 text-xs text-white/30">
-                  Ordered {new Date(order.created_at).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })}
+
+                {/* Price breakdown */}
+                <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-1.5 border-t border-white/5 pt-4 text-sm sm:grid-cols-3">
+                  {order.dp_amount > 0 && <>
+                    <div className="text-white/40">Down payment</div>
+                    <div className="text-right font-black text-emerald-300">CAD ${Number(order.dp_amount).toFixed(2)}</div>
+                    <div className="hidden sm:block" />
+                    <div className="text-white/40">Balance due</div>
+                    <div className="text-right font-black text-yellow-300">CAD ${Number(order.balance_due ?? 0).toFixed(2)}</div>
+                    <div className="hidden sm:block" />
+                  </>}
+                  {order.delivery_fee > 0 && <>
+                    <div className="text-white/40">Shipping</div>
+                    <div className="text-right text-white/70">CAD ${Number(order.delivery_fee).toFixed(2)}</div>
+                    <div className="hidden sm:block" />
+                  </>}
+                  {order.tax_amount > 0 && <>
+                    <div className="text-white/40">Tax</div>
+                    <div className="text-right text-white/70">CAD ${Number(order.tax_amount).toFixed(2)}</div>
+                    <div className="hidden sm:block" />
+                  </>}
+                  {order.address && <>
+                    <div className="text-white/40">Ship to</div>
+                    <div className="col-span-1 text-right text-white/60 sm:col-span-2">{order.address}</div>
+                  </>}
+                </div>
+
+                {/* Payment instructions if awaiting */}
+                {(order.payment_status === 'awaiting_payment' || order.status === 'awaiting_payment') && (
+                  <div className="mt-4 rounded-2xl border border-yellow-400/25 bg-yellow-400/8 px-4 py-3">
+                    <div className="text-xs font-black uppercase tracking-[0.14em] text-yellow-300">Action required — send payment via Wise</div>
+                    <div className="mt-1 text-sm text-white/60">
+                      Send <span className="font-black text-white">CAD ${Number(order.balance_due ?? order.full_price ?? order.total_price ?? 0).toFixed(2)}</span> to{' '}
+                      <span className="font-black text-yellow-300">@cloudninecards</span> on Wise, then submit your payment screenshot in the shop.
+                    </div>
+                  </div>
+                )}
+
+                {/* Footer */}
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-3">
+                  <span className="text-xs text-white/30">
+                    Ordered {new Date(order.created_at).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })}
+                  </span>
+                  <a href="mailto:papspective@gmail.com" className="text-xs font-black uppercase tracking-[0.1em] text-cyan-400/70 hover:text-cyan-300 transition">
+                    Contact Support →
+                  </a>
                 </div>
               </motion.div>
             ))}

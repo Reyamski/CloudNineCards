@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase, supabaseEnabled } from '../lib/supabase';
 import { X, Copy, Check, Camera, Loader2, Package, Globe, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -614,6 +614,7 @@ function NotifyMeModal({ item, onClose }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function ShopPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTag, setActiveTag] = useState('All');
   const [selected, setSelected]   = useState(null);
@@ -634,6 +635,7 @@ export default function ShopPage() {
   }, [products, searchParams]);
 
   function openProduct(item) {
+    if (!user) { navigate('/account', { state: { redirect: `/shop?product=${item.id}` } }); return; }
     setSelected(item);
     setSearchParams({product: item.id});
   }
