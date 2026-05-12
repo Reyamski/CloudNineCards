@@ -35,7 +35,7 @@ export default function Nav() {
             <Link
               key={to}
               to={to}
-              className={`transition hover:text-cyan-300 ${pathname === to ? 'text-cyan-300' : ''}`}
+              className={`transition hover:text-cyan-300 ${(to === '/' ? pathname === '/' : pathname.startsWith(to)) ? 'text-cyan-300' : ''}`}
             >
               {label}
             </Link>
@@ -68,7 +68,7 @@ export default function Nav() {
                 to={to}
                 onClick={() => setIsOpen(false)}
                 className={`rounded-lg px-3 py-2 text-sm font-bold uppercase tracking-[0.14em] transition hover:bg-white/10 hover:text-cyan-300 ${
-                  pathname === to ? 'text-cyan-300' : 'text-white/75'
+                  (to === '/' ? pathname === '/' : pathname.startsWith(to)) ? 'text-cyan-300' : 'text-white/75'
                 }`}
               >
                 {label}

@@ -25,8 +25,7 @@ async function uploadProofImage(base64DataUrl) {
 // ── Pre-order window config ──────────────────────────────────────────────────
 const PO_OPEN_DATE  = new Date('2025-11-01T00:00:00');
 const PO_CLOSE_DATE = new Date('2026-04-30T23:59:59');
-const now = new Date();
-const isOpen = now >= PO_OPEN_DATE && now <= PO_CLOSE_DATE;
+const isOpen = () => { const now = new Date(); return now >= PO_OPEN_DATE && now <= PO_CLOSE_DATE; };
 
 const WISE_HANDLE = '@cloudninecards';
 const CONTACT_EMAIL = 'papspective@gmail.com';
@@ -617,7 +616,7 @@ export default function PreOrdersPage() {
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="mt-6">
             <div className="inline-flex items-center gap-2 rounded-full border border-fuchsia-400/35 bg-fuchsia-400/12 px-4 py-2 text-xs font-black uppercase tracking-[0.24em] text-fuchsia-100">
               <BellRing className="h-4 w-4" />
-              {isOpen ? 'Pre-orders Open' : 'Pre-orders Closed'}
+              {isOpen() ? 'Pre-orders Open' : 'Pre-orders Closed'}
             </div>
             <h1 className="mt-4 text-5xl font-black uppercase leading-[0.88] tracking-[-0.04em] md:text-7xl">
               Pre-orders
@@ -631,11 +630,11 @@ export default function PreOrdersPage() {
 
             {/* Status bar */}
             <div className="mt-6 inline-flex flex-wrap gap-4">
-              <div className={`rounded-full border px-4 py-2 text-xs font-black uppercase tracking-[0.16em] ${isOpen ? 'border-green-400/30 bg-green-400/10 text-green-300' : 'border-red-400/30 bg-red-400/10 text-red-300'}`}>
-                {isOpen ? '● Open now' : '● Closed'}
+              <div className={`rounded-full border px-4 py-2 text-xs font-black uppercase tracking-[0.16em] ${isOpen() ? 'border-green-400/30 bg-green-400/10 text-green-300' : 'border-red-400/30 bg-red-400/10 text-red-300'}`}>
+                {isOpen() ? '● Open now' : '● Closed'}
               </div>
               <div className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-white/55">
-                {isOpen ? 'Window: Nov 2025 – Apr 2026' : 'Next window: Coming soon'}
+                {isOpen() ? 'Window: Nov 2025 – Apr 2026' : 'Next window: Coming soon'}
               </div>
               <div className="rounded-full border border-cyan-300/20 bg-cyan-300/8 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-cyan-200">
                 Payment: Wise · @cloudninecards
@@ -748,7 +747,7 @@ export default function PreOrdersPage() {
                 })()}
 
                 {(() => {
-                  const canReserve = isOpen && !item.soldOut && !item.priceTba;
+                  const canReserve = isOpen() && !item.soldOut && !item.priceTba;
                   return (
                     <button
                       disabled={!canReserve}
@@ -759,7 +758,7 @@ export default function PreOrdersPage() {
                           : 'bg-white/5 border border-white/10 text-white/30 cursor-not-allowed'
                       }`}
                     >
-                      {item.soldOut ? 'Sold Out' : item.priceTba ? 'Price TBA' : !isOpen ? 'Pre-orders Closed' : <>Reserve Now <ChevronRight className="h-4 w-4" /></>}
+                      {item.soldOut ? 'Sold Out' : item.priceTba ? 'Price TBA' : !isOpen() ? 'Pre-orders Closed' : <>Reserve Now <ChevronRight className="h-4 w-4" /></>}
                     </button>
                   );
                 })()}

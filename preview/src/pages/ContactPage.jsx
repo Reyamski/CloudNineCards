@@ -118,7 +118,7 @@ export default function ContactPage() {
             <div className="rounded-[24px] border border-white/8 bg-white/4 p-5">
               <div className="text-xs font-black uppercase tracking-[0.18em] text-white/40">Response time</div>
               <div className="mt-1 text-2xl font-black">Usually within 24h</div>
-              <div className="mt-1 text-sm text-white/55">Mon – Fri, 9 AM – 6 PM EST</div>
+              <div className="mt-1 text-sm text-white/55">Mon – Fri, 9 AM – 6 PM PST</div>
             </div>
           </div>
 

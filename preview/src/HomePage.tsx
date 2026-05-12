@@ -241,7 +241,7 @@ export default function HomePage() {
                 </span>
                 <span className="inline-flex -skew-x-12 items-center gap-2 border border-rose-300/35 bg-rose-300/12 px-4 py-2 text-[11px] font-black uppercase tracking-[0.24em] text-rose-100">
                   <BellRing className="h-3.5 w-3.5 skew-x-12" />
-                  <span className="skew-x-12">OP-17 Soon</span>
+                  <span className="skew-x-12">OP-18 Coming</span>
                 </span>
               </div>
 
@@ -406,7 +406,7 @@ export default function HomePage() {
       <section className="mx-auto max-w-7xl px-6 py-10 md:py-14">
         <div className="mb-6 flex items-end justify-between gap-4">
           <div>
-            <div className="text-sm font-black uppercase tracking-[0.22em] text-cyan-300/75">Featured battle board</div>
+            <div className="text-sm font-black uppercase tracking-[0.22em] text-cyan-300/75">Live inventory</div>
             <h2 className="mt-2 text-3xl font-black uppercase md:text-5xl">In Stock Now</h2>
           </div>
           <Link to="/shop" className="hidden rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-black uppercase tracking-[0.08em] text-white/80 md:inline-flex">
@@ -438,7 +438,7 @@ export default function HomePage() {
                 <div className="mt-4 text-3xl font-black">{item.price}</div>
                 <div className="mt-5 flex gap-3">
                   <Link to={item.link} className="flex-1 rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 px-4 py-3 text-center text-sm font-black uppercase tracking-[0.08em] text-black transition hover:opacity-95">
-                    View Product
+                    Buy Now — Wise
                   </Link>
                 </div>
               </div>

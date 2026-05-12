@@ -578,11 +578,11 @@ export default function ShopPage() {
 
     supabase.from('stock').select('*').then(({ data, error }) => {
       if (error) {
-        setStockSyncError(`Live stock sync failed: ${error.message}`);
+        setStockSyncError('Inventory may not be current — check back soon.');
         return;
       }
       if (!data?.length) {
-        setStockSyncError('No live stock rows found yet. Using default catalog values.');
+        setStockSyncError('');
         return;
       }
       setStockSyncError('');
@@ -631,6 +631,16 @@ export default function ShopPage() {
           ))}
         </div>
 
+        {filtered.length === 0 && (
+          <div className="py-20 text-center">
+            <div className="text-5xl mb-4">📦</div>
+            <div className="text-xl font-black uppercase">No {activeTag} stock right now</div>
+            <p className="mt-2 text-sm text-white/50">We're working on it — join the email list to get notified first.</p>
+            <button onClick={() => setActiveTag('All')} className="mt-6 rounded-2xl border border-white/15 bg-white/5 px-6 py-2.5 text-sm font-black uppercase tracking-[0.1em] text-white/75 hover:bg-white/10">
+              View all products
+            </button>
+          </div>
+        )}
         <div className="grid gap-6 md:grid-cols-3">
           {filtered.map((item) => (
             <div key={item.id} className="group relative overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,#0b1022,#14081d)]">

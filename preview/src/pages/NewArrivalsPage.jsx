@@ -124,9 +124,11 @@ export default function NewArrivalsPage() {
                 <div className="absolute left-4 top-4 rounded-full border border-yellow-300/25 bg-black/70 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-yellow-200 backdrop-blur">
                   {item.badge}
                 </div>
-                <div className="absolute right-4 top-4 rounded-full border border-white/10 bg-black/70 px-3 py-1 text-[11px] font-black text-white/75 backdrop-blur">
-                  {item.quantity ?? 0} left
-                </div>
+                {item.quantity != null && (
+                  <div className="absolute right-4 top-4 rounded-full border border-white/10 bg-black/70 px-3 py-1 text-[11px] font-black text-white/75 backdrop-blur">
+                    {item.quantity} left
+                  </div>
+                )}
               </div>
               <div className="p-5">
                 <div className="text-sm font-black uppercase tracking-[0.18em] text-yellow-300/75">{item.subtitle}</div>
