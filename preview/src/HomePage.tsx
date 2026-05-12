@@ -208,19 +208,30 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    fetch('https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fwww.pokebeach.com%2Ffeed&count=4')
-      .then(r => r.json())
-      .then(data => {
-        if (data.status === 'ok') {
-          setNews(data.items.map((item: any) => ({
-            title: item.title,
-            link: item.link,
-            pubDate: item.pubDate,
-            thumbnail: item.thumbnail || item.enclosure?.link || '',
-          })));
-        }
-      })
-      .catch(() => {}); // fail silently
+    const feeds = [
+      'https%3A%2F%2Fwww.reddit.com%2Fr%2FOnePieceTCG%2Ftop.rss%3Ft%3Dweek',
+      'https%3A%2F%2Fwww.reddit.com%2Fr%2FPokemonTCG%2Ftop.rss%3Ft%3Dweek',
+    ];
+    Promise.all(
+      feeds.map(url =>
+        fetch(`https://api.rss2json.com/v1/api.json?rss_url=${url}`)
+          .then(r => r.json())
+          .catch(() => ({ status: 'error' }))
+      )
+    ).then((results: any[]) => {
+      const items = results
+        .filter(r => r.status === 'ok')
+        .flatMap(r => r.items.slice(0, 2))
+        .map((item: any) => ({
+          title: item.title,
+          link: item.link,
+          pubDate: item.pubDate,
+          thumbnail: item.thumbnail || '',
+          source: item.link?.includes('OnePieceTCG') ? 'r/OnePieceTCG' : 'r/PokemonTCG',
+        }))
+        .slice(0, 4);
+      if (items.length) setNews(items);
+    }).catch(() => {});
   }, []);
 
   const heroCard = spotlightCards[0];
@@ -543,8 +554,8 @@ export default function HomePage() {
               <div className="text-[10px] font-black uppercase tracking-[0.28em] text-white/35 mb-1">TCG News</div>
               <div className="text-2xl font-black uppercase">Latest Headlines</div>
             </div>
-            <a href="https://www.pokebeach.com" target="_blank" rel="noreferrer" className="text-xs font-black uppercase tracking-[0.14em] text-white/40 transition hover:text-cyan-300">
-              See all on PokéBeach →
+            <a href="https://www.reddit.com/r/OnePieceTCG" target="_blank" rel="noreferrer" className="text-xs font-black uppercase tracking-[0.14em] text-white/40 transition hover:text-cyan-300">
+              See more on Reddit →
             </a>
           </div>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -562,8 +573,15 @@ export default function HomePage() {
                   </div>
                 )}
                 <div className="flex flex-1 flex-col p-4">
-                  <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/30 mb-2">
-                    {new Date(article.pubDate).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })}
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/30">
+                      {new Date(article.pubDate).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })}
+                    </div>
+                    {(article as any).source && (
+                      <div className="text-[9px] font-black uppercase tracking-[0.1em] text-white/20 bg-white/5 rounded-full px-2 py-0.5">
+                        {(article as any).source}
+                      </div>
+                    )}
                   </div>
                   <div className="text-sm font-black leading-snug text-white/85 group-hover:text-cyan-200 transition line-clamp-3">
                     {article.title}
