@@ -46,6 +46,7 @@ export default function AccountOrdersPage() {
     supabase
       .from('orders')
       .select('order_number, item_title, quantity, full_price, dp_amount, balance_due, payment_status, order_type, eta, delivery_country, created_at')
+      .ilike('buyer_email', user.email)
       .order('created_at', { ascending: false })
       .then(({ data }) => {
         setOrders(data ?? []);
