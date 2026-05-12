@@ -4,6 +4,7 @@ import {BellRing, ChevronRight, Flame, Quote, ShieldCheck, Sparkles, Star, Truck
 import {motion} from 'framer-motion';
 import {supabase, supabaseEnabled} from './lib/supabase';
 import Footer from './components/Footer';
+import Nav from './components/Nav';
 
 const DEFAULT_VIDEO_ID = 'OcLL44cDh7k';
 
@@ -102,13 +103,6 @@ const vouches = [
   },
 ];
 
-const navLinks = [
-  {label: 'Home', to: '/'},
-  {label: 'Shop', to: '/shop'},
-  {label: 'Pre-Orders', to: '/pre-orders'},
-  {label: 'New Arrivals', to: '/new-arrivals'},
-  {label: 'Contact', to: '/contact'},
-];
 
 function EmailSignup() {
   const [email, setEmail] = useState('');
@@ -293,23 +287,7 @@ export default function HomePage() {
         `}</style>
 
         <div className="relative z-10 mx-auto max-w-7xl px-6 pb-16 pt-6 md:pb-24 md:pt-8">
-          <div className="mb-8 flex items-center justify-between">
-            <div>
-              <div className="bg-gradient-to-r from-cyan-300 via-fuchsia-300 to-yellow-300 bg-clip-text text-2xl font-black tracking-[0.28em] text-transparent md:text-3xl">
-                CLOUDNINECARDS
-              </div>
-              <div className="mt-1 text-xs uppercase tracking-[0.34em] text-white/45">
-                full hype anime | premium tcg drops | sealed madness
-              </div>
-            </div>
-            <div className="hidden items-center gap-6 text-sm font-bold uppercase tracking-[0.14em] text-white/75 md:flex">
-              {navLinks.map((link) => (
-                <Link key={link.to} to={link.to} className="transition hover:text-cyan-300">
-                  {link.label}
-                </Link>
-              ))}
-            </div>
-          </div>
+          <Nav />
 
           <div className="grid items-center gap-10 md:grid-cols-[1.04fr_0.96fr] md:gap-12">
             <motion.div initial={{opacity: 0, y: 20}} animate={{opacity: 1, y: 0}} transition={{duration: 0.6}} className="relative">
