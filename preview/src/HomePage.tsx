@@ -243,13 +243,17 @@ export default function HomePage() {
         <div className="absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_3px,rgba(255,255,255,0.012)_3px,rgba(255,255,255,0.012)_4px)] pointer-events-none" />
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:30px_30px] opacity-40" />
 
-        {/* Hero character art — drop luffy.png (transparent bg PNG) into /public to activate */}
+        {/* Luffy hero art */}
         <img
           src="/luffy.png"
           alt=""
           aria-hidden="true"
-          className="pointer-events-none absolute bottom-0 right-0 hidden h-[92%] w-auto object-contain opacity-20 md:block"
-          style={{ zIndex: 0, filter: 'drop-shadow(0 0 60px rgba(255,140,0,0.4))' }}
+          className="pointer-events-none absolute bottom-0 right-4 hidden h-[96%] w-auto object-contain md:block"
+          style={{
+            zIndex: 0,
+            opacity: 0.38,
+            filter: 'drop-shadow(0 0 80px rgba(255,140,0,0.55)) drop-shadow(0 0 30px rgba(255,200,0,0.3))',
+          }}
           onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
         />
 
