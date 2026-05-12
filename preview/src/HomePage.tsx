@@ -151,6 +151,8 @@ export default function HomePage() {
   const [spotlightCards, setSpotlightCards] = useState(BASE_STOCK_SPOTLIGHT);
   const [videoId, setVideoId] = useState(DEFAULT_VIDEO_ID);
 
+  useEffect(() => { document.title = 'CloudNineCards | One Piece TCG Canada'; }, []);
+
   useEffect(() => {
     async function loadHomepageData() {
       if (!supabaseEnabled || !supabase) return;

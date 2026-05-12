@@ -1,6 +1,6 @@
 import { Mail, MessageSquare, Package, ShieldCheck } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import emailjs from '@emailjs/browser';
 import Nav from '../components/Nav';
 
@@ -13,6 +13,8 @@ const CONTACT_EMAIL = 'papspective@gmail.com';
 const topics = ['Order Issue', 'Pre-order Question', 'Damaged Card / Missing Item', 'General Inquiry', 'Wholesale / Bulk'];
 
 export default function ContactPage() {
+  useEffect(() => { document.title = 'Contact | CloudNineCards'; }, []);
+
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState('');

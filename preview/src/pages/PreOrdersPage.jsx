@@ -1,6 +1,6 @@
 import { BellRing, ChevronRight, Zap, X, Copy, Check, AlertTriangle, Truck, Globe, CreditCard, Camera, Mail, Loader2, Paperclip } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import emailjs from '@emailjs/browser';
 import Nav from '../components/Nav';
 
@@ -600,6 +600,8 @@ function PreOrderModal({ item, onClose }) {
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function PreOrdersPage() {
   const [selected, setSelected] = useState(null);
+
+  useEffect(() => { document.title = 'Pre-Orders | CloudNineCards'; }, []);
 
   return (
     <div className="min-h-screen bg-[#05010c] text-white">

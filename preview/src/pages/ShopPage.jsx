@@ -549,6 +549,8 @@ export default function ShopPage() {
   const [products, setProducts]   = useState(allProducts);
   const [stockSyncError, setStockSyncError] = useState('');
 
+  useEffect(() => { document.title = 'Shop | CloudNineCards'; }, []);
+
   useEffect(() => {
     const productId = searchParams.get('product');
     if (!productId) return;
@@ -640,11 +642,6 @@ export default function ShopPage() {
                 <div className="absolute left-4 top-4 rounded-full border border-white/10 bg-black/72 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-white backdrop-blur">
                   {item.badge}
                 </div>
-                {!item.inStock && (
-                  <div className="absolute right-4 top-4 rounded-full border border-white/10 bg-black/60 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-white/40 backdrop-blur">
-                    Sold Out
-                  </div>
-                )}
               </div>
               <div className="p-5">
                 <div className="text-sm font-black uppercase tracking-[0.18em] text-cyan-300/75">{item.subtitle}</div>

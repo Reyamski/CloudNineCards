@@ -93,6 +93,8 @@ function normalizeOrder(order) {
 }
 
 export default function AdminPage() {
+  useEffect(() => { document.title = 'Admin | CloudNineCards'; }, []);
+
   const [authed, setAuthed] = useState(() => sessionStorage.getItem('cnc_admin') === '1');
   const [pw, setPw] = useState('');
   const [showPw, setShowPw] = useState(false);

@@ -47,6 +47,8 @@ const BASE_NEW_ARRIVALS = [
 export default function NewArrivalsPage() {
   const [items, setItems] = useState(BASE_NEW_ARRIVALS);
 
+  useEffect(() => { document.title = 'New Arrivals | CloudNineCards'; }, []);
+
   useEffect(() => {
     async function loadLiveStock() {
       if (!supabaseEnabled || !supabase) return;
