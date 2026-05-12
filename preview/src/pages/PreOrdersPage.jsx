@@ -122,6 +122,63 @@ const preorders = [
   {id: 'op16jp',  title: 'One Piece Card Game OP-16 Booster Box',  subtitle: 'Japanese', soldOut: true,  priceTba: false, currency: 'CAD', eta: 'TBD', image: 'https://placehold.co/400x560/0d0020/c084fc?text=OP-16%0AJapanese%0ABooster+Box&font=montserrat', hype: 'Stay tuned for updates.'},
 ];
 
+// ── Countdown hook ───────────────────────────────────────────────────────────
+function useCountdown(deadline) {
+  const [timeLeft, setTimeLeft] = useState(() => deadline ? Math.max(0, deadline - Date.now()) : 0);
+  useEffect(() => {
+    if (!deadline) return;
+    const tick = () => setTimeLeft(Math.max(0, deadline - Date.now()));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [deadline]);
+  return timeLeft;
+}
+
+function CountdownBlock({ deadline }) {
+  const msLeft = useCountdown(deadline);
+  if (msLeft <= 0) return null;
+
+  const totalSecs = Math.floor(msLeft / 1000);
+  const days  = Math.floor(totalSecs / 86400);
+  const hours = Math.floor((totalSecs % 86400) / 3600);
+  const mins  = Math.floor((totalSecs % 3600) / 60);
+  const secs  = totalSecs % 60;
+  const pad   = (n) => String(n).padStart(2, '0');
+  const urgent = days <= 7;
+
+  return (
+    <div className={`mt-3 rounded-xl border px-3 py-2 ${urgent ? 'border-amber-400/30 bg-amber-400/8' : 'border-white/10 bg-white/4'}`}>
+      <div className={`text-[10px] font-black uppercase tracking-[0.16em] mb-1.5 ${urgent ? 'text-amber-300/80' : 'text-white/40'}`}>
+        {urgent ? '⚡ Closing Soon' : 'Deadline'}
+      </div>
+      <div className="flex items-center gap-2">
+        {days > 0 && (
+          <div className="text-center">
+            <div className={`text-xl font-black tabular-nums ${urgent ? 'text-amber-200' : 'text-white/80'}`}>{days}</div>
+            <div className="text-[9px] text-white/35 uppercase tracking-wider">days</div>
+          </div>
+        )}
+        <div className="text-center">
+          <div className={`text-xl font-black tabular-nums ${urgent ? 'text-amber-200' : 'text-white/80'}`}>{pad(hours)}</div>
+          <div className="text-[9px] text-white/35 uppercase tracking-wider">hrs</div>
+        </div>
+        <div className={`text-lg font-black ${urgent ? 'text-amber-300/60' : 'text-white/25'}`}>:</div>
+        <div className="text-center">
+          <div className={`text-xl font-black tabular-nums ${urgent ? 'text-amber-200' : 'text-white/80'}`}>{pad(mins)}</div>
+          <div className="text-[9px] text-white/35 uppercase tracking-wider">min</div>
+        </div>
+        <div className={`text-lg font-black ${urgent ? 'text-amber-300/60' : 'text-white/25'}`}>:</div>
+        <div className="text-center">
+          <div className={`text-xl font-black tabular-nums ${urgent ? 'text-amber-200' : 'text-white/80'}`}>{pad(secs)}</div>
+          <div className="text-[9px] text-white/35 uppercase tracking-wider">sec</div>
+        </div>
+      </div>
+      <div className="text-[10px] text-white/30 mt-1.5">Limited allocation — pre-orders may be cut</div>
+    </div>
+  );
+}
+
 // ── Modal ────────────────────────────────────────────────────────────────────
 function PreOrderModal({ item, onClose }) {
   const dp = ((item.price ?? 0) * DP_PERCENT).toFixed(2);
@@ -141,8 +198,9 @@ function PreOrderModal({ item, onClose }) {
   const [paymentFile, setPaymentFile] = useState(null);
   const [paymentB64, setPaymentB64]   = useState('');
   const [orderNumber] = useState(() => {
-    const n = parseInt(localStorage.getItem('cnc_order_counter') || '0', 10) + 1;
-    return `CNC-${String(n).padStart(6, '0')}`;
+    const ts = Date.now().toString(36).toUpperCase();
+    const rand = Math.random().toString(36).slice(2, 5).toUpperCase();
+    return `CNC-${ts.slice(-5)}${rand}`;
   });
 
   function handleFileChange(e) {
@@ -225,8 +283,6 @@ function PreOrderModal({ item, onClose }) {
         },
         { publicKey: EMAILJS_PUBLIC_KEY }
       );
-      const next = parseInt(localStorage.getItem('cnc_order_counter') || '0', 10) + 1;
-      localStorage.setItem('cnc_order_counter', String(next));
       setSubmitted(true);
       try {
         await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID,
@@ -722,23 +778,7 @@ export default function PreOrdersPage() {
                   </div>
                 )}
 
-                {item.deadline && (() => {
-                  const msLeft = item.deadline - new Date();
-                  const daysLeft = Math.ceil(msLeft / 86400000);
-                  const urgent = daysLeft <= 7 && daysLeft > 0;
-                  const expired = msLeft <= 0;
-                  return !expired ? (
-                    <div className={`mt-3 rounded-xl border px-3 py-2 ${urgent ? 'border-amber-400/30 bg-amber-400/8' : 'border-white/10 bg-white/4'}`}>
-                      <div className={`text-[10px] font-black uppercase tracking-[0.16em] ${urgent ? 'text-amber-300/80' : 'text-white/40'}`}>
-                        Deadline — {urgent ? `${daysLeft} day${daysLeft !== 1 ? 's' : ''} left!` : ''}
-                      </div>
-                      <div className={`text-xs font-bold mt-0.5 ${urgent ? 'text-amber-200' : 'text-white/55'}`}>
-                        {item.deadline.toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' })} · 6:00 PM
-                      </div>
-                      <div className="text-[10px] text-white/35 mt-0.5">Limited allocation — pre-orders may be cut</div>
-                    </div>
-                  ) : null;
-                })()}
+                {item.deadline && <CountdownBlock deadline={item.deadline} />}
 
                 {(() => {
                   const canReserve = isOpen() && !item.soldOut && !item.priceTba;
