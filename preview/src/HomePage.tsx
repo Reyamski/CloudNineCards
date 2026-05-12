@@ -243,48 +243,15 @@ export default function HomePage() {
         <div className="absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_3px,rgba(255,255,255,0.012)_3px,rgba(255,255,255,0.012)_4px)] pointer-events-none" />
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:30px_30px] opacity-40" />
 
-        {/* Floating anime card art — decorative */}
-        <div
-          className="pointer-events-none absolute right-[52%] top-6 hidden md:block"
-          style={{
-            animation: 'floatCard1 6s ease-in-out infinite',
-            zIndex: 0,
-          }}
-        >
-          <img
-            src="/op15.webp"
-            alt=""
-            aria-hidden="true"
-            className="h-64 w-44 rounded-2xl object-cover opacity-25 shadow-[0_0_40px_rgba(34,211,238,0.35)]"
-            style={{transform: 'rotate(-8deg)'}}
-          />
-        </div>
-        <div
-          className="pointer-events-none absolute right-[44%] top-32 hidden md:block"
-          style={{
-            animation: 'floatCard2 7.5s ease-in-out infinite',
-            zIndex: 0,
-          }}
-        >
-          <img
-            src="/ascended.jpg"
-            alt=""
-            aria-hidden="true"
-            className="h-52 w-36 rounded-2xl object-cover opacity-20 shadow-[0_0_36px_rgba(168,85,247,0.40)]"
-            style={{transform: 'rotate(6deg)'}}
-          />
-        </div>
-
-        <style>{`
-          @keyframes floatCard1 {
-            0%, 100% { transform: rotate(-8deg) translateY(0px); }
-            50% { transform: rotate(-8deg) translateY(-14px); }
-          }
-          @keyframes floatCard2 {
-            0%, 100% { transform: rotate(6deg) translateY(0px); }
-            50% { transform: rotate(6deg) translateY(12px); }
-          }
-        `}</style>
+        {/* Hero character art — drop luffy.png (transparent bg PNG) into /public to activate */}
+        <img
+          src="/luffy.png"
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute bottom-0 right-0 hidden h-[92%] w-auto object-contain opacity-20 md:block"
+          style={{ zIndex: 0, filter: 'drop-shadow(0 0 60px rgba(255,140,0,0.4))' }}
+          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+        />
 
         <div className="relative z-10 mx-auto max-w-7xl px-6 pb-16 pt-6 md:pb-24 md:pt-8">
           <Nav />
