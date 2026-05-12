@@ -727,6 +727,12 @@ export default function PreOrdersPage() {
               <div className="rounded-full border border-cyan-300/20 bg-cyan-300/8 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-cyan-200">
                 Payment: Wise · @cloudninecards
               </div>
+              <button
+                onClick={() => setShowCalc(true)}
+                className="inline-flex items-center gap-2 rounded-full border border-fuchsia-400/25 bg-fuchsia-400/8 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-fuchsia-300 transition hover:bg-fuchsia-400/15"
+              >
+                <Calculator className="h-3.5 w-3.5" /> DP Calculator
+              </button>
             </div>
           </motion.div>
         </div>
