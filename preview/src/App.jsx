@@ -8,6 +8,8 @@ import NewArrivalsPage from './pages/NewArrivalsPage';
 import ContactPage from './pages/ContactPage';
 import AdminPage from './pages/AdminPage';
 import NotFoundPage from './pages/NotFoundPage';
+import AccountLoginPage from './pages/AccountLoginPage';
+import AccountOrdersPage from './pages/AccountOrdersPage';
 
 export default function App() {
   return (
@@ -20,6 +22,8 @@ export default function App() {
         <Route path="/new-arrivals" element={<NewArrivalsPage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/admin" element={<AdminPage />} />
+        <Route path="/account" element={<AccountLoginPage />} />
+        <Route path="/account/orders" element={<AccountOrdersPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>

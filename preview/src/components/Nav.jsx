@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, User } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useAuth } from '../lib/useAuth';
 
 export default function Nav() {
   const { pathname } = useLocation();
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
   const links = [
@@ -42,6 +44,17 @@ export default function Nav() {
           ))}
         </div>
 
+        {/* Account link */}
+        <Link
+          to={user ? '/account/orders' : '/account'}
+          className={`hidden items-center gap-1.5 rounded-full border px-4 py-1.5 text-xs font-black uppercase tracking-[0.14em] transition md:flex ${
+            pathname.startsWith('/account') ? 'border-cyan-300/50 bg-cyan-300/15 text-cyan-300' : 'border-white/15 bg-white/5 text-white/65 hover:border-white/25 hover:text-white/85'
+          }`}
+        >
+          <User className="h-3.5 w-3.5" />
+          {user ? 'My Orders' : 'Login'}
+        </Link>
+
         {/* Mobile hamburger */}
         <button
           className="md:hidden text-white/75 hover:text-cyan-300 transition"
@@ -74,6 +87,15 @@ export default function Nav() {
                 {label}
               </Link>
             ))}
+            <Link
+              to={user ? '/account/orders' : '/account'}
+              onClick={() => setIsOpen(false)}
+              className={`rounded-lg px-3 py-2 text-sm font-bold uppercase tracking-[0.14em] transition hover:bg-white/10 hover:text-cyan-300 ${
+                pathname.startsWith('/account') ? 'text-cyan-300' : 'text-white/75'
+              }`}
+            >
+              {user ? 'My Orders' : 'Login'}
+            </Link>
           </motion.div>
         )}
       </AnimatePresence>
