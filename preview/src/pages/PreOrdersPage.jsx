@@ -1,6 +1,7 @@
 import { BellRing, ChevronRight, Zap, X, Copy, Check, AlertTriangle, Truck, Globe, CreditCard, Camera, Mail, Loader2, Calculator } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
+import { useAuth } from '../lib/useAuth';
 import emailjs from '@emailjs/browser';
 import Nav from '../components/Nav';
 import Footer from '../components/Footer';
@@ -198,14 +199,14 @@ function CountdownBlock({ deadline }) {
 }
 
 // ── Modal ────────────────────────────────────────────────────────────────────
-function PreOrderModal({ item, onClose }) {
+function PreOrderModal({ item, onClose, userEmail }) {
   const dp = ((item.price ?? 0) * DP_PERCENT).toFixed(2);
   const remaining = ((item.price ?? 0) * (1 - DP_PERCENT)).toFixed(2);
   const [step, setStep] = useState(1); // 1=terms, 2=payment, 3=confirm
   const [qty, setQty] = useState(1);
   const [copied, setCopied] = useState(false);
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(userEmail ?? '');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [country, setCountry] = useState('');
@@ -345,7 +346,6 @@ function PreOrderModal({ item, onClose }) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        onClick={onClose}
         className="absolute inset-0 bg-black/80 backdrop-blur-sm"
       />
 
@@ -597,9 +597,10 @@ function PreOrderModal({ item, onClose }) {
                   required
                   type="email"
                   value={email}
-                  onChange={e => setEmail(e.target.value)}
+                  onChange={e => !userEmail && setEmail(e.target.value)}
+                  readOnly={!!userEmail}
                   placeholder="Confirmation will be sent here"
-                  className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder-white/25 outline-none focus:border-cyan-300/40"
+                  className={`w-full rounded-2xl border px-4 py-3 text-sm placeholder-white/25 outline-none ${userEmail ? 'border-white/5 bg-white/5 text-white/40 cursor-not-allowed' : 'border-white/10 bg-black/30 text-white focus:border-cyan-300/40'}`}
                 />
               </div>
 
@@ -695,6 +696,7 @@ function PreOrderModal({ item, onClose }) {
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function PreOrdersPage() {
+  const { user } = useAuth();
   const [selected, setSelected] = useState(null);
   const [showCalc, setShowCalc] = useState(false);
 
@@ -723,7 +725,7 @@ export default function PreOrdersPage() {
       `}</style>
 
       <AnimatePresence>
-        {selected && <PreOrderModal item={selected} onClose={() => setSelected(null)} />}
+        {selected && <PreOrderModal item={selected} onClose={() => setSelected(null)} userEmail={user?.email ?? ''} />}
       </AnimatePresence>
       <AnimatePresence>
         {showCalc && <DPCalculator onClose={() => setShowCalc(false)} />}
