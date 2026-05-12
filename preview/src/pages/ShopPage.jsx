@@ -676,8 +676,27 @@ export default function ShopPage() {
         {notifyItem && <NotifyMeModal item={notifyItem} onClose={() => setNotifyItem(null)} />}
       </AnimatePresence>
 
-      <section className="relative border-b border-fuchsia-500/20 bg-[#07030f] px-6 pb-6 pt-6">
+      <style>{`
+        @keyframes floatDeco {
+          0%, 100% { transform: translateY(0px) rotate(-6deg); }
+          50% { transform: translateY(-18px) rotate(-6deg); }
+        }
+        .deco-float { animation: floatDeco 7s ease-in-out infinite; }
+      `}</style>
+
+      <section className="relative border-b border-fuchsia-500/20 bg-[#07030f] px-6 pb-6 pt-6 overflow-hidden">
+        {/* existing radial bg */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(244,63,94,0.15),transparent_40%),radial-gradient(circle_at_left,rgba(168,85,247,0.12),transparent_40%)]" />
+        {/* bottom-center radial burst — purple/cyan */}
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-[220px] bg-[radial-gradient(ellipse_at_bottom,rgba(168,85,247,0.22)_0%,rgba(34,211,238,0.10)_45%,transparent_70%)] pointer-events-none" />
+        {/* floating decorative image — right side */}
+        <img
+          src="/ac1.webp"
+          alt=""
+          aria-hidden="true"
+          className="deco-float pointer-events-none absolute right-4 top-0 h-full max-h-[160px] w-auto opacity-[0.15] select-none"
+          style={{ filter: 'drop-shadow(0 0 18px rgba(168,85,247,0.7)) drop-shadow(0 0 40px rgba(168,85,247,0.35))', transform: 'rotate(-6deg)' }}
+        />
         <div className="relative mx-auto max-w-7xl">
           <Nav />
           <div className="mt-4">
@@ -698,11 +717,24 @@ export default function ShopPage() {
           {tags.map((tag) => (
             <button key={tag} onClick={() => setActiveTag(tag)}
               className={`rounded-full border px-5 py-2 text-xs font-black uppercase tracking-[0.18em] transition ${
-                activeTag === tag ? 'border-cyan-300/60 bg-cyan-300/15 text-cyan-100' : 'border-white/10 bg-white/5 text-white/65 hover:border-white/20 hover:text-white/85'
+                activeTag === tag
+                  ? 'border-purple-400/60 bg-purple-500/15 text-purple-100 shadow-[0_0_20px_rgba(168,85,247,0.5)]'
+                  : 'border-white/10 bg-white/5 text-white/65 hover:border-white/20 hover:text-white/85'
               }`}>
               {tag}
             </button>
           ))}
+        </div>
+
+        {/* ── Section header — anime style ── */}
+        <div className="mb-6">
+          <div className="flex items-center gap-2">
+            <span className="text-fuchsia-400 text-lg leading-none select-none">⚡</span>
+            <h2 className="text-2xl font-black uppercase tracking-[0.12em] bg-gradient-to-r from-cyan-300 via-fuchsia-300 to-yellow-300 bg-clip-text text-transparent">
+              In Stock Now
+            </h2>
+          </div>
+          <p className="mt-1 text-xs text-white/35 uppercase tracking-[0.16em]">Sealed product · shipped from Canada</p>
         </div>
 
         {filtered.length === 0 && (
@@ -717,8 +749,12 @@ export default function ShopPage() {
         )}
         <div className="grid gap-6 md:grid-cols-3">
           {filtered.map((item) => (
-            <div key={item.id} className="group relative overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,#0b1022,#14081d)]">
+            <div key={item.id} className={`group relative overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,#0b1022,#14081d)] hover:scale-[1.02] transition-transform duration-300${!item.inStock ? ' grayscale-[0.4]' : ''}`}>
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-yellow-300" />
+              {/* diagonal shine sweep on hover */}
+              <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden rounded-[32px]">
+                <div className="absolute -inset-full top-0 h-full w-1/3 -skew-x-12 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100 group-hover:translate-x-[350%] transition-all duration-700 ease-in-out" />
+              </div>
               <Link to={`/shop/${item.id}`} className="relative overflow-hidden block">
                 <img src={item.image} alt={item.title} onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/product-fallback.svg'; }} className="h-[260px] w-full object-cover saturate-[1.35] transition duration-500 group-hover:scale-105" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
@@ -761,6 +797,39 @@ export default function ShopPage() {
           ))}
         </div>
       </section>
+      {/* ── Follow the Drop CTA banner ── */}
+      <section className="mx-auto max-w-7xl px-6 pb-12">
+        <div className="relative overflow-hidden rounded-[28px] border border-transparent bg-gradient-to-r from-cyan-400/20 to-fuchsia-400/20 p-px">
+          <div className="rounded-[27px] bg-[#08020f] px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-6">
+            {/* left — text block */}
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-fuchsia-400 text-base select-none">◆</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.28em] text-cyan-300/60">Limited Drops · First Look</span>
+              </div>
+              <div className="text-2xl font-black uppercase tracking-[0.08em] bg-gradient-to-r from-cyan-300 via-fuchsia-300 to-yellow-300 bg-clip-text text-transparent">
+                Follow the Drop
+              </div>
+              <p className="mt-1.5 text-sm text-white/45 max-w-sm">
+                New sealed product, restocks, and pre-orders — announced on Instagram first. Don't miss the next wave.
+              </p>
+            </div>
+            {/* right — CTA button */}
+            <a
+              href="https://www.instagram.com/cloudninecards"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-fuchsia-500 to-cyan-400 px-7 py-3.5 text-sm font-black uppercase tracking-[0.1em] text-black transition hover:opacity-90 hover:scale-[1.03] duration-200"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+              </svg>
+              @cloudninecards
+            </a>
+          </div>
+        </div>
+      </section>
+
       <Footer />
     </div>
   );
