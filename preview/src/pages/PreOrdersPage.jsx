@@ -735,18 +735,14 @@ export default function PreOrdersPage() {
       <section className="relative overflow-hidden border-b border-fuchsia-500/20 bg-[#07030f] px-6 pb-12 pt-6">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(244,63,94,0.25),transparent_40%),radial-gradient(circle_at_left,rgba(168,85,247,0.2),transparent_40%)]" />
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:30px_30px]" />
-        {/* Floating card art — hero bg, right side, low opacity */}
+        {/* Goku character art */}
         <img
-          src="/op15.webp"
+          src="/goku.png"
           alt=""
           aria-hidden="true"
-          className="pointer-events-none absolute -right-16 top-0 h-full max-h-[520px] w-auto object-cover object-left opacity-[0.17]"
-          style={{
-            animation: 'floatCard 7s ease-in-out infinite',
-            filter: 'drop-shadow(0 0 40px rgba(232,121,249,0.5)) drop-shadow(0 0 80px rgba(232,121,249,0.2))',
-            maskImage: 'linear-gradient(to left, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.5) 60%, transparent 100%)',
-            WebkitMaskImage: 'linear-gradient(to left, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.5) 60%, transparent 100%)',
-          }}
+          className="pointer-events-none absolute right-0 bottom-0 h-[520px] w-auto select-none"
+          style={{ opacity: 0.38, filter: 'drop-shadow(0 0 40px rgba(250,204,21,0.6)) drop-shadow(0 0 80px rgba(251,146,60,0.3))', zIndex: 0 }}
+          onError={(e) => { e.currentTarget.style.display = 'none'; }}
         />
         <div className="relative mx-auto max-w-7xl">
           <Nav />

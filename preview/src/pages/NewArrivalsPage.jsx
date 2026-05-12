@@ -78,9 +78,18 @@ export default function NewArrivalsPage() {
 
   return (
     <div className="min-h-screen bg-[#05010c] text-white">
-      <section className="relative overflow-hidden border-b border-yellow-400/15 bg-[#07030f] px-6 pb-12 pt-6">
+      <section className="relative overflow-hidden border-b border-yellow-400/15 bg-[#07030f] px-6 pb-12 pt-6 min-h-[420px] flex flex-col justify-center">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(250,204,21,0.18),transparent_40%),radial-gradient(circle_at_left,rgba(34,211,238,0.12),transparent_40%)]" />
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:30px_30px]" />
+        {/* Nami character art */}
+        <img
+          src="/nami.png"
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute right-0 top-0 h-full w-auto select-none"
+          style={{ opacity: 0.42, filter: 'drop-shadow(0 0 40px rgba(250,204,21,0.65)) drop-shadow(0 0 80px rgba(250,204,21,0.25))', zIndex: 0 }}
+          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+        />
         <div className="relative mx-auto max-w-7xl">
           <Nav />
           <motion.div initial={{opacity: 0, y: 16}} animate={{opacity: 1, y: 0}} transition={{duration: 0.5}} className="mt-6">

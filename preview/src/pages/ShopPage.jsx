@@ -7,6 +7,7 @@ import emailjs from '@emailjs/browser';
 import Nav from '../components/Nav';
 import Footer from '../components/Footer';
 import { allProducts } from '../data/products';
+import { useAuth } from '../lib/useAuth';
 
 // ── EmailJS — reuse same service, separate template for on-hand orders ───────
 const EMAILJS_SERVICE_ID   = import.meta.env.VITE_EMAILJS_SERVICE_ID;
@@ -82,16 +83,16 @@ function calcDeliveryFee(country, qty) {
 }
 
 // ── Buy Now Modal ─────────────────────────────────────────────────────────────
-function BuyNowModal({ item, onClose }) {
+function BuyNowModal({ item, onClose, userEmail }) {
   const [step, setStep]           = useState(1);
   const [qty, setQty]             = useState(1);
   const [liveStock, setLiveStock] = useState(item.stock ?? 0);
   const [country, setCountry]     = useState('');
   const [province, setProvince]   = useState('');
   const [name, setName]           = useState('');
-  const [email, setEmail]         = useState('');
   const [phone, setPhone]         = useState('');
   const [address, setAddress]     = useState('');
+  const [email, setEmail]         = useState(userEmail ?? '');
   const [copied, setCopied]       = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [sending, setSending]     = useState(false);
@@ -458,7 +459,9 @@ function BuyNowModal({ item, onClose }) {
               <div className="mb-3">
                 <label className="mb-1.5 block text-xs font-black uppercase tracking-[0.14em] text-white/40">Email</label>
                 <input required type="email" value={email} onChange={e => setEmail(e.target.value)}
-                  placeholder="Confirmation sent here" className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder-white/25 outline-none focus:border-cyan-300/40" />
+                  readOnly={!!userEmail}
+                  placeholder="Confirmation sent here"
+                  className={`w-full rounded-2xl border px-4 py-3 text-sm outline-none ${userEmail ? 'border-white/5 bg-white/5 text-white/50 cursor-default' : 'border-white/10 bg-black/30 text-white focus:border-cyan-300/40'} placeholder-white/25`} />
               </div>
 
               <div className="mb-3">
@@ -610,6 +613,7 @@ function NotifyMeModal({ item, onClose }) {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function ShopPage() {
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTag, setActiveTag] = useState('All');
   const [selected, setSelected]   = useState(null);
@@ -668,7 +672,7 @@ export default function ShopPage() {
   return (
     <div className="min-h-screen bg-[#05010c] text-white">
       <AnimatePresence>
-        {selected && <BuyNowModal item={selected} onClose={closeProduct} />}
+        {selected && <BuyNowModal item={selected} onClose={closeProduct} userEmail={user?.email ?? ''} />}
       </AnimatePresence>
       <AnimatePresence>
         {notifyItem && <NotifyMeModal item={notifyItem} onClose={() => setNotifyItem(null)} />}
@@ -682,18 +686,19 @@ export default function ShopPage() {
         .deco-float { animation: floatDeco 7s ease-in-out infinite; }
       `}</style>
 
-      <section className="relative border-b border-fuchsia-500/20 bg-[#07030f] px-6 pb-6 pt-6 overflow-hidden">
+      <section className="relative border-b border-fuchsia-500/20 bg-[#07030f] px-6 pb-6 pt-6 overflow-hidden min-h-[420px] flex flex-col justify-center">
         {/* existing radial bg */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(244,63,94,0.15),transparent_40%),radial-gradient(circle_at_left,rgba(168,85,247,0.12),transparent_40%)]" />
         {/* bottom-center radial burst — purple/cyan */}
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-[220px] bg-[radial-gradient(ellipse_at_bottom,rgba(168,85,247,0.22)_0%,rgba(34,211,238,0.10)_45%,transparent_70%)] pointer-events-none" />
-        {/* floating decorative image — right side */}
+        {/* Zoro character art */}
         <img
-          src="/ac1.webp"
+          src="/zoro.png"
           alt=""
           aria-hidden="true"
-          className="deco-float pointer-events-none absolute right-4 top-0 h-full max-h-[160px] w-auto opacity-[0.15] select-none"
-          style={{ filter: 'drop-shadow(0 0 18px rgba(168,85,247,0.7)) drop-shadow(0 0 40px rgba(168,85,247,0.35))', transform: 'rotate(-6deg)' }}
+          className="pointer-events-none absolute right-0 bottom-0 h-[600px] w-auto select-none"
+          style={{ opacity: 0.45, filter: 'drop-shadow(0 0 40px rgba(52,211,153,0.6)) drop-shadow(0 0 80px rgba(52,211,153,0.25))', zIndex: 0 }}
+          onError={(e) => { e.currentTarget.style.display = 'none'; }}
         />
         <div className="relative mx-auto max-w-7xl">
           <Nav />

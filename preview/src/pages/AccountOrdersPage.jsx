@@ -46,7 +46,7 @@ export default function AccountOrdersPage() {
 
     supabase
       .from('orders')
-      .select('order_number, item_title, quantity, full_price, dp_amount, balance_due, payment_status, order_type, eta, delivery_country, created_at')
+      .select('order_number, item_title, product_title, quantity, full_price, total_price, dp_amount, balance_due, payment_status, status, order_type, eta, delivery_country, created_at')
       .ilike('buyer_email', user.email)
       .order('created_at', { ascending: false })
       .then(({ data }) => {
@@ -70,8 +70,16 @@ export default function AccountOrdersPage() {
 
   return (
     <div className="min-h-screen bg-[#05010c] text-white">
-      <section className="relative overflow-hidden border-b border-fuchsia-500/15 bg-[#07030f] px-6 pb-12 pt-6">
+      <section className="relative overflow-hidden border-b border-fuchsia-500/15 bg-[#07030f] px-6 pb-12 pt-6 min-h-[420px] flex flex-col justify-center">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(168,85,247,0.18),transparent_40%),radial-gradient(circle_at_left,rgba(34,211,238,0.12),transparent_40%)]" />
+        <img
+          src="/zoro.png"
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute right-0 bottom-0 h-[600px] w-auto select-none"
+          style={{ opacity: 0.42, filter: 'drop-shadow(0 0 40px rgba(52,211,153,0.6)) drop-shadow(0 0 80px rgba(52,211,153,0.25))', zIndex: 0 }}
+          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+        />
         <div className="relative mx-auto max-w-7xl">
           <Nav />
           <div className="mt-6 flex items-end justify-between gap-4">
@@ -122,13 +130,13 @@ export default function AccountOrdersPage() {
                       <span className="text-xs font-black uppercase tracking-[0.18em] text-white/40">#{order.order_number ?? '—'}</span>
                       <OrderTypeBadge type={order.order_type} />
                     </div>
-                    <div className="mt-1.5 text-lg font-black leading-snug">{order.item_title}</div>
+                    <div className="mt-1.5 text-lg font-black leading-snug">{order.item_title ?? order.product_title}</div>
                     <div className="mt-1 text-sm text-white/45">Qty: {order.quantity} · {order.delivery_country ?? 'Canada'}</div>
                     {order.eta && <div className="mt-0.5 text-xs text-white/35">ETA: {order.eta}</div>}
                   </div>
                   <div className="text-right">
-                    <StatusBadge status={order.payment_status} />
-                    <div className="mt-2 text-2xl font-black">CAD ${Number(order.full_price ?? 0).toFixed(2)}</div>
+                    <StatusBadge status={order.payment_status ?? order.status} />
+                    <div className="mt-2 text-2xl font-black">CAD ${Number(order.full_price ?? order.total_price ?? 0).toFixed(2)}</div>
                     {order.dp_amount > 0 && (
                       <div className="text-xs text-white/40">DP paid: CAD ${Number(order.dp_amount).toFixed(2)} · Balance: CAD ${Number(order.balance_due ?? 0).toFixed(2)}</div>
                     )}

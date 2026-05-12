@@ -452,8 +452,16 @@ export default function HomePage() {
         <span className="relative z-10 flex h-6 w-6 items-center justify-center rounded-full border border-fuchsia-400/40 bg-[#05010c] text-xs text-fuchsia-300/70 shadow-[0_0_14px_rgba(217,70,239,0.3)]">◆</span>
       </div>
 
-      <section className="mx-auto max-w-7xl px-6 py-10 md:py-14">
-        <div className="mb-6 flex items-end justify-between gap-4">
+      <section className="relative overflow-hidden mx-auto max-w-7xl px-6 py-10 md:py-14">
+        <img
+          src="/nami.png"
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute right-0 bottom-0 h-[560px] w-auto select-none hidden md:block"
+          style={{ opacity: 0.35, filter: 'drop-shadow(0 0 40px rgba(250,204,21,0.6)) drop-shadow(0 0 80px rgba(250,204,21,0.25))', zIndex: 0 }}
+          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+        />
+        <div className="relative mb-6 flex items-end justify-between gap-4">
           <div>
             <div className="text-sm font-black uppercase tracking-[0.22em] text-cyan-300/75">Live inventory</div>
             <h2 className="mt-2 text-3xl font-black uppercase md:text-5xl">In Stock Now</h2>
@@ -462,7 +470,7 @@ export default function HomePage() {
             View all products
           </Link>
         </div>
-        <div className="grid gap-6 md:grid-cols-3">
+        <div className="relative grid gap-6 md:grid-cols-3">
           {featuredCards.map((item) => (
             <div key={item.id} className="group relative overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,#0b1022,#14081d)]">
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-yellow-300" />
