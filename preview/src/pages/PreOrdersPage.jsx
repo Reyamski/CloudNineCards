@@ -634,7 +634,7 @@ export default function PreOrdersPage() {
                 {isOpen ? '● Open now' : '● Closed'}
               </div>
               <div className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-white/55">
-                Window: Nov 2025 – Apr 2026
+                {isOpen ? 'Window: Nov 2025 – Apr 2026' : 'Next window: Coming soon'}
               </div>
               <div className="rounded-full border border-cyan-300/20 bg-cyan-300/8 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-cyan-200">
                 Payment: Wise · @cloudninecards

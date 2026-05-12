@@ -109,6 +109,44 @@ const navLinks = [
   {label: 'Contact', to: '/contact'},
 ];
 
+function EmailSignup() {
+  const [email, setEmail] = useState('');
+  const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
+
+  function handleSubmit() {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setStatus('error');
+      return;
+    }
+    setStatus('success');
+    setEmail('');
+  }
+
+  return (
+    <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+      <input
+        type="email"
+        value={email}
+        onChange={e => { setEmail(e.target.value); setStatus('idle'); }}
+        onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+        placeholder="Enter your email"
+        className={`rounded-2xl border px-4 py-3 text-sm text-white/80 backdrop-blur outline-none focus:border-cyan-300/50 bg-black/30 ${
+          status === 'error' ? 'border-red-400/60' : 'border-white/15'
+        }`}
+      />
+      <button
+        onClick={handleSubmit}
+        className="rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 px-5 py-3 text-sm font-black uppercase tracking-[0.08em] text-black"
+      >
+        {status === 'success' ? '✓ Subscribed!' : 'Get early access'}
+      </button>
+      {status === 'error' && (
+        <p className="w-full text-xs text-red-400 sm:col-span-2">Enter a valid email address.</p>
+      )}
+    </div>
+  );
+}
+
 export default function HomePage() {
   const [spotlightCards, setSpotlightCards] = useState(BASE_STOCK_SPOTLIGHT);
   const [videoId, setVideoId] = useState(DEFAULT_VIDEO_ID);
@@ -321,21 +359,21 @@ export default function HomePage() {
             </div>
             <div className="flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex items-center gap-2 rounded-full border border-red-500/40 bg-red-500/15 px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-red-300">
-                  <BellRing className="h-3 w-3" /> Pre-Order Open
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/8 px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-white/50">
+                  Pre-Order Closed
                 </div>
-                <div className="inline-flex items-center gap-1.5 rounded-full border border-orange-400/35 bg-orange-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-orange-300">
-                  Deadline: Apr 13 · 11AM
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-white/40">
+                  Sold Out
                 </div>
               </div>
               <div className="mt-2 text-2xl font-black uppercase leading-tight md:text-3xl">
                 One Piece <span className="bg-gradient-to-r from-red-400 via-orange-300 to-red-400 bg-clip-text text-transparent">OP-17 Japanese</span>
               </div>
-              <p className="mt-1.5 text-sm text-white/55">4th Anniversary Set · "World's Strongest Warrior" · CAD $93/box · 30% DP via Wise to secure.</p>
+              <p className="mt-1.5 text-sm text-white/55">4th Anniversary Set · "World's Strongest Warrior" · Pre-order window closed. Stay tuned for the next drop.</p>
             </div>
             <div className="shrink-0">
-              <Link to="/pre-orders" className="inline-flex items-center gap-2 rounded-full border border-red-500/50 bg-red-500/20 px-6 py-2.5 text-xs font-black uppercase tracking-[0.18em] text-red-200 transition hover:bg-red-500/30">
-                Reserve Now <ChevronRight className="h-3.5 w-3.5" />
+              <Link to="/pre-orders" className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/8 px-6 py-2.5 text-xs font-black uppercase tracking-[0.18em] text-white/50 transition hover:bg-white/12">
+                View Pre-Orders <ChevronRight className="h-3.5 w-3.5" />
               </Link>
             </div>
           </div>
@@ -472,16 +510,7 @@ export default function HomePage() {
             <p className="mt-4 max-w-lg text-sm leading-7 text-white/82">
               Be first to know about restocks, new sets, and exclusive drops.
             </p>
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <input
-                type="email"
-                placeholder="Enter your email"
-                className="rounded-2xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white/55 backdrop-blur outline-none focus:border-cyan-300/50"
-              />
-              <button className="rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 px-5 py-3 text-sm font-black uppercase tracking-[0.08em] text-black">
-                Get early access
-              </button>
-            </div>
+            <EmailSignup />
           </div>
         </div>
       </section>
