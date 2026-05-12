@@ -126,8 +126,9 @@ function BuyNowModal({ item, onClose }) {
   const [paymentFile, setPaymentFile] = useState(null);
   const [paymentB64, setPaymentB64]   = useState('');
   const [orderNumber] = useState(() => {
-    const n = parseInt(localStorage.getItem('cnc_order_counter') || '0', 10) + 1;
-    return `CNC-${String(n).padStart(6, '0')}`;
+    const ts = Date.now().toString(36).toUpperCase();
+    const rand = Math.random().toString(36).slice(2, 5).toUpperCase();
+    return `CNC-${ts.slice(-5)}${rand}`;
   });
 
   useEffect(() => {
@@ -269,8 +270,6 @@ function BuyNowModal({ item, onClose }) {
         },
         { publicKey: EMAILJS_PUBLIC_KEY }
       );
-      const next = parseInt(localStorage.getItem('cnc_order_counter') || '0', 10) + 1;
-      localStorage.setItem('cnc_order_counter', String(next));
       setSubmitted(true);
       try {
         await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID,
@@ -533,11 +532,107 @@ function BuyNowModal({ item, onClose }) {
   );
 }
 
+// ── Notify Me Modal ───────────────────────────────────────────────────────────
+function NotifyMeModal({ item, onClose }) {
+  const [email, setEmail]         = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const [sending, setSending]     = useState(false);
+  const [sendError, setSendError] = useState('');
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setSending(true);
+    setSendError('');
+    try {
+      if (supabaseEnabled && supabase) {
+        const { error } = await supabase.from('waitlist').insert({
+          email: email.trim().toLowerCase(),
+          product_id: item.id,
+          product_title: item.title,
+          created_at: new Date().toISOString(),
+        });
+        if (error) throw error;
+      }
+      setSubmitted(true);
+    } catch (err) {
+      console.error('Waitlist insert failed:', err);
+      setSendError(err?.message || 'Something went wrong — try again.');
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+      <motion.div
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+      />
+      <motion.div
+        initial={{ opacity: 0, y: 24, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 24, scale: 0.97 }}
+        transition={{ duration: 0.25 }}
+        className="relative w-full max-w-sm rounded-[32px] border border-white/10 bg-[#07030f] overflow-hidden"
+      >
+        <div className="h-1 w-full bg-gradient-to-r from-fuchsia-500 to-cyan-400" />
+        <div className="p-6">
+          <button onClick={onClose} className="absolute right-5 top-5 rounded-xl border border-white/10 bg-white/5 p-1.5 hover:bg-white/10">
+            <X className="h-4 w-4 text-white/60" />
+          </button>
+
+          {submitted ? (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center gap-4 py-8 text-center">
+              <div className="rounded-full border border-fuchsia-400/30 bg-fuchsia-400/10 p-5">
+                <Check className="h-10 w-10 text-fuchsia-300" />
+              </div>
+              <div className="text-2xl font-black uppercase">You're on the list!</div>
+              <p className="max-w-xs text-sm text-white/60 leading-6">
+                We'll email <span className="text-fuchsia-300">{email}</span> as soon as <span className="text-white/80">{item.title}</span> is back in stock.
+              </p>
+              <button onClick={onClose} className="rounded-2xl border border-white/10 bg-white/5 px-6 py-2.5 text-sm font-black uppercase text-white/65 hover:bg-white/10">
+                Close
+              </button>
+            </motion.div>
+          ) : (
+            <>
+              <div className="mb-5">
+                <div className="text-xs font-black uppercase tracking-[0.2em] text-fuchsia-300/70 mb-1">Get Notified</div>
+                <div className="text-xl font-black leading-snug">{item.title}</div>
+              </div>
+              <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/30 focus:border-fuchsia-400/50 focus:outline-none"
+                />
+                {sendError && <p className="text-xs text-red-400">{sendError}</p>}
+                <button
+                  type="submit"
+                  disabled={sending}
+                  className="w-full rounded-2xl bg-gradient-to-r from-fuchsia-500 to-cyan-400 px-4 py-3 text-sm font-black uppercase tracking-[0.08em] text-black transition hover:opacity-90 disabled:opacity-60"
+                >
+                  {sending ? 'Saving…' : 'Notify Me'}
+                </button>
+              </form>
+            </>
+          )}
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function ShopPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTag, setActiveTag] = useState('All');
   const [selected, setSelected]   = useState(null);
+  const [notifyItem, setNotifyItem] = useState(null);
   const [products, setProducts]   = useState(allProducts);
   const [stockSyncError, setStockSyncError] = useState('');
 
@@ -593,6 +688,9 @@ export default function ShopPage() {
     <div className="min-h-screen bg-[#05010c] text-white">
       <AnimatePresence>
         {selected && <BuyNowModal item={selected} onClose={closeProduct} />}
+      </AnimatePresence>
+      <AnimatePresence>
+        {notifyItem && <NotifyMeModal item={notifyItem} onClose={() => setNotifyItem(null)} />}
       </AnimatePresence>
 
       <section className="relative border-b border-fuchsia-500/20 bg-[#07030f] px-6 pb-6 pt-6">
@@ -662,9 +760,17 @@ export default function ShopPage() {
                       Buy Now — Wise
                     </button>
                   ) : (
-                    <button disabled className="w-full rounded-2xl border border-white/8 bg-white/4 px-4 py-3 text-sm font-black uppercase tracking-[0.08em] text-white/25 cursor-not-allowed">
-                      Sold Out
-                    </button>
+                    <div className="flex flex-col gap-2">
+                      <button disabled className="w-full rounded-2xl border border-white/8 bg-white/4 px-4 py-2.5 text-sm font-black uppercase tracking-[0.08em] text-white/25 cursor-not-allowed">
+                        Sold Out
+                      </button>
+                      <button
+                        onClick={() => setNotifyItem(item)}
+                        className="w-full rounded-2xl border border-fuchsia-400/30 bg-fuchsia-400/8 px-4 py-2.5 text-sm font-black uppercase tracking-[0.08em] text-fuchsia-300 transition hover:bg-fuchsia-400/15"
+                      >
+                        Notify Me
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
