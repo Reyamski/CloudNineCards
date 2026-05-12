@@ -1,10 +1,11 @@
-import { BellRing, ChevronRight, Zap, X, Copy, Check, AlertTriangle, Truck, Globe, CreditCard, Camera, Mail, Loader2 } from 'lucide-react';
+import { BellRing, ChevronRight, Zap, X, Copy, Check, AlertTriangle, Truck, Globe, CreditCard, Camera, Mail, Loader2, Calculator } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import emailjs from '@emailjs/browser';
 import Nav from '../components/Nav';
 import Footer from '../components/Footer';
 import { supabase } from '../lib/supabase';
+import DPCalculator from '../components/DPCalculator';
 
 // ── EmailJS config ───────────────────────────────────────────────────────────
 const EMAILJS_SERVICE_ID  = import.meta.env.VITE_EMAILJS_SERVICE_ID;
@@ -679,6 +680,7 @@ function PreOrderModal({ item, onClose }) {
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function PreOrdersPage() {
   const [selected, setSelected] = useState(null);
+  const [showCalc, setShowCalc] = useState(false);
 
   useEffect(() => { document.title = 'Pre-Orders | CloudNineCards'; }, []);
 
@@ -686,6 +688,9 @@ export default function PreOrdersPage() {
     <div className="min-h-screen bg-[#05010c] text-white">
       <AnimatePresence>
         {selected && <PreOrderModal item={selected} onClose={() => setSelected(null)} />}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showCalc && <DPCalculator onClose={() => setShowCalc(false)} />}
       </AnimatePresence>
 
       {/* Header */}

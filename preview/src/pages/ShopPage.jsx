@@ -410,14 +410,24 @@ function BuyNowModal({ item, onClose }) {
               {/* Wise handle */}
               <div className="mb-4">
                 <div className="text-xs font-black uppercase tracking-[0.14em] text-white/40 mb-2">Send to</div>
-                <div className="flex items-center gap-3 rounded-2xl border border-cyan-300/20 bg-cyan-300/8 p-4">
-                  <div className="flex-1">
-                    <div className="text-2xl font-black text-cyan-200">{WISE_HANDLE}</div>
-                    <div className="text-xs text-white/35 mt-0.5">Cloud Nine Cards — Wise</div>
+                <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/8 p-4">
+                  <div className="flex items-center gap-4">
+                    <img
+                      src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&format=png&bgcolor=ffffff&data=https%3A%2F%2Fwise.com%2Fpay%2Fme%2Fcloudninecards"
+                      alt="Scan to pay on Wise"
+                      className="h-[80px] w-[80px] rounded-xl flex-shrink-0"
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs text-white/40 mb-1">Send to Wise account</div>
+                      <div className="text-xl font-black text-cyan-200">{WISE_HANDLE}</div>
+                      <div className="text-xs text-white/35 mt-0.5">Cloud Nine Cards — Wise</div>
+                      <div className="text-[10px] text-white/30 mt-1">Or scan QR code with your Wise app</div>
+                    </div>
+                    <button onClick={copyWise} className="rounded-xl border border-white/10 bg-white/5 p-2.5 hover:bg-white/10 transition flex-shrink-0">
+                      {copied ? <Check className="h-4 w-4 text-cyan-300" /> : <Copy className="h-4 w-4 text-white/50" />}
+                    </button>
                   </div>
-                  <button onClick={copyWise} className="rounded-xl border border-white/10 bg-white/5 p-2.5 hover:bg-white/10">
-                    {copied ? <Check className="h-4 w-4 text-cyan-300" /> : <Copy className="h-4 w-4 text-white/50" />}
-                  </button>
                 </div>
               </div>
 
