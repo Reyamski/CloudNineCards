@@ -254,7 +254,7 @@ export default function HomePage() {
           className="pointer-events-none absolute right-[52%] top-6 hidden md:block"
           style={{
             animation: 'floatCard1 6s ease-in-out infinite',
-            zIndex: 2,
+            zIndex: 0,
           }}
         >
           <img
@@ -269,7 +269,7 @@ export default function HomePage() {
           className="pointer-events-none absolute right-[44%] top-32 hidden md:block"
           style={{
             animation: 'floatCard2 7.5s ease-in-out infinite',
-            zIndex: 1,
+            zIndex: 0,
           }}
         >
           <img
@@ -292,7 +292,7 @@ export default function HomePage() {
           }
         `}</style>
 
-        <div className="relative mx-auto max-w-7xl px-6 pb-16 pt-6 md:pb-24 md:pt-8">
+        <div className="relative z-10 mx-auto max-w-7xl px-6 pb-16 pt-6 md:pb-24 md:pt-8">
           <div className="mb-8 flex items-center justify-between">
             <div>
               <div className="bg-gradient-to-r from-cyan-300 via-fuchsia-300 to-yellow-300 bg-clip-text text-2xl font-black tracking-[0.28em] text-transparent md:text-3xl">
