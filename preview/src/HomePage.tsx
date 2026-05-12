@@ -350,35 +350,28 @@ export default function HomePage() {
 
 
       <section className="mx-auto max-w-7xl px-6 pb-2 pt-6">
-        <motion.div initial={{opacity: 0, y: 16}} animate={{opacity: 1, y: 0}} transition={{duration: 0.55}} className="relative overflow-hidden rounded-[32px] border border-red-500/30">
-          <img
-            src="/OP-17-JP.png"
-            alt="One Piece OP-17"
-            className="absolute inset-0 h-full w-full object-cover opacity-25 saturate-[1.3]"
-          />
-          <div className="absolute inset-0 bg-[linear-gradient(110deg,rgba(5,1,12,0.97)_0%,rgba(80,5,5,0.82)_50%,rgba(5,1,12,0.93)_100%)]" />
-          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-red-500 via-orange-400 to-red-600" />
+        <motion.div initial={{opacity: 0, y: 16}} animate={{opacity: 1, y: 0}} transition={{duration: 0.55}} className="relative overflow-hidden rounded-[32px] border border-fuchsia-500/30">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(168,85,247,0.18),transparent_50%),radial-gradient(circle_at_bottom_left,rgba(34,211,238,0.10),transparent_50%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(110deg,rgba(5,1,12,0.97)_0%,rgba(30,5,60,0.85)_50%,rgba(5,1,12,0.95)_100%)]" />
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-fuchsia-500 via-purple-400 to-cyan-400" />
           <div className="relative flex flex-col items-center gap-6 px-8 py-10 text-center sm:flex-row sm:text-left md:px-12">
-            <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-red-500/40 shadow-[0_0_30px_rgba(239,68,68,0.25)]">
-              <img src="/OP-17-JP.png" alt="" className="h-full w-full object-cover" />
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border border-fuchsia-500/40 bg-fuchsia-500/10 shadow-[0_0_30px_rgba(168,85,247,0.25)]">
+              <BellRing className="h-8 w-8 text-fuchsia-300" />
             </div>
             <div className="flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/8 px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-white/50">
-                  Pre-Order Closed
-                </div>
-                <div className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-white/40">
-                  Sold Out
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-fuchsia-400/35 bg-fuchsia-400/12 px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-fuchsia-200">
+                  Coming Soon
                 </div>
               </div>
               <div className="mt-2 text-2xl font-black uppercase leading-tight md:text-3xl">
-                One Piece <span className="bg-gradient-to-r from-red-400 via-orange-300 to-red-400 bg-clip-text text-transparent">OP-17 Japanese</span>
+                One Piece <span className="bg-gradient-to-r from-fuchsia-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent">OP-18 Pre-Order</span>
               </div>
-              <p className="mt-1.5 text-sm text-white/55">4th Anniversary Set · "World's Strongest Warrior" · Pre-order window closed. Stay tuned for the next drop.</p>
+              <p className="mt-1.5 text-sm text-white/55">Next pre-order window opening soon. Join the email list to get notified first — before it sells out.</p>
             </div>
             <div className="shrink-0">
-              <Link to="/pre-orders" className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/8 px-6 py-2.5 text-xs font-black uppercase tracking-[0.18em] text-white/50 transition hover:bg-white/12">
-                View Pre-Orders <ChevronRight className="h-3.5 w-3.5" />
+              <Link to="/contact" className="inline-flex items-center gap-2 rounded-full border border-fuchsia-400/35 bg-fuchsia-400/12 px-6 py-2.5 text-xs font-black uppercase tracking-[0.18em] text-fuchsia-200 transition hover:bg-fuchsia-400/20">
+                Get Notified <ChevronRight className="h-3.5 w-3.5" />
               </Link>
             </div>
           </div>
