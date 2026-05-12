@@ -24,7 +24,7 @@ async function uploadProofImage(base64DataUrl) {
 
 // ── Pre-order window config ──────────────────────────────────────────────────
 const PO_OPEN_DATE  = new Date('2025-11-01T00:00:00');
-const PO_CLOSE_DATE = new Date('2026-09-30T23:59:59'); // TODO: confirm actual OP-17 JP deadline
+const PO_CLOSE_DATE = new Date('2026-04-30T23:59:59');
 const now = new Date();
 const isOpen = now >= PO_OPEN_DATE && now <= PO_CLOSE_DATE;
 
