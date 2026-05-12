@@ -134,7 +134,7 @@ export default function NewArrivalsPage() {
                 <div className="mt-4 text-3xl font-black">CAD ${item.price.toFixed(2)}</div>
                 <div className="mt-1 text-xs text-white/35">{item.daysAgo}</div>
                 <Link
-                  to="/shop"
+                  to={`/shop?product=${item.id}`}
                   className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-yellow-300 via-cyan-300 to-fuchsia-400 px-4 py-3 text-sm font-black uppercase tracking-[0.08em] text-black transition hover:opacity-95"
                 >
                   View Product <ChevronRight className="h-4 w-4" />

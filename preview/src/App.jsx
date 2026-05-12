@@ -7,6 +7,7 @@ import PreOrdersPage from './pages/PreOrdersPage';
 import NewArrivalsPage from './pages/NewArrivalsPage';
 import ContactPage from './pages/ContactPage';
 import AdminPage from './pages/AdminPage';
+import NotFoundPage from './pages/NotFoundPage';
 
 export default function App() {
   return (
@@ -19,6 +20,7 @@ export default function App() {
         <Route path="/new-arrivals" element={<NewArrivalsPage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/admin" element={<AdminPage />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>
   );

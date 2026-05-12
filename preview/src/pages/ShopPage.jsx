@@ -10,7 +10,6 @@ import Nav from '../components/Nav';
 const EMAILJS_SERVICE_ID   = import.meta.env.VITE_EMAILJS_SERVICE_ID;
 const EMAILJS_TEMPLATE_ID  = import.meta.env.VITE_EMAILJS_TEMPLATE_ONHAND;
 const EMAILJS_PUBLIC_KEY  = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
-const EMAILJS_PRIVATE_KEY = import.meta.env.VITE_EMAILJS_PRIVATE_KEY;
 
 // ── imgbb — free image hosting so payment proof renders in email ──────────────
 const IMGBB_API_KEY = import.meta.env.VITE_IMGBB_API_KEY;
@@ -267,7 +266,7 @@ function BuyNowModal({ item, onClose }) {
           wise_handle:       WISE_HANDLE,
           to_email:          CONTACT_EMAIL,
         },
-        { publicKey: EMAILJS_PUBLIC_KEY, privateKey: EMAILJS_PRIVATE_KEY }
+        { publicKey: EMAILJS_PUBLIC_KEY }
       );
       const next = parseInt(localStorage.getItem('cnc_order_counter') || '0', 10) + 1;
       localStorage.setItem('cnc_order_counter', String(next));
@@ -275,7 +274,7 @@ function BuyNowModal({ item, onClose }) {
       try {
         await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID,
           { order_number: orderNumber, buyer_name: name, buyer_email: email, buyer_phone: phone, buyer_address: address, item_title: item.title, item_variant: item.subtitle, quantity: qty, subtotal: `CAD $${subtotal.toFixed(2)}`, tax_amount: taxAmount > 0 ? `CAD $${taxAmount.toFixed(2)} (${taxLabel})` : 'N/A', delivery_fee: freeShipping ? 'FREE (Canada $300+)' : `CAD $${deliveryFee.toFixed(2)} (Canada Post / DHL)`, delivery_country: country, delivery_province: province || 'N/A', total_price: `CAD $${total}`, payment_proof: proofHtml, wise_handle: WISE_HANDLE, to_email: email },
-          { publicKey: EMAILJS_PUBLIC_KEY, privateKey: EMAILJS_PRIVATE_KEY }
+          { publicKey: EMAILJS_PUBLIC_KEY }
         );
       } catch (buyerErr) { console.warn('Buyer copy failed:', buyerErr); }
     } catch (error) {

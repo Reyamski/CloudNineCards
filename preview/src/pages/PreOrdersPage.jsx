@@ -8,7 +8,6 @@ import Nav from '../components/Nav';
 const EMAILJS_SERVICE_ID  = import.meta.env.VITE_EMAILJS_SERVICE_ID;
 const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_PREORDER;
 const EMAILJS_PUBLIC_KEY  = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
-const EMAILJS_PRIVATE_KEY = import.meta.env.VITE_EMAILJS_PRIVATE_KEY;
 
 // ── imgbb — free image hosting so payment proof renders in email ──────────────
 const IMGBB_API_KEY = import.meta.env.VITE_IMGBB_API_KEY;
@@ -25,7 +24,7 @@ async function uploadProofImage(base64DataUrl) {
 
 // ── Pre-order window config ──────────────────────────────────────────────────
 const PO_OPEN_DATE  = new Date('2025-11-01T00:00:00');
-const PO_CLOSE_DATE = new Date('2026-04-30T23:59:59');
+const PO_CLOSE_DATE = new Date('2026-09-30T23:59:59'); // TODO: confirm actual OP-17 JP deadline
 const now = new Date();
 const isOpen = now >= PO_OPEN_DATE && now <= PO_CLOSE_DATE;
 
@@ -224,7 +223,7 @@ function PreOrderModal({ item, onClose }) {
           wise_handle:   WISE_HANDLE,
           to_email:      CONTACT_EMAIL,
         },
-        { publicKey: EMAILJS_PUBLIC_KEY, privateKey: EMAILJS_PRIVATE_KEY }
+        { publicKey: EMAILJS_PUBLIC_KEY }
       );
       const next = parseInt(localStorage.getItem('cnc_order_counter') || '0', 10) + 1;
       localStorage.setItem('cnc_order_counter', String(next));
@@ -232,7 +231,7 @@ function PreOrderModal({ item, onClose }) {
       try {
         await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID,
           { order_number: orderNumber, buyer_name: name, buyer_email: email, buyer_phone: phone, buyer_address: address, item_title: item.title, item_subtitle: item.subtitle, quantity: qty, full_price: `CAD $${totalPrice}`, dp_amount: `CAD $${totalDp}`, balance_due: `CAD $${totalRemaining}`, eta: item.eta, payment_proof: proofHtml, wise_handle: WISE_HANDLE, to_email: email },
-          { publicKey: EMAILJS_PUBLIC_KEY, privateKey: EMAILJS_PRIVATE_KEY }
+          { publicKey: EMAILJS_PUBLIC_KEY }
         );
       } catch (buyerErr) { console.warn('Buyer copy failed:', buyerErr); }
     } catch (err) {

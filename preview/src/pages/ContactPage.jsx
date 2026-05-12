@@ -7,7 +7,6 @@ import Nav from '../components/Nav';
 const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID;
 const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ONHAND;
 const EMAILJS_PUBLIC_KEY  = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
-const EMAILJS_PRIVATE_KEY = import.meta.env.VITE_EMAILJS_PRIVATE_KEY;
 const CONTACT_EMAIL = 'papspective@gmail.com';
 
 const topics = ['Order Issue', 'Pre-order Question', 'Damaged Card / Missing Item', 'General Inquiry', 'Wholesale / Bulk'];
@@ -51,7 +50,7 @@ export default function ContactPage() {
         eta:           'N/A',
         wise_handle:   CONTACT_EMAIL,
         to_email:      CONTACT_EMAIL,
-      }, { publicKey: EMAILJS_PUBLIC_KEY, privateKey: EMAILJS_PRIVATE_KEY });
+      }, { publicKey: EMAILJS_PUBLIC_KEY });
       setSent(true);
     } catch {
       setSendError('Failed to send. Please email us directly at ' + CONTACT_EMAIL);

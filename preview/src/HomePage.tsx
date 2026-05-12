@@ -113,10 +113,13 @@ function EmailSignup() {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setStatus('error');
       return;
+    }
+    if (supabaseEnabled && supabase) {
+      await supabase.from('subscribers').upsert({ email, subscribed_at: new Date().toISOString() }, { onConflict: 'email' });
     }
     setStatus('success');
     setEmail('');
