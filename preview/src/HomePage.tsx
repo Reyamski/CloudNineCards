@@ -154,6 +154,8 @@ function EmailSignup() {
 export default function HomePage() {
   const [spotlightCards, setSpotlightCards] = useState(BASE_STOCK_SPOTLIGHT);
   const [videoId, setVideoId] = useState(DEFAULT_VIDEO_ID);
+  const [browsing, setBrowsing] = useState(() => Math.floor(Math.random() * 14) + 8); // 8-21
+  const [news, setNews] = useState<Array<{title: string; link: string; pubDate: string; thumbnail: string}>>([]);
 
   useEffect(() => { document.title = 'CloudNineCards | One Piece TCG Canada'; }, []);
 
@@ -193,6 +195,32 @@ export default function HomePage() {
     }
 
     loadHomepageData();
+  }, []);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setBrowsing(prev => {
+        const delta = Math.random() < 0.5 ? 1 : -1;
+        return Math.max(4, Math.min(28, prev + delta));
+      });
+    }, Math.floor(Math.random() * 12000) + 8000); // every 8-20s
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    fetch('https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fwww.pokebeach.com%2Ffeed&count=4')
+      .then(r => r.json())
+      .then(data => {
+        if (data.status === 'ok') {
+          setNews(data.items.map((item: any) => ({
+            title: item.title,
+            link: item.link,
+            pubDate: item.pubDate,
+            thumbnail: item.thumbnail || item.enclosure?.link || '',
+          })));
+        }
+      })
+      .catch(() => {}); // fail silently
   }, []);
 
   const heroCard = spotlightCards[0];
@@ -268,6 +296,14 @@ export default function HomePage() {
                 <Link to="/pre-orders" className="rounded-2xl border border-white/15 bg-white/5 px-7 py-3.5 text-sm font-black uppercase tracking-[0.12em] text-white backdrop-blur transition hover:border-fuchsia-300/50 hover:bg-white/10">
                   See Pre-Orders
                 </Link>
+              </div>
+
+              <div className="mt-6 inline-flex items-center gap-2 text-xs font-bold text-white/55">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-60" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-green-400" />
+                </span>
+                <span><span className="text-green-300 font-black">{browsing}</span> browsing now</span>
               </div>
 
               <div className="mt-8 flex flex-wrap gap-3 text-xs font-bold uppercase tracking-[0.2em] text-white/75">
@@ -499,6 +535,45 @@ export default function HomePage() {
           ))}
         </div>
       </section>
+
+      {news.length > 0 && (
+        <section className="mx-auto max-w-7xl px-6 py-10">
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-[0.28em] text-white/35 mb-1">TCG News</div>
+              <div className="text-2xl font-black uppercase">Latest Headlines</div>
+            </div>
+            <a href="https://www.pokebeach.com" target="_blank" rel="noreferrer" className="text-xs font-black uppercase tracking-[0.14em] text-white/40 transition hover:text-cyan-300">
+              See all on PokéBeach →
+            </a>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {news.map((article, idx) => (
+              <a
+                key={idx}
+                href={article.link}
+                target="_blank"
+                rel="noreferrer"
+                className="group flex flex-col overflow-hidden rounded-[22px] border border-white/8 bg-white/4 transition hover:border-cyan-300/25 hover:bg-white/6"
+              >
+                {article.thumbnail && (
+                  <div className="h-32 overflow-hidden">
+                    <img src={article.thumbnail} alt="" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                  </div>
+                )}
+                <div className="flex flex-1 flex-col p-4">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/30 mb-2">
+                    {new Date(article.pubDate).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })}
+                  </div>
+                  <div className="text-sm font-black leading-snug text-white/85 group-hover:text-cyan-200 transition line-clamp-3">
+                    {article.title}
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="mx-auto max-w-7xl px-6 pb-20 pt-6">
         <div className="relative overflow-hidden rounded-[34px] border border-fuchsia-400/20 bg-[linear-gradient(135deg,rgba(91,33,182,0.45),rgba(14,165,233,0.18))] p-8">
