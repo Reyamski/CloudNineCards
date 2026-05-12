@@ -27,7 +27,7 @@ async function uploadProofImage(base64DataUrl) {
 
 // ── Pre-order window config ──────────────────────────────────────────────────
 const PO_OPEN_DATE  = new Date('2025-11-01T00:00:00');
-const PO_CLOSE_DATE = new Date('2026-04-30T23:59:59');
+const PO_CLOSE_DATE = new Date('2026-12-31T23:59:59');
 const isOpen = () => { const now = new Date(); return now >= PO_OPEN_DATE && now <= PO_CLOSE_DATE; };
 
 const WISE_HANDLE = '@cloudninecards';
@@ -118,6 +118,22 @@ const preorders = [
       'Orders released only after full payment cleared.',
       'Buyer shoulders shipping fees, taxes, and import duties.',
     ],
+  },
+  {
+    id: 'test-dummy',
+    title: '[TEST ITEM — DO NOT ORDER]',
+    subtitle: 'For internal testing only',
+    soldOut: false,
+    priceTba: false,
+    price: 1.00,
+    usdPrice: 0.73,
+    audPrice: 1.10,
+    currency: 'CAD',
+    eta: 'N/A',
+    deadline: new Date('2026-12-31T23:59:59'),
+    image: 'https://placehold.co/400x560/1a0030/ff0000?text=TEST+ITEM%0ADO+NOT+ORDER&font=montserrat',
+    hype: 'Internal test only',
+    notes: ['This is a test item. Do not submit a real order.'],
   },
   {id: 'op17eng', title: 'One Piece Card Game OP-17 Booster Box',  subtitle: 'English',  soldOut: true,  priceTba: false, currency: 'CAD', eta: 'TBD', image: 'https://placehold.co/400x560/0d0020/9333ea?text=OP-17%0AEnglish%0ABooster+Box&font=montserrat', hype: 'Stay tuned for updates.'},
   {id: 'op16eng', title: 'One Piece Card Game OP-16 Booster Box',  subtitle: 'English',  soldOut: true,  priceTba: false, currency: 'CAD', eta: 'TBD', image: 'https://placehold.co/400x560/0d0020/9333ea?text=OP-16%0AEnglish%0ABooster+Box&font=montserrat', hype: 'Stay tuned for updates.'},
@@ -289,7 +305,7 @@ function PreOrderModal({ item, onClose }) {
       // Write to Supabase so it appears in buyer order history
       try {
         if (supabase) {
-          await supabase.from('orders').insert({
+          const { error: dbErr } = await supabase.from('orders').insert({
             order_number:     orderNumber,
             order_type:       'pre_order',
             buyer_email:      email.trim().toLowerCase(),
