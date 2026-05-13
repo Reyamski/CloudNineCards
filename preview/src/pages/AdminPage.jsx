@@ -114,6 +114,19 @@ export default function AdminPage() {
   const [confirmingId, setConfirmingId] = useState('');
   const [paymentUpdatingId, setPaymentUpdatingId] = useState('');
 
+  // ── Singles state ────────────────────────────────────────────────────────────
+  const [singles, setSingles]               = useState([]);
+  const [singlesLoaded, setSinglesLoaded]   = useState(false);
+  const [singlesLoading, setSinglesLoading] = useState(false);
+  const [singlesError, setSinglesError]     = useState('');
+  const [showAddForm, setShowAddForm]       = useState(false);
+  const [savingAdd, setSavingAdd]           = useState(false);
+  const [deletingId, setDeletingId]         = useState('');
+  const [editCell, setEditCell]             = useState({ id: '', field: '' });
+  const [editVal, setEditVal]               = useState('');
+  const BLANK_FORM = { card_name: '', set_name: '', set_code: '', card_number: '', game: 'One Piece', language: 'English', condition: 'NM', rarity: '', price: '', stock: '1', image_url: '' };
+  const [addForm, setAddForm]               = useState(BLANK_FORM);
+
   useEffect(() => {
     async function load() {
       if (!supabaseEnabled || !supabase) {
@@ -396,6 +409,63 @@ export default function AdminPage() {
     }
   }
 
+  async function loadSingles() {
+    if (!supabaseEnabled || !supabase) { setSinglesError('Supabase not configured.'); return; }
+    setSinglesLoading(true);
+    const { data, error } = await supabase.from('singles').select('*').order('created_at', { ascending: false });
+    if (error) setSinglesError(`Load failed: ${error.message}`);
+    else { setSingles(data ?? []); setSinglesError(''); }
+    setSinglesLoading(false);
+    setSinglesLoaded(true);
+  }
+
+  async function addSingle(e) {
+    e.preventDefault();
+    if (!supabaseEnabled || !supabase) return;
+    setSavingAdd(true);
+    const payload = {
+      card_name:   addForm.card_name.trim(),
+      set_name:    addForm.set_name.trim(),
+      set_code:    addForm.set_code.trim() || null,
+      card_number: addForm.card_number.trim() || null,
+      game:        addForm.game,
+      language:    addForm.language,
+      condition:   addForm.condition,
+      rarity:      addForm.rarity.trim() || null,
+      price:       parseFloat(addForm.price) || 0,
+      stock:       parseInt(addForm.stock, 10) || 1,
+      in_stock:    (parseInt(addForm.stock, 10) || 1) > 0,
+      image_url:   addForm.image_url.trim() || null,
+    };
+    const { data, error } = await supabase.from('singles').insert(payload).select().single();
+    if (error) { setSinglesError(`Add failed: ${error.message}`); }
+    else { setSingles(prev => [data, ...prev]); setAddForm(BLANK_FORM); setShowAddForm(false); setSinglesError(''); }
+    setSavingAdd(false);
+  }
+
+  async function updateSingle(id, field, value) {
+    if (!supabaseEnabled || !supabase) return;
+    const parsed = field === 'price' ? parseFloat(value) || 0 : field === 'stock' ? parseInt(value, 10) || 0 : value;
+    const extra  = field === 'stock' ? { in_stock: parsed > 0 } : {};
+    const { error } = await supabase.from('singles').update({ [field]: parsed, ...extra, updated_at: new Date().toISOString() }).eq('id', id);
+    if (error) { setSinglesError(`Update failed: ${error.message}`); }
+    else {
+      setSingles(prev => prev.map(s => s.id === id ? { ...s, [field]: parsed, ...extra } : s));
+      setSinglesError('');
+    }
+    setEditCell({ id: '', field: '' });
+    setEditVal('');
+  }
+
+  async function deleteSingle(id) {
+    if (!supabaseEnabled || !supabase) return;
+    setDeletingId(id);
+    const { error } = await supabase.from('singles').delete().eq('id', id);
+    if (error) setSinglesError(`Delete failed: ${error.message}`);
+    else { setSingles(prev => prev.filter(s => s.id !== id)); setSinglesError(''); }
+    setDeletingId('');
+  }
+
   function extractVideoId(input) {
     const match = input.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
     return match ? match[1] : input.trim();
@@ -593,6 +663,14 @@ export default function AdminPage() {
               }`}
             >
               Price Research
+            </button>
+            <button
+              onClick={() => { setActiveTab('singles'); if (!singlesLoaded) loadSingles(); }}
+              className={`rounded-2xl px-4 py-2.5 text-sm font-black uppercase tracking-[0.08em] transition ${
+                activeTab === 'singles' ? 'bg-gradient-to-r from-fuchsia-400 via-purple-400 to-cyan-400 text-black' : 'border border-white/15 bg-white/5 text-white/70 hover:bg-white/10'
+              }`}
+            >
+              Singles
             </button>
           </div>
         </div>
@@ -870,6 +948,182 @@ export default function AdminPage() {
         {activeTab === 'prices' ? (
           <div className="mt-2">
             <p className="text-center text-sm text-white/40 py-8">Price Research tool coming soon.</p>
+          </div>
+        ) : null}
+
+        {activeTab === 'singles' ? (
+          <div>
+            {singlesError ? <div className="mb-4 rounded-2xl border border-red-400/25 bg-red-400/10 px-4 py-3 text-sm text-red-200">{singlesError}</div> : null}
+
+            {/* Header + Add button */}
+            <div className="mb-5 flex items-center justify-between gap-4">
+              <div>
+                <div className="text-xs font-black uppercase tracking-[0.2em] text-fuchsia-300/70">Singles Inventory</div>
+                <div className="mt-0.5 text-2xl font-black">{singles.length} card{singles.length !== 1 ? 's' : ''} listed</div>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => loadSingles()} disabled={singlesLoading}
+                  className="rounded-2xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-black uppercase text-white/70 hover:bg-white/10 disabled:opacity-40">
+                  {singlesLoading ? 'Loading…' : 'Refresh'}
+                </button>
+                <button onClick={() => setShowAddForm(v => !v)}
+                  className="rounded-2xl bg-gradient-to-r from-fuchsia-400 via-purple-400 to-cyan-400 px-5 py-2.5 text-sm font-black uppercase text-black transition hover:opacity-90">
+                  {showAddForm ? 'Cancel' : '+ Add Single'}
+                </button>
+              </div>
+            </div>
+
+            {/* Add form */}
+            {showAddForm && (
+              <form onSubmit={addSingle} className="mb-6 rounded-[24px] border border-fuchsia-400/25 bg-fuchsia-400/8 p-5">
+                <div className="text-xs font-black uppercase tracking-[0.18em] text-fuchsia-300 mb-4">New Single</div>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {[
+                    { key: 'card_name',   label: 'Card Name *',   placeholder: 'Monkey D. Luffy' },
+                    { key: 'set_name',    label: 'Set Name *',    placeholder: 'Romance Dawn' },
+                    { key: 'set_code',    label: 'Set Code',      placeholder: 'OP-01' },
+                    { key: 'card_number', label: 'Card Number',   placeholder: 'OP01-060' },
+                    { key: 'rarity',      label: 'Rarity',        placeholder: 'Secret Rare' },
+                    { key: 'image_url',   label: 'Image URL',     placeholder: 'https://...' },
+                  ].map(({ key, label, placeholder }) => (
+                    <div key={key}>
+                      <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">{label}</label>
+                      <input value={addForm[key]} onChange={e => setAddForm(f => ({ ...f, [key]: e.target.value }))}
+                        placeholder={placeholder} required={key === 'card_name' || key === 'set_name'}
+                        className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-fuchsia-400/40" />
+                    </div>
+                  ))}
+                  <div>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Game *</label>
+                    <select value={addForm.game} onChange={e => setAddForm(f => ({ ...f, game: e.target.value }))}
+                      className="w-full rounded-xl border border-white/10 bg-white px-3 py-2 text-sm text-black outline-none">
+                      {['One Piece', 'Pokemon', 'Dragon Ball', 'Yu-Gi-Oh!'].map(g => <option key={g}>{g}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Language *</label>
+                    <select value={addForm.language} onChange={e => setAddForm(f => ({ ...f, language: e.target.value }))}
+                      className="w-full rounded-xl border border-white/10 bg-white px-3 py-2 text-sm text-black outline-none">
+                      <option>English</option><option>Japanese</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Condition *</label>
+                    <select value={addForm.condition} onChange={e => setAddForm(f => ({ ...f, condition: e.target.value }))}
+                      className="w-full rounded-xl border border-white/10 bg-white px-3 py-2 text-sm text-black outline-none">
+                      {['NM', 'LP', 'MP', 'HP', 'D'].map(c => <option key={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Price (CAD) *</label>
+                    <input type="number" step="0.01" min="0" required value={addForm.price}
+                      onChange={e => setAddForm(f => ({ ...f, price: e.target.value }))}
+                      placeholder="25.00"
+                      className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-fuchsia-400/40" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Stock *</label>
+                    <input type="number" min="0" required value={addForm.stock}
+                      onChange={e => setAddForm(f => ({ ...f, stock: e.target.value }))}
+                      placeholder="1"
+                      className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-fuchsia-400/40" />
+                  </div>
+                </div>
+                <button type="submit" disabled={savingAdd}
+                  className="mt-4 rounded-2xl bg-gradient-to-r from-fuchsia-400 via-purple-400 to-cyan-400 px-6 py-2.5 text-sm font-black uppercase text-black disabled:opacity-60">
+                  {savingAdd ? 'Saving…' : 'Add to Inventory'}
+                </button>
+              </form>
+            )}
+
+            {/* Singles table */}
+            {singlesLoading ? (
+              <div className="py-16 text-center text-white/40 text-sm">Loading singles…</div>
+            ) : singles.length === 0 ? (
+              <div className="py-16 text-center">
+                <div className="text-4xl mb-3">🃏</div>
+                <div className="text-lg font-black uppercase text-white/60">No singles yet</div>
+                <p className="mt-1 text-sm text-white/35">Run the SQL migration in Supabase first, then add your first card above.</p>
+                <a href="https://supabase.com" target="_blank" rel="noreferrer" className="mt-4 inline-block text-xs text-cyan-400 hover:underline">Open Supabase Dashboard →</a>
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-[20px] border border-white/10">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-white/10 bg-white/5 text-left">
+                      {['Card', 'Set', 'Cond', 'Lang', 'Rarity', 'Price', 'Stock', 'Actions'].map(h => (
+                        <th key={h} className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.16em] text-white/40">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {singles.map(s => (
+                      <tr key={s.id} className="border-b border-white/5 hover:bg-white/3 transition">
+                        <td className="px-4 py-3 font-black text-white max-w-[180px]">
+                          <div className="truncate">{s.card_name}</div>
+                          {s.card_number && <div className="text-[10px] text-white/35">{s.card_number}</div>}
+                        </td>
+                        <td className="px-4 py-3 text-white/60 max-w-[140px]">
+                          <div className="truncate text-xs">{s.set_name}</div>
+                          {s.set_code && <div className="text-[10px] text-white/30">{s.set_code}</div>}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`rounded-full border px-2 py-0.5 text-[10px] font-black ${
+                            s.condition === 'NM' ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-300' :
+                            s.condition === 'LP' ? 'border-cyan-400/40 bg-cyan-400/10 text-cyan-300' :
+                            s.condition === 'MP' ? 'border-yellow-400/40 bg-yellow-400/10 text-yellow-300' :
+                            'border-red-400/40 bg-red-400/10 text-red-300'
+                          }`}>{s.condition}</span>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-white/50">{s.language === 'Japanese' ? '🇯🇵 JP' : '🇺🇸 EN'}</td>
+                        <td className="px-4 py-3 text-xs text-white/50 max-w-[100px]"><div className="truncate">{s.rarity ?? '—'}</div></td>
+
+                        {/* Inline-editable price */}
+                        <td className="px-4 py-3">
+                          {editCell.id === s.id && editCell.field === 'price' ? (
+                            <input type="number" step="0.01" min="0" autoFocus value={editVal}
+                              onChange={e => setEditVal(e.target.value)}
+                              onBlur={() => updateSingle(s.id, 'price', editVal)}
+                              onKeyDown={e => { if (e.key === 'Enter') updateSingle(s.id, 'price', editVal); if (e.key === 'Escape') { setEditCell({id:'',field:''}); setEditVal(''); } }}
+                              className="w-20 rounded-lg border border-fuchsia-400/40 bg-black/40 px-2 py-1 text-sm text-white outline-none" />
+                          ) : (
+                            <button onClick={() => { setEditCell({id: s.id, field: 'price'}); setEditVal(String(s.price)); }}
+                              className="text-cyan-300 font-black hover:text-cyan-200 transition text-sm">
+                              ${Number(s.price).toFixed(2)}
+                            </button>
+                          )}
+                        </td>
+
+                        {/* Inline-editable stock */}
+                        <td className="px-4 py-3">
+                          {editCell.id === s.id && editCell.field === 'stock' ? (
+                            <input type="number" min="0" autoFocus value={editVal}
+                              onChange={e => setEditVal(e.target.value)}
+                              onBlur={() => updateSingle(s.id, 'stock', editVal)}
+                              onKeyDown={e => { if (e.key === 'Enter') updateSingle(s.id, 'stock', editVal); if (e.key === 'Escape') { setEditCell({id:'',field:''}); setEditVal(''); } }}
+                              className="w-16 rounded-lg border border-fuchsia-400/40 bg-black/40 px-2 py-1 text-sm text-white outline-none" />
+                          ) : (
+                            <button onClick={() => { setEditCell({id: s.id, field: 'stock'}); setEditVal(String(s.stock)); }}
+                              className={`font-black hover:opacity-80 transition text-sm ${s.in_stock ? 'text-emerald-300' : 'text-red-300'}`}>
+                              {s.stock}
+                            </button>
+                          )}
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <button onClick={() => { if (window.confirm(`Delete "${s.card_name}"?`)) deleteSingle(s.id); }}
+                            disabled={deletingId === s.id}
+                            className="rounded-lg border border-red-400/25 bg-red-400/8 px-2.5 py-1 text-[10px] font-black uppercase text-red-300 hover:bg-red-400/15 disabled:opacity-40 transition">
+                            {deletingId === s.id ? '…' : 'Delete'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <p className="mt-3 text-xs text-white/25">Click price or stock to edit inline. Press Enter to save, Escape to cancel.</p>
           </div>
         ) : null}
 
