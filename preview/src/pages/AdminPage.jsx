@@ -1,6 +1,7 @@
 import {useEffect, useRef, useState} from 'react';
 import {ShieldCheck, Save, RotateCcw, Eye, EyeOff, Youtube, Loader2, Sparkles, Upload, X, Check} from 'lucide-react';
 import {supabase, supabaseEnabled} from '../lib/supabase';
+import heic2any from 'heic2any';
 
 const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD;
 const DEFAULT_VIDEO_ID = 'OcLL44cDh7k';
@@ -144,12 +145,33 @@ export default function AdminPage() {
     });
   }
 
-  async function analyzeCard(file) {
-    if (!file || !file.type.startsWith('image/')) return;
+  async function analyzeCard(rawFile) {
+    if (!rawFile) return;
+
+    const HEIC_TYPES = ['image/heic', 'image/heif', 'image/heic-sequence', 'image/heif-sequence'];
+    const isHeic = HEIC_TYPES.includes(rawFile.type) || /\.heic$/i.test(rawFile.name);
+
+    let file = rawFile;
+    if (isHeic) {
+      setImagePreview(URL.createObjectURL(rawFile));
+      setAnalyzing(true);
+      setAnalyzed(false);
+      setAnalyzeError('');
+      try {
+        const blob = await heic2any({ blob: rawFile, toType: 'image/jpeg', quality: 0.85 });
+        file = new File([blob], rawFile.name.replace(/\.heic$/i, '.jpg'), { type: 'image/jpeg' });
+      } catch (err) {
+        setAnalyzing(false);
+        setAnalyzeError(`HEIC conversion failed: ${err.message}`);
+        return;
+      }
+    }
+
+    if (!file.type.startsWith('image/')) return;
 
     const SUPPORTED = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     if (!SUPPORTED.includes(file.type)) {
-      setAnalyzeError(`Unsupported format: ${file.type}. Use JPEG, PNG, GIF, or WebP.`);
+      setAnalyzeError(`Unsupported format: ${file.type}. Use JPEG, PNG, GIF, WebP, or HEIC.`);
       setImagePreview(URL.createObjectURL(file));
       return;
     }
@@ -159,7 +181,7 @@ export default function AdminPage() {
       return;
     }
 
-    setImagePreview(URL.createObjectURL(file));
+    if (!isHeic) setImagePreview(URL.createObjectURL(file));
     setAnalyzing(true);
     setAnalyzed(false);
     setAnalyzeError('');
@@ -1067,7 +1089,7 @@ export default function AdminPage() {
                 </div>
 
                 {/* Image drop zone */}
-                <input ref={fileInputRef} type="file" accept="image/*" className="hidden"
+                <input ref={fileInputRef} type="file" accept="image/*,.heic,.heif" className="hidden"
                   onChange={e => { const f = e.target.files?.[0]; if (f) analyzeCard(f); e.target.value = ''; }} />
 
                 {imagePreview ? (
