@@ -117,6 +117,7 @@ Analyze this card image and return ONLY valid JSON — no explanation, no markdo
     const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : text);
     return res.json(parsed);
   } catch {
-    return res.status(500).json({ error: 'Could not parse AI response', raw: text.slice(0, 400) });
+    console.error('[analyze-card] parse fail, raw text:', text.slice(0, 400));
+    return res.status(500).json({ error: 'Could not parse AI response', detail: text.slice(0, 400) });
   }
 }
