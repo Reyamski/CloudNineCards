@@ -30,6 +30,14 @@ async function uploadProofImage(base64DataUrl) {
 const WISE_HANDLE    = '@cloudninecards';
 const CONTACT_EMAIL  = 'papspective@gmail.com';
 
+const FX_RATES = { USD: 1.37, AUD: 0.91, EUR: 1.50 };
+const INTL_CURRENCIES = ['USD', 'AUD', 'EUR'];
+const CURRENCY_SYMBOLS = { CAD: 'CAD $', USD: 'USD $', AUD: 'AUD $', EUR: 'EUR €' };
+function cadToFx(cadAmt, cur) {
+  if (cur === 'CAD') return cadAmt;
+  return Math.ceil(cadAmt / FX_RATES[cur] * 1.03 * 100) / 100;
+}
+
 const tags = ['All', 'One Piece', 'Dragon Ball', 'Pokemon', 'Pre-orders', 'Accessories'];
 const langFilters = ['All', 'Japanese', 'English'];
 
@@ -90,6 +98,7 @@ function BuyNowModal({ item, onClose, userEmail }) {
   const [liveStock, setLiveStock] = useState(item.stock ?? 0);
   const [country, setCountry]     = useState('');
   const [province, setProvince]   = useState('');
+  const [currency, setCurrency]   = useState('CAD');
   const [name, setName]           = useState('');
   const [phone, setPhone]         = useState('');
   const [address, setAddress]     = useState('');
@@ -169,6 +178,8 @@ function BuyNowModal({ item, onClose, userEmail }) {
   const taxAmount   = subtotal * taxRate;
   const grandTotal  = subtotal + taxAmount + deliveryFee;
   const total       = grandTotal.toFixed(2);
+  const fxTotal     = cadToFx(grandTotal, currency);
+  const sym         = CURRENCY_SYMBOLS[currency] ?? 'CAD $';
 
   function copyWise() {
     navigator.clipboard.writeText(WISE_HANDLE);
@@ -327,7 +338,7 @@ function BuyNowModal({ item, onClose, userEmail }) {
                 <div className="text-xs font-black uppercase tracking-[0.14em] text-white/40 mb-2">Shipping Destination</div>
                 <select
                   value={country}
-                  onChange={e => { setCountry(e.target.value); setProvince(''); }}
+                  onChange={e => { const c = e.target.value; setCountry(c); setProvince(''); setCurrency(c === 'Canada' ? 'CAD' : 'USD'); }}
                   className="w-full rounded-2xl border border-white/10 bg-white px-4 py-3 text-sm text-black outline-none focus:border-cyan-300/40 appearance-none"
                 >
                   <option value="" disabled>Select destination…</option>
@@ -352,31 +363,51 @@ function BuyNowModal({ item, onClose, userEmail }) {
                 )}
               </div>
 
+              {/* Currency selector — non-Canada only */}
+              {country && country !== 'Canada' && (
+                <div className="mb-4">
+                  <div className="text-xs font-black uppercase tracking-[0.14em] text-white/40 mb-2">
+                    Payment Currency
+                    {country === 'United States' && <span className="ml-2 text-cyan-300/50 normal-case font-normal">(auto-selected)</span>}
+                  </div>
+                  <select value={currency} onChange={e => setCurrency(e.target.value)}
+                    disabled={country === 'United States'}
+                    className="w-full rounded-2xl border border-white/10 bg-white px-4 py-3 text-sm text-black outline-none appearance-none disabled:opacity-60">
+                    {INTL_CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              )}
+
               {/* Price Breakdown */}
               <div className="mb-4 rounded-2xl border border-cyan-300/20 bg-cyan-300/6 p-4 space-y-1.5">
                 <div className="text-xs font-black uppercase tracking-[0.16em] text-cyan-300/60 mb-2">Price Breakdown</div>
                 <div className="flex justify-between text-sm text-white/70">
                   <span>Subtotal ({qty}×)</span>
-                  <span>CAD ${subtotal.toFixed(2)}</span>
+                  <span>{sym}{cadToFx(subtotal, currency).toFixed(2)}</span>
                 </div>
                 {country === 'Canada' && province && (
                   <div className="flex justify-between text-sm text-white/70">
                     <span>Tax ({taxLabel} — {province})</span>
-                    <span>CAD ${taxAmount.toFixed(2)}</span>
+                    <span>{sym}{cadToFx(taxAmount, currency).toFixed(2)}</span>
                   </div>
                 )}
                 {country && (
                   <div className="flex justify-between text-sm text-white/70">
                     <span>Delivery — {freeShipping ? 'FREE Shipping 🎉' : `Canada Post / DHL (${(qty * WEIGHT_PER_BOX).toFixed(2)}kg)`}</span>
-                    <span className={freeShipping ? 'text-green-400 font-bold' : ''}>{freeShipping ? 'CAD $0.00' : `CAD $${deliveryFee.toFixed(2)}`}</span>
+                    <span className={freeShipping ? 'text-green-400 font-bold' : ''}>{freeShipping ? 'FREE' : `${sym}${cadToFx(deliveryFee, currency).toFixed(2)}`}</span>
                   </div>
                 )}
                 {freeShipping && (
                   <div className="text-xs text-green-400 font-black text-center py-1">FREE SHIPPING on Canadian orders over CAD $300</div>
                 )}
-                <div className="border-t border-cyan-300/20 pt-2 flex justify-between">
+                <div className="border-t border-cyan-300/20 pt-2 flex justify-between items-end">
                   <span className="font-black text-sm">Total — send via Wise</span>
-                  <span className="text-2xl font-black text-cyan-200">CAD ${country ? total : '—'}</span>
+                  <div className="text-right">
+                    <div className="text-2xl font-black text-cyan-200">{country ? `${sym}${fxTotal.toFixed(2)}` : '—'}</div>
+                    {currency !== 'CAD' && country && (
+                      <div className="text-xs text-white/30 mt-0.5">≈ CAD ${total} · rate incl. 3% Wise fee</div>
+                    )}
+                  </div>
                 </div>
                 {!country && <div className="text-xs text-white/35 text-center">Select destination to see total</div>}
               </div>
@@ -408,7 +439,7 @@ function BuyNowModal({ item, onClose, userEmail }) {
               {/* Steps */}
               <div className="mb-4 space-y-2">
                 {[
-                  { n: '1', text: country ? `Send CAD $${total} to ${WISE_HANDLE} via Wise.` : `Select your destination above, then send the total via Wise.` },
+                  { n: '1', text: country ? `Send ${sym}${fxTotal.toFixed(2)} to ${WISE_HANDLE} via Wise.` : `Select your destination above, then send the total via Wise.` },
                   { n: '2', text: 'Include your name + item in the Wise reference/note.' },
                   { n: '3', text: 'Take a screenshot of the completed payment.' },
                   { n: '4', text: `Fill in the next step — we'll confirm within 24h.` },
@@ -491,10 +522,10 @@ function BuyNowModal({ item, onClose, userEmail }) {
               <div className="mb-5 rounded-2xl border border-white/8 bg-white/4 p-4 text-xs text-white/50 space-y-1.5">
                 <div className="font-black text-white/70 uppercase tracking-[0.12em] text-[10px] mb-2">Order Summary</div>
                 <div className="flex justify-between"><span>{item.title}</span><span>× {qty}</span></div>
-                <div className="flex justify-between"><span>Subtotal</span><span>CAD ${subtotal.toFixed(2)}</span></div>
-                {taxAmount > 0 && <div className="flex justify-between"><span>Tax ({taxLabel})</span><span>CAD ${taxAmount.toFixed(2)}</span></div>}
-                <div className="flex justify-between"><span>Delivery {freeShipping ? '(Free!)' : `(Canada Post / DHL — ${country})`}</span><span className={freeShipping ? 'text-green-400' : ''}>{freeShipping ? 'FREE' : `CAD $${deliveryFee.toFixed(2)}`}</span></div>
-                <div className="flex justify-between text-cyan-300 font-bold border-t border-white/8 pt-1.5"><span>Total sent via Wise</span><span>CAD ${total}</span></div>
+                <div className="flex justify-between"><span>Subtotal</span><span>{sym}{cadToFx(subtotal, currency).toFixed(2)}</span></div>
+                {taxAmount > 0 && <div className="flex justify-between"><span>Tax ({taxLabel})</span><span>{sym}{cadToFx(taxAmount, currency).toFixed(2)}</span></div>}
+                <div className="flex justify-between"><span>Delivery {freeShipping ? '(Free!)' : `(Canada Post / DHL — ${country})`}</span><span className={freeShipping ? 'text-green-400' : ''}>{freeShipping ? 'FREE' : `${sym}${cadToFx(deliveryFee, currency).toFixed(2)}`}</span></div>
+                <div className="flex justify-between text-cyan-300 font-bold border-t border-white/8 pt-1.5"><span>Total sent via Wise</span><span>{sym}{fxTotal.toFixed(2)}</span></div>
                 <div className="flex items-start gap-2 text-white/35 border-t border-white/8 pt-2">
                   <Camera className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                   <span>Email your Wise screenshot to <span className="text-cyan-300">{CONTACT_EMAIL}</span></span>

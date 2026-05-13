@@ -290,18 +290,18 @@ function BuySingleModal({ card, onClose, userEmail }) {
 
               <div className="mb-4 rounded-2xl border border-cyan-300/20 bg-cyan-300/6 p-4 space-y-1.5">
                 <div className="text-xs font-black uppercase tracking-[0.16em] text-cyan-300/60 mb-2">Price Breakdown</div>
-                <div className="flex justify-between text-sm text-white/70"><span>Subtotal ({qty}×)</span><span>CAD ${subtotal.toFixed(2)}</span></div>
+                <div className="flex justify-between text-sm text-white/70"><span>Subtotal ({qty}×)</span><span>{sym}{cadToFx(subtotal, currency).toFixed(2)}</span></div>
                 {country && (
                   <div className="flex justify-between text-sm text-white/70">
                     <span>Shipping (tracked) {freeShip ? '🎉' : ''}</span>
-                    <span className={freeShip ? 'text-green-400 font-bold' : ''}>{freeShip ? 'FREE' : `CAD $${deliveryFee.toFixed(2)}`}</span>
+                    <span className={freeShip ? 'text-green-400 font-bold' : ''}>{freeShip ? 'FREE' : `${sym}${cadToFx(deliveryFee, currency).toFixed(2)}`}</span>
                   </div>
                 )}
                 {freeShip && <div className="text-xs text-green-400 font-black text-center">Free shipping on Canadian orders $100+</div>}
                 {taxAmount > 0 && (
                   <div className="flex justify-between text-sm text-white/70">
                     <span>Tax ({taxLabel} — {province})</span>
-                    <span>CAD ${taxAmount.toFixed(2)}</span>
+                    <span>{sym}{cadToFx(taxAmount, currency).toFixed(2)}</span>
                   </div>
                 )}
                 <div className="border-t border-cyan-300/20 pt-2 flex justify-between items-end">
