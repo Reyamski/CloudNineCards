@@ -13,13 +13,14 @@ async function convertHeicToJpeg(base64Data) {
   const { writeFileSync, readFileSync, unlinkSync } = await import('fs');
   const { execSync } = await import('child_process');
   const { randomUUID } = await import('crypto');
+  const { default: ffmpegBin } = await import('ffmpeg-static');
 
   const id = randomUUID();
   const inPath  = join(tmpdir(), `heic-in-${id}.heic`);
   const outPath = join(tmpdir(), `heic-out-${id}.jpg`);
   try {
     writeFileSync(inPath, Buffer.from(base64Data, 'base64'));
-    execSync(`ffmpeg -y -i "${inPath}" -q:v 2 "${outPath}"`, { timeout: 15000, stdio: 'pipe' });
+    execSync(`"${ffmpegBin}" -y -i "${inPath}" -q:v 2 "${outPath}"`, { timeout: 15000, stdio: 'pipe' });
     const jpegData = readFileSync(outPath).toString('base64');
     return jpegData;
   } finally {
