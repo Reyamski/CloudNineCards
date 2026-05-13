@@ -42,6 +42,22 @@ const SINGLES_SHIP = {
   'Other International':            28,
 };
 
+const PROVINCE_TAX = {
+  'Alberta':                 { rate: 0.05,    label: 'GST'       },
+  'British Columbia':        { rate: 0.12,    label: 'GST + PST' },
+  'Manitoba':                { rate: 0.12,    label: 'GST + PST' },
+  'New Brunswick':           { rate: 0.15,    label: 'HST'       },
+  'Newfoundland & Labrador': { rate: 0.15,    label: 'HST'       },
+  'Nova Scotia':             { rate: 0.15,    label: 'HST'       },
+  'Ontario':                 { rate: 0.13,    label: 'HST'       },
+  'Prince Edward Island':    { rate: 0.15,    label: 'HST'       },
+  'Quebec':                  { rate: 0.14975, label: 'GST + QST' },
+  'Saskatchewan':            { rate: 0.11,    label: 'GST + PST' },
+  'Northwest Territories':   { rate: 0.05,    label: 'GST'       },
+  'Nunavut':                 { rate: 0.05,    label: 'GST'       },
+  'Yukon':                   { rate: 0.05,    label: 'GST'       },
+};
+
 // Static fallback singles — shown while Supabase table is being set up.
 // Prices set to 0 intentionally; update in DB after migration.
 const STATIC_SINGLES = [
@@ -55,15 +71,16 @@ const STATIC_SINGLES = [
 
 // ── Buy Modal ─────────────────────────────────────────────────────────────────
 function BuySingleModal({ card, onClose, userEmail }) {
-  const [qty, setQty]         = useState(1);
-  const [country, setCountry] = useState('');
-  const [name, setName]       = useState('');
-  const [email, setEmail]     = useState(userEmail ?? '');
-  const [phone, setPhone]     = useState('');
-  const [address, setAddress] = useState('');
-  const [copied, setCopied]   = useState(false);
-  const [step, setStep]       = useState(1);
-  const [sending, setSending] = useState(false);
+  const [qty, setQty]           = useState(1);
+  const [country, setCountry]   = useState('');
+  const [province, setProvince] = useState('');
+  const [name, setName]         = useState('');
+  const [email, setEmail]       = useState(userEmail ?? '');
+  const [phone, setPhone]       = useState('');
+  const [address, setAddress]   = useState('');
+  const [copied, setCopied]     = useState(false);
+  const [step, setStep]         = useState(1);
+  const [sending, setSending]   = useState(false);
   const [sendError, setSendError] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [orderNumber] = useState(() => {
@@ -76,7 +93,11 @@ function BuySingleModal({ card, onClose, userEmail }) {
   const shipFee     = country ? (SINGLES_SHIP[country] ?? 28) : 0;
   const freeShip    = country === 'Canada' && subtotal >= 100;
   const deliveryFee = freeShip ? 0 : shipFee;
-  const grandTotal  = subtotal + deliveryFee;
+  const taxRate     = country === 'Canada' && province ? (PROVINCE_TAX[province]?.rate ?? 0) : 0;
+  const taxLabel    = country === 'Canada' && province ? (PROVINCE_TAX[province]?.label ?? '') : '';
+  const taxAmount   = subtotal * taxRate;
+  const grandTotal  = subtotal + deliveryFee + taxAmount;
+  const step1Ready  = country && (country !== 'Canada' || province);
 
   function copyWise() {
     navigator.clipboard.writeText(WISE_HANDLE);
@@ -105,12 +126,13 @@ function BuySingleModal({ card, onClose, userEmail }) {
         buyer_email:      email.trim().toLowerCase(),
         buyer_phone:      phone,
         buyer_address:    address,
-        delivery_country: country,
-        full_price:       grandTotal,
-        total_price:      grandTotal,
-        delivery_fee:     deliveryFee,
-        subtotal:         subtotal,
-        tax_amount:       0,
+        delivery_country:  country,
+        delivery_province: province || null,
+        full_price:        grandTotal,
+        total_price:       grandTotal,
+        delivery_fee:      deliveryFee,
+        subtotal:          subtotal,
+        tax_amount:        taxAmount,
       });
       if (dbErr) throw dbErr;
 
@@ -123,12 +145,12 @@ function BuySingleModal({ card, onClose, userEmail }) {
         item_title:       `[SINGLE] ${card.card_name}`,
         item_subtitle:    `${card.set_name} · ${card.condition} · ${card.language}`,
         quantity:         qty,
-        subtotal:         `CAD $${subtotal.toFixed(2)}`,
-        tax_amount:       'N/A',
-        delivery_fee:     freeShip ? 'FREE (Canada $100+)' : `CAD $${deliveryFee.toFixed(2)}`,
-        delivery_country: country,
-        delivery_province:'N/A',
-        total_price:      `CAD $${grandTotal.toFixed(2)}`,
+        subtotal:          `CAD $${subtotal.toFixed(2)}`,
+        tax_amount:        taxAmount > 0 ? `CAD $${taxAmount.toFixed(2)} (${taxLabel})` : 'N/A',
+        delivery_fee:      freeShip ? 'FREE (Canada $100+)' : `CAD $${deliveryFee.toFixed(2)}`,
+        delivery_country:  country,
+        delivery_province: province || 'N/A',
+        total_price:       `CAD $${grandTotal.toFixed(2)}`,
         payment_proof:    'Not provided — buyer will email separately',
         wise_handle:      WISE_HANDLE,
         to_email:         CONTACT_EMAIL,
@@ -203,7 +225,7 @@ function BuySingleModal({ card, onClose, userEmail }) {
 
               <div className="mb-4">
                 <div className="text-xs font-black uppercase tracking-[0.14em] text-white/40 mb-2">Shipping Destination</div>
-                <select value={country} onChange={e => setCountry(e.target.value)}
+                <select value={country} onChange={e => { setCountry(e.target.value); setProvince(''); }}
                   className="w-full rounded-2xl border border-white/10 bg-white px-4 py-3 text-sm text-black outline-none appearance-none">
                   <option value="" disabled>Select destination…</option>
                   <option value="Canada">🇨🇦 Canada</option>
@@ -215,6 +237,19 @@ function BuySingleModal({ card, onClose, userEmail }) {
                 </select>
               </div>
 
+              {country === 'Canada' && (
+                <div className="mb-4">
+                  <div className="text-xs font-black uppercase tracking-[0.14em] text-white/40 mb-2">Province / Territory</div>
+                  <select value={province} onChange={e => setProvince(e.target.value)}
+                    className="w-full rounded-2xl border border-white/10 bg-white px-4 py-3 text-sm text-black outline-none appearance-none">
+                    <option value="" disabled>Select province / territory…</option>
+                    {Object.keys(PROVINCE_TAX).map(p => (
+                      <option key={p} value={p}>{p} — {PROVINCE_TAX[p].label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div className="mb-4 rounded-2xl border border-cyan-300/20 bg-cyan-300/6 p-4 space-y-1.5">
                 <div className="text-xs font-black uppercase tracking-[0.16em] text-cyan-300/60 mb-2">Price Breakdown</div>
                 <div className="flex justify-between text-sm text-white/70"><span>Subtotal ({qty}×)</span><span>CAD ${subtotal.toFixed(2)}</span></div>
@@ -225,11 +260,18 @@ function BuySingleModal({ card, onClose, userEmail }) {
                   </div>
                 )}
                 {freeShip && <div className="text-xs text-green-400 font-black text-center">Free shipping on Canadian orders $100+</div>}
+                {taxAmount > 0 && (
+                  <div className="flex justify-between text-sm text-white/70">
+                    <span>Tax ({taxLabel} — {province})</span>
+                    <span>CAD ${taxAmount.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="border-t border-cyan-300/20 pt-2 flex justify-between">
                   <span className="font-black text-sm">Total — send via Wise</span>
-                  <span className="text-2xl font-black text-cyan-200">{country ? `CAD $${grandTotal.toFixed(2)}` : '—'}</span>
+                  <span className="text-2xl font-black text-cyan-200">{step1Ready ? `CAD $${grandTotal.toFixed(2)}` : '—'}</span>
                 </div>
                 {!country && <div className="text-xs text-white/35 text-center">Select destination to see total</div>}
+                {country === 'Canada' && !province && <div className="text-xs text-white/35 text-center">Select province to calculate tax</div>}
               </div>
 
               <div className="mb-5 rounded-2xl border border-cyan-300/20 bg-cyan-300/8 p-4 flex items-center justify-between gap-4">
@@ -243,7 +285,7 @@ function BuySingleModal({ card, onClose, userEmail }) {
                 </button>
               </div>
 
-              <button onClick={() => setStep(2)} disabled={!country}
+              <button onClick={() => setStep(2)} disabled={!step1Ready}
                 className="w-full rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 py-3.5 text-sm font-black uppercase tracking-[0.1em] text-black transition hover:opacity-95 disabled:opacity-40 disabled:cursor-not-allowed">
                 I've Sent the Payment →
               </button>

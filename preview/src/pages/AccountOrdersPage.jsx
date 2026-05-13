@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Package, LogOut, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Package, LogOut, Clock, CheckCircle, XCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import Nav from '../components/Nav';
 import Footer from '../components/Footer';
 import { supabase } from '../lib/supabase';
@@ -42,27 +42,38 @@ export default function AccountOrdersPage() {
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [fetching, setFetching] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
 
   useEffect(() => { document.title = 'My Orders | CloudNineCards'; }, []);
 
-  useEffect(() => {
-    if (loading) return;
-    if (!user) { navigate('/account', { replace: true }); return; }
-
-    if (!supabase) { setFetching(false); return; }
-
-    supabase
+  const loadOrders = useCallback(async (showSpinner = false) => {
+    if (!user || !supabase) return;
+    if (showSpinner) setRefreshing(true);
+    const { data } = await supabase
       .from('orders')
       .select('order_number, item_title, product_title, quantity, full_price, total_price, dp_amount, balance_due, payment_status, status, order_type, eta, delivery_country, delivery_fee, tax_amount, buyer_address, buyer_name, created_at')
       .ilike('buyer_email', user.email)
-      .order('created_at', { ascending: false })
-      .then(({ data }) => {
-        setOrders(data ?? []);
-        setFetching(false);
-      });
-  }, [user, loading, navigate]);
+      .order('created_at', { ascending: false });
+    setOrders(data ?? []);
+    setFetching(false);
+    setRefreshing(false);
+  }, [user]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (!user) { navigate('/account', { replace: true }); return; }
+    if (!supabase) { setFetching(false); return; }
+    loadOrders();
+  }, [user, loading, navigate, loadOrders]);
+
+  // Refresh when tab regains focus (catches admin updates from another tab)
+  useEffect(() => {
+    const onFocus = () => { if (user && supabase) loadOrders(); };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [user, loadOrders]);
 
   async function handleSignOut() {
     await supabase?.auth.signOut();
@@ -103,12 +114,21 @@ export default function AccountOrdersPage() {
                 </span>
               </h1>
             </motion.div>
-            <button
-              onClick={handleSignOut}
-              className="mb-1 flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-black uppercase tracking-[0.12em] text-white/60 transition hover:bg-white/10 hover:text-white/80"
-            >
-              <LogOut className="h-3.5 w-3.5" /> Sign Out
-            </button>
+            <div className="mb-1 flex items-center gap-2">
+              <button
+                onClick={() => loadOrders(true)}
+                disabled={refreshing}
+                className="flex items-center gap-2 rounded-2xl border border-cyan-300/20 bg-cyan-300/8 px-4 py-2.5 text-xs font-black uppercase tracking-[0.12em] text-cyan-300/70 transition hover:bg-cyan-300/15 hover:text-cyan-300 disabled:opacity-40"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} /> Refresh
+              </button>
+              <button
+                onClick={handleSignOut}
+                className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-black uppercase tracking-[0.12em] text-white/60 transition hover:bg-white/10 hover:text-white/80"
+              >
+                <LogOut className="h-3.5 w-3.5" /> Sign Out
+              </button>
+            </div>
           </div>
         </div>
       </section>
