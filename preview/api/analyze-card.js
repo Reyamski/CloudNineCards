@@ -86,7 +86,7 @@ Analyze this card image and return ONLY valid JSON — no explanation, no markdo
   "set_name": "full set name (e.g. 'EB-03 Heroines Edition', 'Scarlet & Violet—Stellar Crown')",
   "set_code": "short set code (e.g. 'EB-03', 'OP-15', 'SV7')",
   "card_number": "full card number as printed (e.g. 'EB03-018', 'OP15-001', '25/142')",
-  "game": "one of exactly: One Piece, Pokemon, Dragon Ball, Yu-Gi-Oh!",
+  "game": "one of exactly: One Piece, Pokemon, Dragon Ball, Yu-Gi-Oh!, Union Arena",
   "language": "one of exactly: English, Japanese",
   "condition": "one of exactly: NM, LP, MP, HP, D — default NM if no damage visible",
   "rarity": "rarity (e.g. Common, Uncommon, Rare, Super Rare, Secret Rare, Leader Rare, Special Rare)"

@@ -260,7 +260,7 @@ export default function AdminPage() {
         set_name:    r.set_name    || f.set_name,
         set_code:    r.set_code    || f.set_code,
         card_number: r.card_number || f.card_number,
-        game:        (['One Piece','Pokemon','Dragon Ball','Yu-Gi-Oh!'].includes(r.game) ? r.game : f.game),
+        game:        (['One Piece','Pokemon','Dragon Ball','Yu-Gi-Oh!','Union Arena'].includes(r.game) ? r.game : f.game),
         language:    (['English','Japanese'].includes(r.language) ? r.language : f.language),
         condition:   (['NM','LP','MP','HP','D'].includes(r.condition) ? r.condition : f.condition),
         rarity:      r.rarity || f.rarity,
@@ -1397,7 +1397,7 @@ export default function AdminPage() {
                     <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Game *</label>
                     <select value={addForm.game} onChange={e => setAddForm(f => ({ ...f, game: e.target.value }))}
                       className={`w-full rounded-xl border px-3 py-2 text-sm text-black outline-none bg-white ${analyzed ? 'border-emerald-400/40' : 'border-white/10'}`}>
-                      {['One Piece', 'Pokemon', 'Dragon Ball', 'Yu-Gi-Oh!'].map(g => <option key={g}>{g}</option>)}
+                      {['One Piece', 'Pokemon', 'Dragon Ball', 'Yu-Gi-Oh!', 'Union Arena'].map(g => <option key={g}>{g}</option>)}
                     </select>
                   </div>
                   <div>

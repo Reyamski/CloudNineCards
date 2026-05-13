@@ -14,7 +14,7 @@ const EMAILJS_PUBLIC_KEY  = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
 const WISE_HANDLE    = '@cloudninecards';
 const CONTACT_EMAIL  = 'papspective@gmail.com';
 
-const GAMES      = ['All', 'One Piece', 'Pokemon', 'Dragon Ball', 'Yu-Gi-Oh!'];
+const GAMES      = ['All', 'One Piece', 'Pokemon', 'Dragon Ball', 'Yu-Gi-Oh!', 'Union Arena'];
 const LANGS      = ['All', 'English', 'Japanese'];
 const CONDITIONS = ['All', 'NM', 'LP', 'MP', 'HP', 'D'];
 const SORTS      = [
@@ -31,6 +31,15 @@ const CONDITION_COLOR = {
   HP: 'border-orange-400/40  bg-orange-400/10  text-orange-300',
   D:  'border-red-400/40     bg-red-400/10     text-red-300',
 };
+
+// CAD → foreign currency rates + 3% buffer to cover Wise transfer fees
+const FX_RATES = { USD: 1.37, AUD: 0.91, EUR: 1.50 }; // 1 foreign unit = X CAD
+const INTL_CURRENCIES = ['USD', 'AUD', 'EUR'];
+const CURRENCY_SYMBOLS = { CAD: 'CAD $', USD: 'USD $', AUD: 'AUD $', EUR: 'EUR €' };
+function cadToFx(cadAmount, currency) {
+  if (currency === 'CAD') return cadAmount;
+  return Math.ceil(cadAmount / FX_RATES[currency] * 1.03 * 100) / 100;
+}
 
 // Flat per-shipment shipping (singles ship light in toploader)
 const SINGLES_SHIP = {
@@ -74,6 +83,15 @@ function BuySingleModal({ card, onClose, userEmail }) {
   const [qty, setQty]           = useState(1);
   const [country, setCountry]   = useState('');
   const [province, setProvince] = useState('');
+  const [currency, setCurrency] = useState('CAD');
+
+  function handleCountryChange(c) {
+    setCountry(c);
+    setProvince('');
+    if (c === 'Canada') setCurrency('CAD');
+    else if (c === 'United States') setCurrency('USD');
+    else setCurrency('USD'); // default for international, user can change
+  }
   const [name, setName]         = useState('');
   const [email, setEmail]       = useState(userEmail ?? '');
   const [phone, setPhone]       = useState('');
@@ -96,8 +114,11 @@ function BuySingleModal({ card, onClose, userEmail }) {
   const taxRate     = country === 'Canada' && province ? (PROVINCE_TAX[province]?.rate ?? 0) : 0;
   const taxLabel    = country === 'Canada' && province ? (PROVINCE_TAX[province]?.label ?? '') : '';
   const taxAmount   = subtotal * taxRate;
-  const grandTotal  = subtotal + deliveryFee + taxAmount;
+  const grandTotalCAD = subtotal + deliveryFee + taxAmount;
+  const grandTotal    = cadToFx(grandTotalCAD, currency);
+  const sym           = CURRENCY_SYMBOLS[currency] ?? 'CAD $';
   const step1Ready  = country && (country !== 'Canada' || province);
+  const isIntl      = country && country !== 'Canada' && country !== 'United States';
 
   function copyWise() {
     navigator.clipboard.writeText(WISE_HANDLE);
@@ -150,7 +171,9 @@ function BuySingleModal({ card, onClose, userEmail }) {
         delivery_fee:      freeShip ? 'FREE (Canada $100+)' : `CAD $${deliveryFee.toFixed(2)}`,
         delivery_country:  country,
         delivery_province: province || 'N/A',
-        total_price:       `CAD $${grandTotal.toFixed(2)}`,
+        total_price:       currency === 'CAD'
+          ? `CAD $${grandTotalCAD.toFixed(2)}`
+          : `${sym}${grandTotal.toFixed(2)} (≈ CAD $${grandTotalCAD.toFixed(2)})`,
         payment_proof:    'Not provided — buyer will email separately',
         wise_handle:      WISE_HANDLE,
         to_email:         CONTACT_EMAIL,
@@ -225,7 +248,7 @@ function BuySingleModal({ card, onClose, userEmail }) {
 
               <div className="mb-4">
                 <div className="text-xs font-black uppercase tracking-[0.14em] text-white/40 mb-2">Shipping Destination</div>
-                <select value={country} onChange={e => { setCountry(e.target.value); setProvince(''); }}
+                <select value={country} onChange={e => handleCountryChange(e.target.value)}
                   className="w-full rounded-2xl border border-white/10 bg-white px-4 py-3 text-sm text-black outline-none appearance-none">
                   <option value="" disabled>Select destination…</option>
                   <option value="Canada">🇨🇦 Canada</option>
@@ -250,6 +273,21 @@ function BuySingleModal({ card, onClose, userEmail }) {
                 </div>
               )}
 
+              {/* Currency selector — US auto-selects USD, international gets dropdown */}
+              {country && country !== 'Canada' && (
+                <div className="mb-4">
+                  <div className="text-xs font-black uppercase tracking-[0.14em] text-white/40 mb-2">
+                    Payment Currency
+                    {country === 'United States' && <span className="ml-2 text-cyan-300/50 normal-case font-normal">(auto-selected)</span>}
+                  </div>
+                  <select value={currency} onChange={e => setCurrency(e.target.value)}
+                    disabled={country === 'United States'}
+                    className="w-full rounded-2xl border border-white/10 bg-white px-4 py-3 text-sm text-black outline-none appearance-none disabled:opacity-60">
+                    {INTL_CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              )}
+
               <div className="mb-4 rounded-2xl border border-cyan-300/20 bg-cyan-300/6 p-4 space-y-1.5">
                 <div className="text-xs font-black uppercase tracking-[0.16em] text-cyan-300/60 mb-2">Price Breakdown</div>
                 <div className="flex justify-between text-sm text-white/70"><span>Subtotal ({qty}×)</span><span>CAD ${subtotal.toFixed(2)}</span></div>
@@ -266,9 +304,14 @@ function BuySingleModal({ card, onClose, userEmail }) {
                     <span>CAD ${taxAmount.toFixed(2)}</span>
                   </div>
                 )}
-                <div className="border-t border-cyan-300/20 pt-2 flex justify-between">
+                <div className="border-t border-cyan-300/20 pt-2 flex justify-between items-end">
                   <span className="font-black text-sm">Total — send via Wise</span>
-                  <span className="text-2xl font-black text-cyan-200">{step1Ready ? `CAD $${grandTotal.toFixed(2)}` : '—'}</span>
+                  <div className="text-right">
+                    <div className="text-2xl font-black text-cyan-200">{step1Ready ? `${sym}${grandTotal.toFixed(2)}` : '—'}</div>
+                    {currency !== 'CAD' && step1Ready && (
+                      <div className="text-xs text-white/30 mt-0.5">≈ CAD ${grandTotalCAD.toFixed(2)} · rate incl. 3% Wise fee</div>
+                    )}
+                  </div>
                 </div>
                 {!country && <div className="text-xs text-white/35 text-center">Select destination to see total</div>}
                 {country === 'Canada' && !province && <div className="text-xs text-white/35 text-center">Select province to calculate tax</div>}
