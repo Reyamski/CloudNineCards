@@ -42,10 +42,15 @@ export default function ContactPage() {
       await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
         buyer_name:    name,
         buyer_email:   email,
-        item_title:    `[CONTACT] ${topic || 'General Inquiry'}`,
+        // Put message in item_title so it shows in the email body/subject
+        item_title:    `[CONTACT — ${topic || 'General Inquiry'}] ${message}`,
         item_subtitle: message,
-        quantity:      orderNum || '—',
-        full_price:    `CONTACT INQUIRY — ref: ${orderNum || 'none'}`,
+        // buyer_phone & buyer_address are shown in order template — put message here too
+        buyer_phone:   `Topic: ${topic || 'General Inquiry'} | Ref: ${orderNum || 'none'}`,
+        buyer_address: message,
+        quantity:      orderNum || 'N/A',
+        full_price:    'CONTACT FORM',
+        total_price:   'CONTACT FORM',
         dp_amount:     message,
         balance_due:   message,
         eta:           topic,
