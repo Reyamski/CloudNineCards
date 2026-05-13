@@ -81,88 +81,35 @@ function calcPoShipping(country, qty) {
   return Math.ceil(tier[zone] * 1.10); // +10% buffer, rounded up
 }
 
-const preorders = [
-  {
-    id: 'op17jp',
-    title: 'One Piece Card Game OP-17 Booster Box [Japanese]',
-    subtitle: '4th Anniversary Set – "World\'s Strongest Warrior"',
-    soldOut: true,
-    priceTba: false,
-    price: 93,
-    usdPrice: 68,
-    audPrice: 96,
-    currency: 'CAD',
-    eta: 'Est. Aug 31, 2026',
-    deadline: new Date('2026-04-13T11:00:00'),
-    image: '/OP-17-JP.png',
-    hype: '4th Anniversary Set',
-    notes: [
-      'Per Box — Case (12 Boxes): CAD $1,113 | USD $810 | AUD $1,148.',
-      'Pre-orders are not guaranteed and subject to allocation.',
-      'If allocation is cut, down payment will be refunded.',
-      'Buyer shoulders shipping fees, taxes, and import duties.',
-    ],
-  },
-  {
-    id: 'ygo-cg2122ae',
-    title: 'Yu-Gi-Oh! Creation Pack 12 [CG2122AE]',
-    subtitle: 'Asian English · Per Case (24 Boxes)',
-    soldOut: true,
-    priceTba: false,
-    price: 1650.55,
-    usdPrice: 1196.08,
-    audPrice: 1718.31,
-    currency: 'CAD',
-    eta: 'Est. July 11, 2026',
-    deadline: new Date('2026-03-28T18:00:00'),
-    image: '/Yu-Gi-Oh! Creation Pack 12.png',
-    hype: 'Limited Allocation',
-    notes: [
-      'Limited allocation only. Pre-orders may be cut.',
-      'Orders released only after full payment cleared.',
-      'Buyer shoulders shipping fees, taxes, and import duties.',
-    ],
-  },
-  {
-    id: 'test-dummy',
-    title: '[TEST ITEM — DO NOT ORDER]',
-    subtitle: 'For internal testing only',
-    soldOut: false,
-    priceTba: false,
-    price: 1.00,
-    usdPrice: 0.73,
-    audPrice: 1.10,
-    currency: 'CAD',
-    eta: 'N/A',
-    deadline: new Date('2026-12-31T23:59:59'),
-    image: 'https://placehold.co/400x560/1a0030/ff0000?text=TEST+ITEM%0ADO+NOT+ORDER&font=montserrat',
-    hype: 'Internal test only',
-    notes: ['This is a test item. Do not submit a real order.'],
-  },
-  {
-    id: 'op17eng',
-    title: 'One Piece Card Game OP-17 Booster Box [English]',
-    subtitle: '4th Anniversary Set – "World\'s Strongest Warrior"',
-    soldOut: true,
-    priceTba: false,
-    price: 130,
-    usdPrice: 94,
-    audPrice: 138,
-    currency: 'CAD',
-    eta: 'Est. Oct 31, 2026',
-    deadline: new Date('2026-09-01T23:59:59'),
-    image: '/OP-17-JP.png',
-    hype: 'Open — Limited Slots',
-    notes: [
-      'Per Box. Case (12 Boxes): CAD $1,560 | USD $1,128 | AUD $1,656.',
-      'Pre-orders are not guaranteed and subject to allocation.',
-      'If allocation is cut, down payment will be refunded in full.',
-      'Buyer shoulders shipping fees, taxes, and import duties.',
-    ],
-  },
-  {id: 'op16eng', title: 'One Piece Card Game OP-16 Booster Box',  subtitle: 'English',  soldOut: true,  priceTba: false, currency: 'CAD', eta: 'TBD', image: 'https://placehold.co/400x560/0d0020/9333ea?text=OP-16%0AEnglish%0ABooster+Box&font=montserrat', hype: 'Stay tuned for updates.'},
-  {id: 'op16jp',  title: 'One Piece Card Game OP-16 Booster Box',  subtitle: 'Japanese', soldOut: true,  priceTba: false, currency: 'CAD', eta: 'TBD', image: 'https://placehold.co/400x560/0d0020/c084fc?text=OP-16%0AJapanese%0ABooster+Box&font=montserrat', hype: 'Stay tuned for updates.'},
-];
+// ── SEED DATA (reference copy — now managed via Supabase Admin > Pre-Orders) ──
+// const SEED_PREORDERS = [
+//   { id: 'op17jp', title: 'One Piece Card Game OP-17 Booster Box [Japanese]', subtitle: '4th Anniversary Set – "World\'s Strongest Warrior"', soldOut: true, priceTba: false, price: 93, usdPrice: 68, audPrice: 96, currency: 'CAD', eta: 'Est. Aug 31, 2026', deadline: new Date('2026-04-13T11:00:00'), image: '/OP-17-JP.png', hype: '4th Anniversary Set', notes: ['Per Box — Case (12 Boxes): CAD $1,113 | USD $810 | AUD $1,148.', 'Pre-orders are not guaranteed and subject to allocation.', 'If allocation is cut, down payment will be refunded.', 'Buyer shoulders shipping fees, taxes, and import duties.'] },
+//   { id: 'ygo-cg2122ae', title: 'Yu-Gi-Oh! Creation Pack 12 [CG2122AE]', subtitle: 'Asian English · Per Case (24 Boxes)', soldOut: true, priceTba: false, price: 1650.55, usdPrice: 1196.08, audPrice: 1718.31, currency: 'CAD', eta: 'Est. July 11, 2026', deadline: new Date('2026-03-28T18:00:00'), image: '/Yu-Gi-Oh! Creation Pack 12.png', hype: 'Limited Allocation', notes: ['Limited allocation only. Pre-orders may be cut.', 'Orders released only after full payment cleared.', 'Buyer shoulders shipping fees, taxes, and import duties.'] },
+//   { id: 'test-dummy', title: '[TEST ITEM — DO NOT ORDER]', subtitle: 'For internal testing only', soldOut: false, priceTba: false, price: 1.00, usdPrice: 0.73, audPrice: 1.10, currency: 'CAD', eta: 'N/A', deadline: new Date('2026-12-31T23:59:59'), image: 'https://placehold.co/400x560/1a0030/ff0000?text=TEST+ITEM%0ADO+NOT+ORDER&font=montserrat', hype: 'Internal test only', notes: ['This is a test item. Do not submit a real order.'] },
+//   { id: 'op17eng', title: 'One Piece Card Game OP-17 Booster Box [English]', subtitle: '4th Anniversary Set – "World\'s Strongest Warrior"', soldOut: true, priceTba: false, price: 130, usdPrice: 94, audPrice: 138, currency: 'CAD', eta: 'Est. Oct 31, 2026', deadline: new Date('2026-09-01T23:59:59'), image: '/OP-17-JP.png', hype: 'Open — Limited Slots', notes: ['Per Box. Case (12 Boxes): CAD $1,560 | USD $1,128 | AUD $1,656.', 'Pre-orders are not guaranteed and subject to allocation.', 'If allocation is cut, down payment will be refunded in full.', 'Buyer shoulders shipping fees, taxes, and import duties.'] },
+//   { id: 'op16eng', title: 'One Piece Card Game OP-16 Booster Box', subtitle: 'English',  soldOut: true, priceTba: false, currency: 'CAD', eta: 'TBD', image: 'https://placehold.co/400x560/0d0020/9333ea?text=OP-16%0AEnglish%0ABooster+Box&font=montserrat', hype: 'Stay tuned for updates.' },
+//   { id: 'op16jp',  title: 'One Piece Card Game OP-16 Booster Box', subtitle: 'Japanese', soldOut: true, priceTba: false, currency: 'CAD', eta: 'TBD', image: 'https://placehold.co/400x560/0d0020/c084fc?text=OP-16%0AJapanese%0ABooster+Box&font=montserrat', hype: 'Stay tuned for updates.' },
+// ];
+
+// ── Normalize a Supabase preorders row to the shape the UI expects ─────────
+function normalizeDbPreorder(row) {
+  return {
+    id:       row.id,
+    title:    row.title,
+    subtitle: row.subtitle ?? '',
+    soldOut:  row.sold_out,
+    priceTba: row.price_tba,
+    price:    row.price ?? 0,
+    usdPrice: row.usd_price ?? null,
+    audPrice: row.aud_price ?? null,
+    currency: row.currency ?? 'CAD',
+    eta:      row.eta ?? '',
+    deadline: row.deadline ? new Date(row.deadline) : null,
+    image:    row.image_url ?? '',
+    hype:     row.hype ?? '',
+    notes:    Array.isArray(row.notes) ? row.notes : [],
+  };
+}
 
 // ── Countdown hook ───────────────────────────────────────────────────────────
 function useCountdown(deadline) {
@@ -726,8 +673,31 @@ export default function PreOrdersPage() {
   const navigate = useNavigate();
   const [selected, setSelected] = useState(null);
   const [showCalc, setShowCalc] = useState(false);
+  const [preorders, setPreorders] = useState([]);
+  const [preordersLoading, setPreordersLoading] = useState(true);
 
   useEffect(() => { document.title = 'Pre-Orders | CloudNineCards'; }, []);
+
+  // Load from Supabase; gracefully fall back to empty list if unavailable
+  useEffect(() => {
+    async function load() {
+      if (!supabase) { setPreordersLoading(false); return; }
+      try {
+        const { data, error } = await supabase
+          .from('preorders')
+          .select('*')
+          .order('display_order', { ascending: true });
+        if (!error && data) {
+          setPreorders(data.map(normalizeDbPreorder));
+        }
+      } catch {
+        // silently fail — shop stays functional, just no preorders shown
+      } finally {
+        setPreordersLoading(false);
+      }
+    }
+    load();
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#05010c] text-white">
@@ -884,6 +854,18 @@ export default function PreOrdersPage() {
 
       {/* Pre-order cards */}
       <section className="mx-auto max-w-7xl px-6 py-8 pb-20">
+        {preordersLoading && (
+          <div className="flex items-center justify-center py-20 text-white/40 text-sm gap-2">
+            <Loader2 className="h-5 w-5 animate-spin" /> Loading pre-orders…
+          </div>
+        )}
+        {!preordersLoading && preorders.length === 0 && (
+          <div className="py-20 text-center">
+            <div className="text-4xl mb-3">📦</div>
+            <div className="text-lg font-black uppercase text-white/60">No pre-orders available</div>
+            <p className="mt-1 text-sm text-white/35">Check back soon for upcoming releases.</p>
+          </div>
+        )}
         <div className="grid gap-6 md:grid-cols-3">
           {preorders.map((item, idx) => (
             <motion.div
