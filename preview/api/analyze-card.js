@@ -14,6 +14,14 @@ async function convertHeicToJpeg(base64Data) {
   return Buffer.from(outputBuffer).toString('base64');
 }
 
+async function uploadToImgbb(base64Data, imgbbKey) {
+  const body = new FormData();
+  body.append('image', base64Data);
+  const res = await fetch(`https://api.imgbb.com/1/upload?key=${imgbbKey}`, { method: 'POST', body });
+  const json = await res.json();
+  return json.success ? json.data.url : null;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -104,12 +112,23 @@ Analyze this card image and return ONLY valid JSON — no explanation, no markdo
   const data = await claudeRes.json();
   const text = (data.content?.[0]?.text ?? '').trim();
 
+  let parsed;
   try {
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : text);
-    return res.json(parsed);
+    parsed = JSON.parse(jsonMatch ? jsonMatch[0] : text);
   } catch {
     console.error('[analyze-card] parse fail, raw text:', text.slice(0, 400));
     return res.status(500).json({ error: 'Could not parse AI response', detail: text.slice(0, 400) });
   }
+
+  // Upload the (possibly converted) JPEG to imgbb so the client gets a public image URL
+  const imgbbKey = process.env.VITE_IMGBB_API_KEY ?? process.env.IMGBB_API_KEY;
+  if (imgbbKey && imageBase64) {
+    try {
+      const url = await uploadToImgbb(imageBase64, imgbbKey);
+      if (url) parsed.image_url = url;
+    } catch { /* non-fatal */ }
+  }
+
+  return res.json(parsed);
 }

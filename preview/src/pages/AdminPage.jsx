@@ -215,26 +215,14 @@ export default function AdminPage() {
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.detail != null ? `${result.error}: ${result.detail}` : result.error || 'Analysis failed');
-      setForm(f => mapResult(f, result));
+      setForm(f => {
+        const mapped = mapResult(f, result);
+        // Server uploads to imgbb and returns image_url alongside card details
+        return result.image_url ? { ...mapped, image_url: result.image_url } : mapped;
+      });
       setAnalyzed(true);
     } catch (err) {
       setError(err.message || 'Analysis failed — fill fields manually.');
-    }
-
-    const imgbbKey = import.meta.env.VITE_IMGBB_API_KEY;
-    if (imgbbKey) {
-      setUploading(true);
-      try {
-        const base64 = await fileToBase64(file);
-        const body = new FormData();
-        body.append('image', base64);
-        const imgRes = await fetch(`https://api.imgbb.com/1/upload?key=${imgbbKey}`, { method: 'POST', body });
-        const imgJson = await imgRes.json();
-        if (imgJson.success) setForm(f => ({ ...f, image_url: imgJson.data.url }));
-      } catch (e) {
-        console.warn('imgbb upload failed:', e.message);
-      }
-      setUploading(false);
     }
 
     setAnalyzing(false);
