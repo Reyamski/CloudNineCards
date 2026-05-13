@@ -279,7 +279,6 @@ export default function AdminPage() {
     setDbError('');
 
     try {
-      // Only update stock if the order has a known product_id
       if (order.product_id) {
         const existingProduct = products.find((product) => product.id === order.product_id);
         const fallbackQty = existingProduct?.stock ?? 0;
@@ -301,6 +300,12 @@ export default function AdminPage() {
           .upsert({id: order.product_id, quantity: nextQty, in_stock: nextInStock}, {onConflict: 'id'});
 
         if (upsertError) throw upsertError;
+
+        setProducts((prev) => prev.map((product) => (
+          product.id === order.product_id
+            ? {...product, stock: nextQty, inStock: nextInStock}
+            : product
+        )));
       }
 
       const confirmedAt = new Date().toISOString();
@@ -310,12 +315,6 @@ export default function AdminPage() {
         .eq('id', order.id);
 
       if (orderUpdateError) throw orderUpdateError;
-
-      setProducts((prev) => prev.map((product) => (
-        product.id === order.product_id
-          ? {...product, stock: nextQty, inStock: nextInStock}
-          : product
-      )));
 
       setOrders((prev) => prev.map((item) => (
         item.id === order.id
