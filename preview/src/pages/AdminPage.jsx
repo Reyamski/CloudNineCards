@@ -145,7 +145,8 @@ export default function AdminPage() {
   const [deletingPreorderId, setDeletingPreorderId] = useState('');
   const [poEditCell, setPoEditCell]                 = useState({ id: '', field: '' });
   const [poEditVal, setPoEditVal]                   = useState('');
-  const BLANK_PO = { id: '', title: '', subtitle: '', sold_out: false, price_tba: false, price: '', usd_price: '', aud_price: '', currency: 'CAD', eta: '', deadline: '', image_url: '', hype: '', notes: '', display_order: '0' };
+  const DEFAULT_PO_NOTES = 'Pre-orders are not guaranteed and subject to allocation.\nIf allocation is cut, down payment will be refunded in full.\nBuyer shoulders shipping fees, taxes, and import duties.';
+  const BLANK_PO = { id: '', title: '', subtitle: '', sold_out: false, price_tba: false, price: '', usd_price: '', aud_price: '', currency: 'CAD', eta: '', deadline: '', image_url: '', hype: '', notes: DEFAULT_PO_NOTES, display_order: '0' };
   const [addPoForm, setAddPoForm]                   = useState(BLANK_PO);
   // AI state for preorders form
   const [poImagePreview, setPoImagePreview]         = useState('');
@@ -789,7 +790,16 @@ export default function AdminPage() {
           <div>Verified: {formatDate(order.payment_verified_at)}</div>
           <div>Rejected: {formatDate(order.payment_rejected_at)}</div>
           <div>Paid At: {formatDate(order.paid_at)}</div>
-          {order.payment_proof ? <div className="text-cyan-200/80">Payment proof attached on order record</div> : null}
+          {order.payment_proof ? (
+            <div>
+              <div className="mb-1 text-cyan-200/80">Payment proof:</div>
+              <a href={order.payment_proof} target="_blank" rel="noopener noreferrer">
+                <img src={order.payment_proof} alt="Payment proof"
+                  className="max-h-40 rounded-xl border border-white/10 cursor-zoom-in hover:opacity-80 transition" />
+                <div className="mt-1 text-[10px] text-white/30">Click to open full size</div>
+              </a>
+            </div>
+          ) : null}
         </div>
       </div>
     );
@@ -1555,26 +1565,18 @@ export default function AdminPage() {
                 )}
 
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  <div>
-                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">ID (leave blank to auto-generate)</label>
-                    <input value={addPoForm.id} onChange={e => setAddPoForm(f => ({ ...f, id: e.target.value }))}
-                      placeholder="op17jp" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
-                  </div>
-                  <div className="lg:col-span-2">
+                  {/* Row 1: Title (full width) */}
+                  <div className="sm:col-span-2 lg:col-span-3">
                     <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Title *</label>
                     <input required value={addPoForm.title} onChange={e => setAddPoForm(f => ({ ...f, title: e.target.value }))}
                       placeholder="One Piece Card Game OP-17 Booster Box [Japanese]"
                       className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
                   </div>
+                  {/* Row 2: Subtitle, ETA, Deadline */}
                   <div>
                     <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Subtitle</label>
                     <input value={addPoForm.subtitle} onChange={e => setAddPoForm(f => ({ ...f, subtitle: e.target.value }))}
                       placeholder="4th Anniversary Set" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Hype badge</label>
-                    <input value={addPoForm.hype} onChange={e => setAddPoForm(f => ({ ...f, hype: e.target.value }))}
-                      placeholder="Limited Allocation" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
                   </div>
                   <div>
                     <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">ETA</label>
@@ -1582,12 +1584,13 @@ export default function AdminPage() {
                       placeholder="Est. Aug 31, 2026" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
                   </div>
                   <div>
-                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Deadline (datetime-local)</label>
-                    <input type="datetime-local" value={addPoForm.deadline} onChange={e => setAddPoForm(f => ({ ...f, deadline: e.target.value }))}
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Order Deadline</label>
+                    <input type="date" value={addPoForm.deadline ? addPoForm.deadline.toString().slice(0,10) : ''} onChange={e => setAddPoForm(f => ({ ...f, deadline: e.target.value ? e.target.value + 'T23:59:59' : '' }))}
                       className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-pink-400/40" />
                   </div>
+                  {/* Row 3: Prices */}
                   <div>
-                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Price (CAD)</label>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Price (CAD) *</label>
                     <input type="number" step="0.01" min="0" value={addPoForm.price} onChange={e => setAddPoForm(f => ({ ...f, price: e.target.value }))}
                       placeholder="93.00" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
                   </div>
@@ -1601,12 +1604,8 @@ export default function AdminPage() {
                     <input type="number" step="0.01" min="0" value={addPoForm.aud_price} onChange={e => setAddPoForm(f => ({ ...f, aud_price: e.target.value }))}
                       placeholder="96.00" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
                   </div>
-                  <div>
-                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Display order</label>
-                    <input type="number" min="0" value={addPoForm.display_order} onChange={e => setAddPoForm(f => ({ ...f, display_order: e.target.value }))}
-                      placeholder="0" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
-                  </div>
-                  <div>
+                  {/* Row 4: Image URL + Sold Out toggle */}
+                  <div className="sm:col-span-2">
                     <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Image URL</label>
                     <input value={addPoForm.image_url} onChange={e => setAddPoForm(f => ({ ...f, image_url: e.target.value }))}
                       placeholder="Auto-filled after upload"
@@ -1617,15 +1616,11 @@ export default function AdminPage() {
                       <input type="checkbox" checked={addPoForm.sold_out} onChange={e => setAddPoForm(f => ({ ...f, sold_out: e.target.checked }))} className="h-4 w-4 accent-pink-400" />
                       <span className="text-xs font-black uppercase tracking-[0.12em] text-white/60">Sold Out</span>
                     </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={addPoForm.price_tba} onChange={e => setAddPoForm(f => ({ ...f, price_tba: e.target.checked }))} className="h-4 w-4 accent-pink-400" />
-                      <span className="text-xs font-black uppercase tracking-[0.12em] text-white/60">Price TBA</span>
-                    </label>
                   </div>
-                  <div className="sm:col-span-2">
+                  {/* Notes — pre-filled with default */}
+                  <div className="sm:col-span-2 lg:col-span-3">
                     <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Notes (one per line)</label>
                     <textarea rows={3} value={addPoForm.notes} onChange={e => setAddPoForm(f => ({ ...f, notes: e.target.value }))}
-                      placeholder="Pre-orders are not guaranteed...&#10;Buyer shoulders shipping fees..."
                       className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40 resize-none" />
                   </div>
                 </div>
