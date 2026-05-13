@@ -54,14 +54,16 @@ const PROVINCE_TAX = {
 
 // ── Shipping (pre-orders ship per case = 12 booster boxes) ───────────────────
 const WEIGHT_PER_CASE = 22.92; // kg — 12 boxes × 1.91kg each
+// Rates cover heavy pre-order shipments (each case alone is ~23kg)
 const PO_SHIP_RATES = [
-  { maxKg:  2.0, domestic: 15,  usa: 35,  asia: 65,  europe: 70,  other: 75  },
-  { maxKg:  4.0, domestic: 22,  usa: 50,  asia: 85,  europe: 90,  other: 100 },
-  { maxKg:  6.0, domestic: 30,  usa: 65,  asia: 105, europe: 115, other: 125 },
-  { maxKg:  8.0, domestic: 38,  usa: 80,  asia: 125, europe: 135, other: 150 },
-  { maxKg: 10.0, domestic: 45,  usa: 95,  asia: 145, europe: 155, other: 175 },
-  { maxKg: 15.0, domestic: 55,  usa: 115, asia: 175, europe: 190, other: 210 },
-  { maxKg: 20.0, domestic: 65,  usa: 135, asia: 205, europe: 220, other: 245 },
+  { maxKg:  10, domestic:  45, usa:   95, asia:  145, europe:  155, other:  175 },
+  { maxKg:  20, domestic:  65, usa:  135, asia:  205, europe:  220, other:  245 },
+  { maxKg:  30, domestic:  90, usa:  190, asia:  285, europe:  310, other:  345 },
+  { maxKg:  50, domestic: 130, usa:  280, asia:  430, europe:  470, other:  530 },
+  { maxKg:  75, domestic: 180, usa:  390, asia:  605, europe:  665, other:  745 },
+  { maxKg: 100, domestic: 230, usa:  500, asia:  780, europe:  860, other:  960 },
+  { maxKg: 150, domestic: 320, usa:  710, asia: 1120, europe: 1240, other: 1380 },
+  { maxKg: 250, domestic: 490, usa: 1090, asia: 1720, europe: 1900, other: 2120 },
 ];
 const PO_COUNTRY_ZONE = {
   'Canada':                         'domestic',
@@ -813,7 +815,7 @@ export default function PreOrdersPage() {
               </div>
               <button
                 onClick={() => setShowCalc(true)}
-                className="inline-flex items-center gap-2 rounded-full border border-fuchsia-400/25 bg-fuchsia-400/8 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-fuchsia-300 transition hover:bg-fuchsia-400/15"
+                className="inline-flex items-center gap-2 rounded-full border border-fuchsia-400/60 bg-gradient-to-r from-fuchsia-500/20 to-cyan-400/20 px-5 py-2 text-xs font-black uppercase tracking-[0.16em] text-fuchsia-200 shadow-[0_0_16px_rgba(232,121,249,0.3)] transition hover:shadow-[0_0_24px_rgba(232,121,249,0.5)] hover:from-fuchsia-500/30 hover:to-cyan-400/30"
               >
                 <Calculator className="h-3.5 w-3.5" /> DP Calculator
               </button>

@@ -101,6 +101,8 @@ export default function AdminPage() {
   const [pwError, setPwError] = useState(false);
   const [activeTab, setActiveTab] = useState('orders');
   const [orderFilter, setOrderFilter] = useState('pending');
+  const [orderTypeFilter, setOrderTypeFilter] = useState('all');
+  const [search, setSearch] = useState('');
   const [selectedOrderId, setSelectedOrderId] = useState('');
   const [products, setProducts] = useState(() => mergeProducts([]));
   const [loading, setLoading] = useState(true);
@@ -130,7 +132,6 @@ export default function AdminPage() {
       const {data: orderRows, error: orderError} = await supabase
         .from('orders')
         .select('*')
-        .eq('order_type', 'on_hand')
         .order('created_at', {ascending: false});
 
       if (orderError) {
@@ -164,8 +165,10 @@ export default function AdminPage() {
     }
 
     const nextVisibleOrders = orders.filter((order) => {
-      if (orderFilter === 'pending') return order.status === 'pending';
-      if (orderFilter === 'confirmed') return order.status === 'confirmed';
+      if (orderFilter === 'pending' && order.status !== 'pending') return false;
+      if (orderFilter === 'confirmed' && order.status !== 'confirmed') return false;
+      if (orderTypeFilter === 'on_hand' && order.order_type !== 'on_hand') return false;
+      if (orderTypeFilter === 'pre_order' && order.order_type !== 'pre_order') return false;
       return true;
     });
 
@@ -178,7 +181,7 @@ export default function AdminPage() {
     if (!stillVisible) {
       setSelectedOrderId(nextVisibleOrders[0].id);
     }
-  }, [orders, orderFilter, selectedOrderId]);
+  }, [orders, orderFilter, orderTypeFilter, selectedOrderId]);
 
   function login() {
     if (pw === ADMIN_PASSWORD) {
@@ -480,11 +483,20 @@ export default function AdminPage() {
   const soldOutProducts = products.filter((product) => !product.inStock);
   const pendingOrders = orders.filter((order) => order.status === 'pending');
   const confirmedOrders = orders.filter((order) => order.status === 'confirmed');
-  const visibleOrders = orders.filter((order) => {
-    if (orderFilter === 'pending') return order.status === 'pending';
-    if (orderFilter === 'confirmed') return order.status === 'confirmed';
+  const filteredOrders = orders.filter((order) => {
+    if (orderFilter === 'pending' && order.status !== 'pending') return false;
+    if (orderFilter === 'confirmed' && order.status !== 'confirmed') return false;
+    if (orderTypeFilter === 'on_hand' && order.order_type !== 'on_hand') return false;
+    if (orderTypeFilter === 'pre_order' && order.order_type !== 'pre_order') return false;
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      const matchNum = (order.order_number || '').toLowerCase().includes(q);
+      const matchName = (order.buyer_name || '').toLowerCase().includes(q);
+      if (!matchNum && !matchName) return false;
+    }
     return true;
   });
+  const visibleOrders = filteredOrders.slice(0, 50);
   const selectedOrder = visibleOrders.find((order) => order.id === selectedOrderId) || visibleOrders[0] || null;
 
   function renderOrderRow(order) {
@@ -523,6 +535,15 @@ export default function AdminPage() {
             <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${paymentMeta.badge}`}>
               {paymentMeta.label}
             </span>
+            {order.order_type === 'pre_order' ? (
+              <span className="rounded-full border border-fuchsia-400/30 bg-fuchsia-400/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-fuchsia-200">
+                Pre-Order
+              </span>
+            ) : (
+              <span className="rounded-full border border-cyan-400/25 bg-cyan-400/8 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-cyan-200/70">
+                On Hand
+              </span>
+            )}
           </div>
         </div>
       </button>
@@ -619,7 +640,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="mb-5 flex flex-wrap gap-3">
+            <div className="mb-3 flex flex-wrap gap-3">
               {[
                 {id: 'pending', label: `Pending (${pendingOrders.length})`},
                 {id: 'confirmed', label: `Confirmed (${confirmedOrders.length})`},
@@ -636,6 +657,46 @@ export default function AdminPage() {
                 </button>
               ))}
             </div>
+
+            <div className="mb-3 flex flex-wrap gap-2">
+              {[
+                {id: 'all', label: 'All Types'},
+                {id: 'on_hand', label: 'On Hand'},
+                {id: 'pre_order', label: 'Pre-Order'},
+              ].map((filter) => (
+                <button
+                  key={filter.id}
+                  onClick={() => setOrderTypeFilter(filter.id)}
+                  className={`rounded-2xl px-3 py-2 text-xs font-black uppercase tracking-[0.1em] transition ${
+                    orderTypeFilter === filter.id
+                      ? filter.id === 'pre_order'
+                        ? 'bg-gradient-to-r from-fuchsia-400 to-pink-400 text-black'
+                        : filter.id === 'on_hand'
+                          ? 'bg-gradient-to-r from-cyan-300 to-sky-400 text-black'
+                          : 'bg-white/20 text-white'
+                      : 'border border-white/15 bg-white/5 text-white/60 hover:bg-white/10'
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="mb-5">
+              <input
+                type="text"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search order # or buyer…"
+                className="w-full rounded-2xl border border-white/15 bg-black/30 px-4 py-2.5 text-sm text-white outline-none focus:border-cyan-300/50 placeholder:text-white/30"
+              />
+            </div>
+
+            {filteredOrders.length > 50 ? (
+              <div className="mb-3 rounded-2xl border border-yellow-400/20 bg-yellow-400/8 px-4 py-2.5 text-xs text-yellow-200/70">
+                Showing 50 of {filteredOrders.length} — use search to narrow.
+              </div>
+            ) : null}
 
             {visibleOrders.length ? (
               <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
