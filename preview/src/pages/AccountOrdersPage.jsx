@@ -76,7 +76,7 @@ export default function AccountOrdersPage() {
           src="/zoro.png"
           alt=""
           aria-hidden="true"
-          className="pointer-events-none absolute right-0 bottom-0 h-[600px] w-auto select-none"
+          className="pointer-events-none absolute right-0 top-0 h-[520px] w-auto select-none"
           style={{ opacity: 0.42, filter: 'drop-shadow(0 0 40px rgba(52,211,153,0.6)) drop-shadow(0 0 80px rgba(52,211,153,0.25))', zIndex: 0 }}
           onError={(e) => { e.currentTarget.style.display = 'none'; }}
         />
