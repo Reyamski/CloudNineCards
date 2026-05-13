@@ -46,7 +46,7 @@ export default function AccountOrdersPage() {
 
     supabase
       .from('orders')
-      .select('order_number, item_title, product_title, quantity, full_price, total_price, dp_amount, balance_due, payment_status, status, order_type, eta, delivery_country, delivery_fee, tax_amount, address, buyer_name, created_at')
+      .select('order_number, item_title, product_title, quantity, full_price, total_price, dp_amount, balance_due, payment_status, status, order_type, eta, delivery_country, delivery_fee, tax_amount, buyer_address, buyer_name, created_at')
       .ilike('buyer_email', user.email)
       .order('created_at', { ascending: false })
       .then(({ data }) => {
@@ -161,9 +161,9 @@ export default function AccountOrdersPage() {
                     <div className="text-right text-white/70">CAD ${Number(order.tax_amount).toFixed(2)}</div>
                     <div className="hidden sm:block" />
                   </>}
-                  {order.address && <>
+                  {order.buyer_address && <>
                     <div className="text-white/40">Ship to</div>
-                    <div className="col-span-1 text-right text-white/60 sm:col-span-2">{order.address}</div>
+                    <div className="col-span-1 text-right text-white/60 sm:col-span-2">{order.buyer_address}</div>
                   </>}
                 </div>
 
