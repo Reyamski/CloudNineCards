@@ -38,7 +38,7 @@ export default async function handler(req, res) {
         'content-type':       'application/json',
       },
       body: JSON.stringify({
-        model:      'claude-sonnet-4-6',
+        model:      'claude-3-5-sonnet-20241022',
         max_tokens: 512,
         messages: [{
           role: 'user',
@@ -70,7 +70,10 @@ Analyze this card image and return ONLY valid JSON — no explanation, no markdo
 
   if (!claudeRes.ok) {
     const errText = await claudeRes.text();
-    return res.status(500).json({ error: `Claude API ${claudeRes.status}`, detail: errText.slice(0, 300) });
+    console.error('[analyze-card] Anthropic error', claudeRes.status, errText);
+    let detail = errText;
+    try { detail = JSON.parse(errText)?.error?.message ?? errText; } catch { /* keep raw */ }
+    return res.status(500).json({ error: `Claude API ${claudeRes.status}`, detail: detail.slice(0, 500) });
   }
 
   const data = await claudeRes.json();

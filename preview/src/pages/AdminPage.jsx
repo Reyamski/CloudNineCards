@@ -146,6 +146,19 @@ export default function AdminPage() {
 
   async function analyzeCard(file) {
     if (!file || !file.type.startsWith('image/')) return;
+
+    const SUPPORTED = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!SUPPORTED.includes(file.type)) {
+      setAnalyzeError(`Unsupported format: ${file.type}. Use JPEG, PNG, GIF, or WebP.`);
+      setImagePreview(URL.createObjectURL(file));
+      return;
+    }
+    if (file.size > 3_800_000) {
+      setAnalyzeError(`Image too large (${(file.size/1e6).toFixed(1)}MB). Max ~3.8MB.`);
+      setImagePreview(URL.createObjectURL(file));
+      return;
+    }
+
     setImagePreview(URL.createObjectURL(file));
     setAnalyzing(true);
     setAnalyzed(false);
@@ -159,7 +172,7 @@ export default function AdminPage() {
         body: JSON.stringify({ imageBase64: base64, mediaType: file.type }),
       });
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error || 'Analysis failed');
+      if (!res.ok) throw new Error(result.detail != null ? `${result.error}: ${result.detail}` : result.error || 'Analysis failed');
 
       setAddForm(f => ({
         ...f,
