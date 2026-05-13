@@ -1,5 +1,5 @@
-import {useEffect, useState} from 'react';
-import {ShieldCheck, Save, RotateCcw, Eye, EyeOff, Youtube, Loader2} from 'lucide-react';
+import {useEffect, useRef, useState} from 'react';
+import {ShieldCheck, Save, RotateCcw, Eye, EyeOff, Youtube, Loader2, Sparkles, Upload, X, Check} from 'lucide-react';
 import {supabase, supabaseEnabled} from '../lib/supabase';
 
 const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD;
@@ -126,6 +126,79 @@ export default function AdminPage() {
   const [editVal, setEditVal]               = useState('');
   const BLANK_FORM = { card_name: '', set_name: '', set_code: '', card_number: '', game: 'One Piece', language: 'English', condition: 'NM', rarity: '', price: '', stock: '1', image_url: '' };
   const [addForm, setAddForm]               = useState(BLANK_FORM);
+  // ── AI image analysis state ───────────────────────────────────────────────
+  const [imagePreview, setImagePreview]     = useState('');
+  const [analyzing, setAnalyzing]           = useState(false);
+  const [analyzed, setAnalyzed]             = useState(false);
+  const [analyzeError, setAnalyzeError]     = useState('');
+  const [uploadingImg, setUploadingImg]     = useState(false);
+  const [dragOver, setDragOver]             = useState(false);
+  const fileInputRef                        = useRef(null);
+
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function analyzeCard(file) {
+    if (!file || !file.type.startsWith('image/')) return;
+    setImagePreview(URL.createObjectURL(file));
+    setAnalyzing(true);
+    setAnalyzed(false);
+    setAnalyzeError('');
+
+    try {
+      const base64 = await fileToBase64(file);
+      const res = await fetch('/api/analyze-card', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: base64, mediaType: file.type }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Analysis failed');
+
+      setAddForm(f => ({
+        ...f,
+        card_name:   result.card_name   || f.card_name,
+        set_name:    result.set_name    || f.set_name,
+        set_code:    result.set_code    || f.set_code,
+        card_number: result.card_number || f.card_number,
+        game:        (['One Piece','Pokemon','Dragon Ball','Yu-Gi-Oh!'].includes(result.game) ? result.game : f.game),
+        language:    (['English','Japanese'].includes(result.language) ? result.language : f.language),
+        condition:   (['NM','LP','MP','HP','D'].includes(result.condition) ? result.condition : f.condition),
+        rarity:      result.rarity      || f.rarity,
+      }));
+      setAnalyzed(true);
+    } catch (err) {
+      setAnalyzeError(err.message || 'Analysis failed — fill fields manually.');
+    }
+
+    // Upload to Supabase Storage regardless of analysis result
+    if (supabaseEnabled && supabase) {
+      setUploadingImg(true);
+      const filename = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
+      const { error: uploadErr } = await supabase.storage.from('singles').upload(filename, file, { contentType: file.type });
+      if (!uploadErr) {
+        const { data: { publicUrl } } = supabase.storage.from('singles').getPublicUrl(filename);
+        setAddForm(f => ({ ...f, image_url: publicUrl }));
+      }
+      setUploadingImg(false);
+    }
+
+    setAnalyzing(false);
+  }
+
+  function resetImageState() {
+    setImagePreview('');
+    setAnalyzing(false);
+    setAnalyzed(false);
+    setAnalyzeError('');
+    setUploadingImg(false);
+  }
 
   useEffect(() => {
     async function load() {
@@ -966,7 +1039,7 @@ export default function AdminPage() {
                   className="rounded-2xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-black uppercase text-white/70 hover:bg-white/10 disabled:opacity-40">
                   {singlesLoading ? 'Loading…' : 'Refresh'}
                 </button>
-                <button onClick={() => setShowAddForm(v => !v)}
+                <button onClick={() => { setShowAddForm(v => !v); setAddForm(BLANK_FORM); resetImageState(); }}
                   className="rounded-2xl bg-gradient-to-r from-fuchsia-400 via-purple-400 to-cyan-400 px-5 py-2.5 text-sm font-black uppercase text-black transition hover:opacity-90">
                   {showAddForm ? 'Cancel' : '+ Add Single'}
                 </button>
@@ -975,51 +1048,114 @@ export default function AdminPage() {
 
             {/* Add form */}
             {showAddForm && (
-              <form onSubmit={addSingle} className="mb-6 rounded-[24px] border border-fuchsia-400/25 bg-fuchsia-400/8 p-5">
-                <div className="text-xs font-black uppercase tracking-[0.18em] text-fuchsia-300 mb-4">New Single</div>
+              <form onSubmit={e => { addSingle(e); resetImageState(); }} className="mb-6 rounded-[24px] border border-fuchsia-400/25 bg-fuchsia-400/8 p-5">
+                <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-fuchsia-300 mb-4">
+                  <Sparkles className="h-3.5 w-3.5" /> New Single — AI Card Reader
+                </div>
+
+                {/* Image drop zone */}
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) analyzeCard(f); e.target.value = ''; }} />
+
+                {imagePreview ? (
+                  <div className="mb-4 flex gap-4 items-start">
+                    <div className="relative shrink-0">
+                      <img src={imagePreview} alt="Card preview" className="h-32 w-24 rounded-xl object-contain bg-black/40 border border-white/10" />
+                      <button type="button" onClick={() => { resetImageState(); setAddForm(f => ({ ...f, image_url: '' })); }}
+                        className="absolute -top-2 -right-2 rounded-full border border-white/20 bg-black/80 p-0.5 hover:bg-white/20">
+                        <X className="h-3 w-3 text-white/60" />
+                      </button>
+                    </div>
+                    <div className="flex-1">
+                      {analyzing ? (
+                        <div className="flex items-center gap-2 text-sm text-fuchsia-300">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Analyzing card with AI…
+                        </div>
+                      ) : analyzed ? (
+                        <div className="flex items-center gap-2 text-sm text-emerald-300">
+                          <Check className="h-4 w-4" /> AI filled the details — review below, then set your price.
+                        </div>
+                      ) : analyzeError ? (
+                        <div className="text-sm text-red-300">{analyzeError}</div>
+                      ) : null}
+                      {uploadingImg && (
+                        <div className="mt-1 flex items-center gap-2 text-xs text-white/40">
+                          <Loader2 className="h-3 w-3 animate-spin" /> Uploading image to storage…
+                        </div>
+                      )}
+                      {addForm.image_url && !uploadingImg && (
+                        <div className="mt-1 text-xs text-emerald-400/70">✓ Image uploaded to storage</div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    className={`mb-4 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed py-8 transition ${
+                      dragOver ? 'border-fuchsia-400/60 bg-fuchsia-400/10' : 'border-white/15 bg-white/3 hover:border-fuchsia-400/40 hover:bg-fuchsia-400/6'
+                    }`}
+                    onClick={() => fileInputRef.current?.click()}
+                    onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) analyzeCard(f); }}
+                  >
+                    <Upload className="h-7 w-7 text-fuchsia-300/50" />
+                    <div className="text-sm font-black uppercase tracking-[0.14em] text-white/50">Drop card photo here or click to upload</div>
+                    <div className="flex items-center gap-1.5 text-xs text-fuchsia-300/60">
+                      <Sparkles className="h-3 w-3" /> AI will read name, set, number, language, rarity, condition
+                    </div>
+                  </div>
+                )}
+
+                {/* Fields — AI pre-filled, user reviews */}
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {[
-                    { key: 'card_name',   label: 'Card Name *',   placeholder: 'Monkey D. Luffy' },
-                    { key: 'set_name',    label: 'Set Name *',    placeholder: 'Romance Dawn' },
+                    { key: 'card_name',   label: 'Card Name *',   placeholder: 'Monkey D. Luffy', req: true },
+                    { key: 'set_name',    label: 'Set Name *',    placeholder: 'Romance Dawn',    req: true },
                     { key: 'set_code',    label: 'Set Code',      placeholder: 'OP-01' },
                     { key: 'card_number', label: 'Card Number',   placeholder: 'OP01-060' },
                     { key: 'rarity',      label: 'Rarity',        placeholder: 'Secret Rare' },
-                    { key: 'image_url',   label: 'Image URL',     placeholder: 'https://...' },
-                  ].map(({ key, label, placeholder }) => (
+                  ].map(({ key, label, placeholder, req }) => (
                     <div key={key}>
                       <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">{label}</label>
                       <input value={addForm[key]} onChange={e => setAddForm(f => ({ ...f, [key]: e.target.value }))}
-                        placeholder={placeholder} required={key === 'card_name' || key === 'set_name'}
-                        className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-fuchsia-400/40" />
+                        placeholder={placeholder} required={req}
+                        className={`w-full rounded-xl border px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-fuchsia-400/40 bg-black/30 ${addForm[key] && analyzed ? 'border-emerald-400/30' : 'border-white/10'}`} />
                     </div>
                   ))}
                   <div>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Image URL</label>
+                    <input value={addForm.image_url} onChange={e => setAddForm(f => ({ ...f, image_url: e.target.value }))}
+                      placeholder="Auto-filled after upload"
+                      className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-fuchsia-400/40" />
+                  </div>
+                  <div>
                     <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Game *</label>
                     <select value={addForm.game} onChange={e => setAddForm(f => ({ ...f, game: e.target.value }))}
-                      className="w-full rounded-xl border border-white/10 bg-white px-3 py-2 text-sm text-black outline-none">
+                      className={`w-full rounded-xl border px-3 py-2 text-sm text-black outline-none bg-white ${analyzed ? 'border-emerald-400/40' : 'border-white/10'}`}>
                       {['One Piece', 'Pokemon', 'Dragon Ball', 'Yu-Gi-Oh!'].map(g => <option key={g}>{g}</option>)}
                     </select>
                   </div>
                   <div>
                     <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Language *</label>
                     <select value={addForm.language} onChange={e => setAddForm(f => ({ ...f, language: e.target.value }))}
-                      className="w-full rounded-xl border border-white/10 bg-white px-3 py-2 text-sm text-black outline-none">
+                      className={`w-full rounded-xl border px-3 py-2 text-sm text-black outline-none bg-white ${analyzed ? 'border-emerald-400/40' : 'border-white/10'}`}>
                       <option>English</option><option>Japanese</option>
                     </select>
                   </div>
                   <div>
                     <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Condition *</label>
                     <select value={addForm.condition} onChange={e => setAddForm(f => ({ ...f, condition: e.target.value }))}
-                      className="w-full rounded-xl border border-white/10 bg-white px-3 py-2 text-sm text-black outline-none">
+                      className={`w-full rounded-xl border px-3 py-2 text-sm text-black outline-none bg-white ${analyzed ? 'border-emerald-400/40' : 'border-white/10'}`}>
                       {['NM', 'LP', 'MP', 'HP', 'D'].map(c => <option key={c}>{c}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Price (CAD) *</label>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/30">Price (CAD) * — set manually</label>
                     <input type="number" step="0.01" min="0" required value={addForm.price}
                       onChange={e => setAddForm(f => ({ ...f, price: e.target.value }))}
                       placeholder="25.00"
-                      className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-fuchsia-400/40" />
+                      className="w-full rounded-xl border border-yellow-400/30 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-yellow-400/50" />
                   </div>
                   <div>
                     <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Stock *</label>
@@ -1029,7 +1165,7 @@ export default function AdminPage() {
                       className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-fuchsia-400/40" />
                   </div>
                 </div>
-                <button type="submit" disabled={savingAdd}
+                <button type="submit" disabled={savingAdd || analyzing}
                   className="mt-4 rounded-2xl bg-gradient-to-r from-fuchsia-400 via-purple-400 to-cyan-400 px-6 py-2.5 text-sm font-black uppercase text-black disabled:opacity-60">
                   {savingAdd ? 'Saving…' : 'Add to Inventory'}
                 </button>
