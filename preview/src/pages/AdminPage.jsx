@@ -279,26 +279,29 @@ export default function AdminPage() {
     setDbError('');
 
     try {
-      const existingProduct = products.find((product) => product.id === order.product_id);
-      const fallbackQty = existingProduct?.stock ?? 0;
+      // Only update stock if the order has a known product_id
+      if (order.product_id) {
+        const existingProduct = products.find((product) => product.id === order.product_id);
+        const fallbackQty = existingProduct?.stock ?? 0;
 
-      const {data: stockRow, error: stockError} = await supabase
-        .from('stock')
-        .select('*')
-        .eq('id', order.product_id)
-        .maybeSingle();
+        const {data: stockRow, error: stockError} = await supabase
+          .from('stock')
+          .select('*')
+          .eq('id', order.product_id)
+          .maybeSingle();
 
-      if (stockError) throw stockError;
+        if (stockError) throw stockError;
 
-      const currentQty = stockRow?.quantity ?? fallbackQty;
-      const nextQty = Math.max(0, currentQty - order.quantity);
-      const nextInStock = nextQty > 0;
+        const currentQty = stockRow?.quantity ?? fallbackQty;
+        const nextQty = Math.max(0, currentQty - order.quantity);
+        const nextInStock = nextQty > 0;
 
-      const {error: upsertError} = await supabase
-        .from('stock')
-        .upsert({id: order.product_id, quantity: nextQty, in_stock: nextInStock}, {onConflict: 'id'});
+        const {error: upsertError} = await supabase
+          .from('stock')
+          .upsert({id: order.product_id, quantity: nextQty, in_stock: nextInStock}, {onConflict: 'id'});
 
-      if (upsertError) throw upsertError;
+        if (upsertError) throw upsertError;
+      }
 
       const confirmedAt = new Date().toISOString();
       const {error: orderUpdateError} = await supabase

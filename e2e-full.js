@@ -1,5 +1,6 @@
 // CloudNineCards — Full E2E Test (sign in → order → contact → orders → sign out)
 const { chromium } = require('playwright');
+const { createClient } = require('./preview/node_modules/@supabase/supabase-js');
 const path = require('path');
 const fs   = require('fs');
 
@@ -8,6 +9,22 @@ const EMAIL     = 'reyamski0@gmail.com';
 const PASSWORD  = 'Password';
 const VIDEO_DIR = path.join(__dirname, 'e2e-full-video');
 const PROOF_IMG = path.join(__dirname, 'test-payment-proof.png');
+const TEST_TAG  = '[E2E-TEST]'; // used in buyer_name so cleanup can target exactly these rows
+
+const sb = createClient(
+  'https://fxbrjlzgczwxeiiraudy.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ4YnJqbHpnY3p3eGVpaXJhdWR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2ODczOTksImV4cCI6MjA4OTI2MzM5OX0.NAqLGiJac3eU6VDJUWP2eEUbGqjZGyYcRSJa8jiRd54'
+);
+
+async function cleanupTestOrders() {
+  const { data, error } = await sb
+    .from('orders')
+    .delete()
+    .ilike('buyer_name', `%${TEST_TAG}%`)
+    .select('order_number');
+  if (error) console.warn('  ⚠ Cleanup error:', error.message);
+  else console.log(`  🧹 Cleaned up ${data?.length ?? 0} test order(s):`, data?.map(r => r.order_number).join(', ') || 'none');
+}
 
 if (!fs.existsSync(VIDEO_DIR)) fs.mkdirSync(VIDEO_DIR, { recursive: true });
 
@@ -140,7 +157,7 @@ async function run() {
     // ── Step 2: fill form details ──────────────────────────────────────
     const nameInput = page.locator('input[placeholder*="name" i]').first();
     if (await nameInput.isVisible().catch(() => false)) {
-      await nameInput.fill('[TEST] E2E Playwright');
+      await nameInput.fill(`${TEST_TAG} Playwright`);
     }
 
     // Email should be pre-filled — verify
@@ -168,6 +185,15 @@ async function run() {
     const success = await page.locator('text=Order Sent').isVisible().catch(() => false);
     success ? pass('Order submitted — "Order Sent!" visible') : fail('Order submit', 'no "Order Sent!" message');
     orderPlaced = success;
+
+    // Capture the order number shown in the success screen
+    if (success) {
+      const orderNumEl = page.locator('[class*="tracking-widest"]').first();
+      const orderNumText = await orderNumEl.textContent().catch(() => '');
+      if (orderNumText.startsWith('CNC-')) {
+        pass(`Order number captured: ${orderNumText}`);
+      }
+    }
 
     await page.screenshot({ path: path.join(__dirname, 'full-08-order-sent.png') });
   } catch (e) {
@@ -283,6 +309,10 @@ async function run() {
   await page.waitForTimeout(1500);
   await ctx.close();
   await browser.close();
+
+  // Clean up test orders from DB
+  console.log('\n🧹 Cleanup');
+  await cleanupTestOrders();
 
   // Save video
   const videos = fs.readdirSync(VIDEO_DIR).filter(f => f.endsWith('.webm'));
