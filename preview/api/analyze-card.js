@@ -32,13 +32,20 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'imageUrl or imageBase64 required' });
   }
 
-  // Server-side HEIC/HEIF → JPEG conversion via sharp
-  if (imageBase64 && (mediaType === 'image/heic' || mediaType === 'image/heif')) {
-    try {
-      imageBase64 = await convertHeicToJpeg(imageBase64);
-      mediaType = 'image/jpeg';
-    } catch (err) {
-      return res.status(400).json({ error: 'HEIC conversion failed on server', detail: err.message });
+  // Detect HEIC by ISO BMFF magic bytes — catches files with wrong .jpg extension
+  if (imageBase64) {
+    const hdr = Buffer.from(imageBase64.substring(0, 20), 'base64');
+    const isHeicContent = hdr.length >= 12
+      && hdr[4] === 0x66 && hdr[5] === 0x74 && hdr[6] === 0x79 && hdr[7] === 0x70
+      && ['heic','heis','hevc','hevx','heim','heix','hevm','hevs','mif1','msf1']
+           .includes(hdr.slice(8, 12).toString('ascii'));
+    if (isHeicContent || mediaType === 'image/heic' || mediaType === 'image/heif') {
+      try {
+        imageBase64 = await convertHeicToJpeg(imageBase64);
+        mediaType = 'image/jpeg';
+      } catch (err) {
+        return res.status(400).json({ error: 'HEIC conversion failed on server', detail: err.message });
+      }
     }
   }
 
