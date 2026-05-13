@@ -143,7 +143,7 @@ const preorders = [
     id: 'op17eng',
     title: 'One Piece Card Game OP-17 Booster Box [English]',
     subtitle: '4th Anniversary Set – "World\'s Strongest Warrior"',
-    soldOut: false,
+    soldOut: true,
     priceTba: false,
     price: 130,
     usdPrice: 94,

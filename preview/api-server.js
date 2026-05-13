@@ -5,6 +5,22 @@
  */
 import http from 'http';
 import { URL } from 'url';
+import { readFileSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+// Load .env into process.env for local dev
+const __dir = dirname(fileURLToPath(import.meta.url));
+for (const envFile of ['.env', '.env.local']) {
+  try {
+    const lines = readFileSync(resolve(__dir, envFile), 'utf8').split('\n');
+    for (const line of lines) {
+      const m = line.match(/^\s*([^#=\s][^=]*?)\s*=\s*(.*?)\s*$/);
+      if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+    }
+  } catch { /* file missing = ok */ }
+}
+
 import fetchPricesHandler from './api/fetch-prices.js';
 import analyzeCardHandler from './api/analyze-card.js';
 

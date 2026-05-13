@@ -3,9 +3,31 @@
  *
  * Accepts POST { imageBase64, mediaType } or { imageUrl }
  * Calls Claude Vision API → returns parsed TCG card details as JSON.
+ * If mediaType is image/heic or image/heif, converts to JPEG via sharp first.
  *
  * Requires env var: ANTHROPIC_API_KEY
  */
+async function convertHeicToJpeg(base64Data) {
+  const { tmpdir } = await import('os');
+  const { join } = await import('path');
+  const { writeFileSync, readFileSync, unlinkSync } = await import('fs');
+  const { execSync } = await import('child_process');
+  const { randomUUID } = await import('crypto');
+
+  const id = randomUUID();
+  const inPath  = join(tmpdir(), `heic-in-${id}.heic`);
+  const outPath = join(tmpdir(), `heic-out-${id}.jpg`);
+  try {
+    writeFileSync(inPath, Buffer.from(base64Data, 'base64'));
+    execSync(`ffmpeg -y -i "${inPath}" -q:v 2 "${outPath}"`, { timeout: 15000, stdio: 'pipe' });
+    const jpegData = readFileSync(outPath).toString('base64');
+    return jpegData;
+  } finally {
+    try { unlinkSync(inPath); } catch {}
+    try { unlinkSync(outPath); } catch {}
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -18,10 +40,20 @@ export default async function handler(req, res) {
   if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured on server' });
 
   const body = req.body ?? {};
-  const { imageUrl, imageBase64, mediaType = 'image/jpeg' } = body;
+  let { imageUrl, imageBase64, mediaType = 'image/jpeg' } = body;
 
   if (!imageUrl && !imageBase64) {
     return res.status(400).json({ error: 'imageUrl or imageBase64 required' });
+  }
+
+  // Server-side HEIC/HEIF → JPEG conversion via sharp
+  if (imageBase64 && (mediaType === 'image/heic' || mediaType === 'image/heif')) {
+    try {
+      imageBase64 = await convertHeicToJpeg(imageBase64);
+      mediaType = 'image/jpeg';
+    } catch (err) {
+      return res.status(400).json({ error: 'HEIC conversion failed on server', detail: err.message });
+    }
   }
 
   const imageSource = imageUrl

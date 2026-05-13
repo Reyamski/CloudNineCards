@@ -145,38 +145,74 @@ export default function AdminPage() {
     });
   }
 
+  // Detect HEIC/HEIF by ISO BMFF magic bytes — catches files with wrong .jpg extension
+  async function isHeicByMagicBytes(file) {
+    const buf = await file.slice(0, 12).arrayBuffer();
+    const b = new Uint8Array(buf);
+    if (b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70) {
+      const brand = String.fromCharCode(b[8], b[9], b[10], b[11]);
+      return ['heic','heis','hevc','hevx','heim','heix','hevm','hevs','mif1','msf1'].includes(brand);
+    }
+    return false;
+  }
+
+  // Fallback: use browser's native HEIC rendering via canvas (Chrome 117+ / Safari)
+  function heicToJpegViaCanvas(file) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('canvas toBlob returned null')), 'image/jpeg', 0.85);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Browser cannot render this HEIC file')); };
+      img.src = url;
+    });
+  }
+
   async function analyzeCard(rawFile) {
     if (!rawFile) return;
 
     const HEIC_TYPES = ['image/heic', 'image/heif', 'image/heic-sequence', 'image/heif-sequence'];
-    const isHeic = HEIC_TYPES.includes(rawFile.type) || /\.heic$/i.test(rawFile.name);
+    const heicByContent = await isHeicByMagicBytes(rawFile);
+    const isHeic = HEIC_TYPES.includes(rawFile.type) || /\.heic$/i.test(rawFile.name) || heicByContent;
 
     let file = rawFile;
+    let serverMediaType = null; // set when server must handle conversion
+
     if (isHeic) {
       setImagePreview(URL.createObjectURL(rawFile));
       setAnalyzing(true);
       setAnalyzed(false);
       setAnalyzeError('');
       try {
-        const blob = await heic2any({ blob: rawFile, toType: 'image/jpeg', quality: 0.85 });
-        file = new File([blob], rawFile.name.replace(/\.heic$/i, '.jpg'), { type: 'image/jpeg' });
-      } catch (err) {
-        setAnalyzing(false);
-        setAnalyzeError(`HEIC conversion failed: ${err.message}`);
-        return;
+        let blob;
+        try {
+          blob = await heic2any({ blob: rawFile, toType: 'image/jpeg', quality: 0.85 });
+        } catch {
+          blob = await heicToJpegViaCanvas(rawFile);
+        }
+        file = new File([Array.isArray(blob) ? blob[0] : blob], rawFile.name.replace(/\.heic$/i, '.jpg'), { type: 'image/jpeg' });
+      } catch {
+        // Both client-side conversions failed — send raw HEIC, server converts with sharp
+        serverMediaType = 'image/heic';
       }
     }
 
     if (!file.type.startsWith('image/')) return;
 
     const SUPPORTED = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    if (!SUPPORTED.includes(file.type)) {
+    if (!serverMediaType && !SUPPORTED.includes(file.type)) {
       setAnalyzeError(`Unsupported format: ${file.type}. Use JPEG, PNG, GIF, WebP, or HEIC.`);
       setImagePreview(URL.createObjectURL(file));
       return;
     }
-    if (file.size > 3_800_000) {
-      setAnalyzeError(`Image too large (${(file.size/1e6).toFixed(1)}MB). Max ~3.8MB.`);
+    if (file.size > 20_000_000) {
+      setAnalyzeError(`Image too large (${(file.size/1e6).toFixed(1)}MB). Max 20MB.`);
       setImagePreview(URL.createObjectURL(file));
       return;
     }
@@ -191,7 +227,7 @@ export default function AdminPage() {
       const res = await fetch('/api/analyze-card', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: base64, mediaType: file.type }),
+        body: JSON.stringify({ imageBase64: base64, mediaType: serverMediaType ?? file.type }),
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.detail != null ? `${result.error}: ${result.detail}` : result.error || 'Analysis failed');
