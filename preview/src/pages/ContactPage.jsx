@@ -42,13 +42,13 @@ export default function ContactPage() {
       await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
         buyer_name:    name,
         buyer_email:   email,
-        item_title:    `Contact Form — ${topic || 'General Inquiry'}`,
-        item_subtitle: orderNum ? `Order #${orderNum}` : 'No order number provided',
-        quantity:      1,
-        full_price:    'N/A',
+        item_title:    `[CONTACT] ${topic || 'General Inquiry'}`,
+        item_subtitle: message,
+        quantity:      orderNum || '—',
+        full_price:    `CONTACT INQUIRY — ref: ${orderNum || 'none'}`,
         dp_amount:     message,
-        balance_due:   'N/A',
-        eta:           'N/A',
+        balance_due:   message,
+        eta:           topic,
         wise_handle:   CONTACT_EMAIL,
         to_email:      CONTACT_EMAIL,
       }, { publicKey: EMAILJS_PUBLIC_KEY });
@@ -62,8 +62,17 @@ export default function ContactPage() {
 
   return (
     <div className="min-h-screen bg-[#05010c] text-white">
-      <section className="relative overflow-hidden border-b border-cyan-400/15 bg-[#07030f] px-6 pb-12 pt-6">
+      <section className="relative overflow-hidden border-b border-cyan-400/15 bg-[#07030f] px-6 pb-12 pt-6 min-h-[420px] flex flex-col justify-center">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.18),transparent_40%),radial-gradient(circle_at_left,rgba(168,85,247,0.12),transparent_40%)]" />
+        {/* Robin character art */}
+        <img
+          src="/robin.png"
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute right-0 bottom-0 h-[600px] w-auto select-none"
+          style={{ opacity: 0.42, filter: 'drop-shadow(0 0 40px rgba(139,92,246,0.65)) drop-shadow(0 0 80px rgba(34,211,238,0.25))', zIndex: 0 }}
+          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+        />
         <div className="relative mx-auto max-w-7xl">
           <Nav />
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="mt-6">

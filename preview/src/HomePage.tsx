@@ -4,6 +4,7 @@ import {BellRing, ChevronRight, Flame, Quote, ShieldCheck, Sparkles, Star, Truck
 import {motion} from 'framer-motion';
 import {supabase, supabaseEnabled} from './lib/supabase';
 import Footer from './components/Footer';
+import Nav from './components/Nav';
 
 const DEFAULT_VIDEO_ID = 'OcLL44cDh7k';
 
@@ -102,13 +103,6 @@ const vouches = [
   },
 ];
 
-const navLinks = [
-  {label: 'Home', to: '/'},
-  {label: 'Shop', to: '/shop'},
-  {label: 'Pre-Orders', to: '/pre-orders'},
-  {label: 'New Arrivals', to: '/new-arrivals'},
-  {label: 'Contact', to: '/contact'},
-];
 
 function EmailSignup() {
   const [email, setEmail] = useState('');
@@ -243,26 +237,28 @@ export default function HomePage() {
       <section className="relative overflow-hidden border-b border-fuchsia-500/20 bg-[#07030f]">
         <div className="absolute inset-0 bg-[linear-gradient(110deg,rgba(5,1,12,0.98)_0%,rgba(23,7,48,0.94)_35%,rgba(40,10,66,0.76)_100%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(244,63,94,0.22),transparent_22%),radial-gradient(circle_at_left_center,rgba(34,211,238,0.15),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.18),transparent_24%)]" />
+        {/* Bottom-center energy burst */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_40%_at_50%_100%,rgba(139,92,246,0.18),transparent_70%),radial-gradient(ellipse_60%_30%_at_50%_100%,rgba(34,211,238,0.10),transparent_60%)]" />
+        {/* Scan lines overlay */}
+        <div className="absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_3px,rgba(255,255,255,0.012)_3px,rgba(255,255,255,0.012)_4px)] pointer-events-none" />
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:30px_30px] opacity-40" />
 
-        <div className="relative mx-auto max-w-7xl px-6 pb-16 pt-6 md:pb-24 md:pt-8">
-          <div className="mb-8 flex items-center justify-between">
-            <div>
-              <div className="bg-gradient-to-r from-cyan-300 via-fuchsia-300 to-yellow-300 bg-clip-text text-2xl font-black tracking-[0.28em] text-transparent md:text-3xl">
-                CLOUDNINECARDS
-              </div>
-              <div className="mt-1 text-xs uppercase tracking-[0.34em] text-white/45">
-                full hype anime | premium tcg drops | sealed madness
-              </div>
-            </div>
-            <div className="hidden items-center gap-6 text-sm font-bold uppercase tracking-[0.14em] text-white/75 md:flex">
-              {navLinks.map((link) => (
-                <Link key={link.to} to={link.to} className="transition hover:text-cyan-300">
-                  {link.label}
-                </Link>
-              ))}
-            </div>
-          </div>
+        {/* Luffy hero art */}
+        <img
+          src="/luffy.png"
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute bottom-0 right-4 hidden h-[96%] w-auto object-contain md:block"
+          style={{
+            zIndex: 0,
+            opacity: 0.38,
+            filter: 'drop-shadow(0 0 80px rgba(255,140,0,0.55)) drop-shadow(0 0 30px rgba(255,200,0,0.3))',
+          }}
+          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+        />
+
+        <div className="relative z-10 mx-auto max-w-7xl px-6 pb-16 pt-6 md:pb-24 md:pt-8">
+          <Nav />
 
           <div className="grid items-center gap-10 md:grid-cols-[1.04fr_0.96fr] md:gap-12">
             <motion.div initial={{opacity: 0, y: 20}} animate={{opacity: 1, y: 0}} transition={{duration: 0.6}} className="relative">
@@ -317,20 +313,20 @@ export default function HomePage() {
                 <span><span className="text-green-300 font-black">{browsing}</span> browsing now</span>
               </div>
 
-              <div className="mt-8 flex flex-wrap gap-3 text-xs font-bold uppercase tracking-[0.2em] text-white/75">
-                {['One Piece', 'Pokemon', 'Live Stock', 'Pre-Orders'].map((tag, idx) => (
-                  <span
-                    key={tag}
-                    className={`rounded-full border px-4 py-2 ${
-                      idx === 0 ? 'border-cyan-300/25 bg-cyan-300/10' :
-                      idx === 1 ? 'border-fuchsia-300/25 bg-fuchsia-300/10' :
-                      idx === 2 ? 'border-yellow-300/25 bg-yellow-300/10' :
-                      'border-white/10 bg-white/5'
-                    }`}
-                  >
-                    {tag}
-                  </span>
-                ))}
+              {/* Franchise badge pills */}
+              <div className="mt-8 flex flex-wrap gap-3">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-red-400/40 bg-red-500/15 px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-red-200 shadow-[0_0_18px_rgba(239,68,68,0.22)] backdrop-blur">
+                  <span className="text-base leading-none">🏴‍☠️</span> One Piece
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-yellow-300/40 bg-yellow-400/15 px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-yellow-100 shadow-[0_0_18px_rgba(250,204,21,0.22)] backdrop-blur">
+                  <span className="text-base leading-none">⚡</span> Pokémon
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-orange-400/40 bg-orange-500/15 px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-orange-200 shadow-[0_0_18px_rgba(249,115,22,0.22)] backdrop-blur">
+                  <span className="text-base leading-none">🔥</span> Dragon Ball
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-purple-400/40 bg-purple-600/15 px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-purple-200 shadow-[0_0_18px_rgba(147,51,234,0.22)] backdrop-blur">
+                  <span className="text-base leading-none">🌀</span> Yu-Gi-Oh
+                </span>
               </div>
 
               <div className="mt-8 grid max-w-3xl gap-3 sm:grid-cols-3">
@@ -397,6 +393,12 @@ export default function HomePage() {
       </section>
 
 
+      {/* Anime section divider */}
+      <div className="relative flex items-center justify-center py-2" aria-hidden="true">
+        <div className="absolute inset-x-0 top-1/2 h-px bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent" />
+        <span className="relative z-10 flex h-6 w-6 items-center justify-center rounded-full border border-cyan-400/40 bg-[#07030f] text-xs text-cyan-300/70 shadow-[0_0_14px_rgba(34,211,238,0.3)]">◆</span>
+      </div>
+
       <section className="mx-auto max-w-7xl px-6 pb-2 pt-6">
         <motion.div initial={{opacity: 0, y: 16}} animate={{opacity: 1, y: 0}} transition={{duration: 0.55}} className="relative overflow-hidden rounded-[32px] border border-fuchsia-500/30">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(168,85,247,0.18),transparent_50%),radial-gradient(circle_at_bottom_left,rgba(34,211,238,0.10),transparent_50%)]" />
@@ -444,8 +446,23 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-10 md:py-14">
-        <div className="mb-6 flex items-end justify-between gap-4">
+      {/* Anime section divider */}
+      <div className="relative flex items-center justify-center py-2" aria-hidden="true">
+        <div className="absolute inset-x-0 top-1/2 h-px bg-gradient-to-r from-transparent via-fuchsia-400/50 to-transparent" />
+        <span className="relative z-10 flex h-6 w-6 items-center justify-center rounded-full border border-fuchsia-400/40 bg-[#05010c] text-xs text-fuchsia-300/70 shadow-[0_0_14px_rgba(217,70,239,0.3)]">◆</span>
+      </div>
+
+      <section className="relative mx-auto max-w-7xl px-6 py-10 md:py-14">
+        <div className="pointer-events-none absolute inset-0 overflow-hidden hidden md:block" aria-hidden="true">
+          <img
+            src="/nami.png"
+            alt=""
+            className="absolute right-0 top-0 h-[560px] w-auto select-none"
+            style={{ opacity: 0.35, filter: 'drop-shadow(0 0 40px rgba(250,204,21,0.6)) drop-shadow(0 0 80px rgba(250,204,21,0.25))' }}
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+          />
+        </div>
+        <div className="relative mb-6 flex items-end justify-between gap-4">
           <div>
             <div className="text-sm font-black uppercase tracking-[0.22em] text-cyan-300/75">Live inventory</div>
             <h2 className="mt-2 text-3xl font-black uppercase md:text-5xl">In Stock Now</h2>
@@ -454,7 +471,7 @@ export default function HomePage() {
             View all products
           </Link>
         </div>
-        <div className="grid gap-6 md:grid-cols-3">
+        <div className="relative grid gap-6 md:grid-cols-3">
           {featuredCards.map((item) => (
             <div key={item.id} className="group relative overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,#0b1022,#14081d)]">
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-yellow-300" />
@@ -565,7 +582,16 @@ export default function HomePage() {
                 href={article.link}
                 target="_blank"
                 rel="noreferrer"
-                className="group flex flex-col overflow-hidden rounded-[22px] border border-white/8 bg-white/4 transition hover:border-cyan-300/25 hover:bg-white/6"
+                className={`group flex flex-col overflow-hidden rounded-[22px] border transition hover:scale-[1.01] ${
+                  idx % 2 === 0
+                    ? 'border-cyan-400/20 hover:border-cyan-300/40'
+                    : 'border-fuchsia-400/20 hover:border-fuchsia-300/40'
+                }`}
+                style={{
+                  borderLeftWidth: '3px',
+                  borderLeftColor: idx % 2 === 0 ? 'rgba(34,211,238,0.55)' : 'rgba(217,70,239,0.55)',
+                  background: 'linear-gradient(to right, rgba(255,255,255,0.05), transparent)',
+                }}
               >
                 {article.thumbnail && (
                   <div className="h-32 overflow-hidden">
@@ -578,12 +604,16 @@ export default function HomePage() {
                       {new Date(article.pubDate).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })}
                     </div>
                     {(article as any).source && (
-                      <div className="text-[9px] font-black uppercase tracking-[0.1em] text-white/20 bg-white/5 rounded-full px-2 py-0.5">
+                      <div className={`text-[9px] font-black uppercase tracking-[0.1em] rounded-full px-2 py-0.5 ${
+                        idx % 2 === 0 ? 'text-cyan-300/60 bg-cyan-400/8' : 'text-fuchsia-300/60 bg-fuchsia-400/8'
+                      }`}>
                         {(article as any).source}
                       </div>
                     )}
                   </div>
-                  <div className="text-sm font-black leading-snug text-white/85 group-hover:text-cyan-200 transition line-clamp-3">
+                  <div className={`text-sm font-black leading-snug text-white/85 transition line-clamp-3 ${
+                    idx % 2 === 0 ? 'group-hover:text-cyan-200' : 'group-hover:text-fuchsia-200'
+                  }`}>
                     {article.title}
                   </div>
                 </div>

@@ -1,6 +1,8 @@
 import { BellRing, ChevronRight, Zap, X, Copy, Check, AlertTriangle, Truck, Globe, CreditCard, Camera, Mail, Loader2, Calculator } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../lib/useAuth';
 import emailjs from '@emailjs/browser';
 import Nav from '../components/Nav';
 import Footer from '../components/Footer';
@@ -198,14 +200,14 @@ function CountdownBlock({ deadline }) {
 }
 
 // ── Modal ────────────────────────────────────────────────────────────────────
-function PreOrderModal({ item, onClose }) {
+function PreOrderModal({ item, onClose, userEmail }) {
   const dp = ((item.price ?? 0) * DP_PERCENT).toFixed(2);
   const remaining = ((item.price ?? 0) * (1 - DP_PERCENT)).toFixed(2);
   const [step, setStep] = useState(1); // 1=terms, 2=payment, 3=confirm
   const [qty, setQty] = useState(1);
   const [copied, setCopied] = useState(false);
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(userEmail ?? '');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [country, setCountry] = useState('');
@@ -345,7 +347,6 @@ function PreOrderModal({ item, onClose }) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        onClick={onClose}
         className="absolute inset-0 bg-black/80 backdrop-blur-sm"
       />
 
@@ -597,9 +598,10 @@ function PreOrderModal({ item, onClose }) {
                   required
                   type="email"
                   value={email}
-                  onChange={e => setEmail(e.target.value)}
+                  onChange={e => !userEmail && setEmail(e.target.value)}
+                  readOnly={!!userEmail}
                   placeholder="Confirmation will be sent here"
-                  className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder-white/25 outline-none focus:border-cyan-300/40"
+                  className={`w-full rounded-2xl border px-4 py-3 text-sm placeholder-white/25 outline-none ${userEmail ? 'border-white/5 bg-white/5 text-white/40 cursor-not-allowed' : 'border-white/10 bg-black/30 text-white focus:border-cyan-300/40'}`}
                 />
               </div>
 
@@ -695,6 +697,8 @@ function PreOrderModal({ item, onClose }) {
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function PreOrdersPage() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [selected, setSelected] = useState(null);
   const [showCalc, setShowCalc] = useState(false);
 
@@ -702,8 +706,28 @@ export default function PreOrdersPage() {
 
   return (
     <div className="min-h-screen bg-[#05010c] text-white">
+      {/* Anime keyframe animations */}
+      <style>{`
+        @keyframes floatCard {
+          0%, 100% { transform: translateY(0px) rotate(-6deg); }
+          50% { transform: translateY(-18px) rotate(-6deg); }
+        }
+        @keyframes glowRingPulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(232,121,249,0.55), 0 0 12px 2px rgba(232,121,249,0.25); }
+          50% { box-shadow: 0 0 0 6px rgba(232,121,249,0), 0 0 22px 6px rgba(232,121,249,0.4); }
+        }
+        @keyframes redDotPulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.4; transform: scale(1.5); }
+        }
+        @keyframes stepGlow {
+          0%, 100% { filter: drop-shadow(0 0 4px rgba(34,211,238,0.4)); }
+          50% { filter: drop-shadow(0 0 10px rgba(232,121,249,0.7)); }
+        }
+      `}</style>
+
       <AnimatePresence>
-        {selected && <PreOrderModal item={selected} onClose={() => setSelected(null)} />}
+        {selected && <PreOrderModal item={selected} onClose={() => setSelected(null)} userEmail={user?.email ?? ''} />}
       </AnimatePresence>
       <AnimatePresence>
         {showCalc && <DPCalculator onClose={() => setShowCalc(false)} />}
@@ -713,11 +737,35 @@ export default function PreOrdersPage() {
       <section className="relative overflow-hidden border-b border-fuchsia-500/20 bg-[#07030f] px-6 pb-12 pt-6">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(244,63,94,0.25),transparent_40%),radial-gradient(circle_at_left,rgba(168,85,247,0.2),transparent_40%)]" />
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:30px_30px]" />
+        {/* Goku character art */}
+        <img
+          src="/goku.png"
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute right-0 bottom-0 h-[520px] w-auto select-none"
+          style={{ opacity: 0.38, filter: 'drop-shadow(0 0 40px rgba(250,204,21,0.6)) drop-shadow(0 0 80px rgba(251,146,60,0.3))', zIndex: 0 }}
+          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+        />
         <div className="relative mx-auto max-w-7xl">
           <Nav />
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="mt-6">
-            <div className="inline-flex items-center gap-2 rounded-full border border-fuchsia-400/35 bg-fuchsia-400/12 px-4 py-2 text-xs font-black uppercase tracking-[0.24em] text-fuchsia-100">
-              <BellRing className="h-4 w-4" />
+            {/* Hero badge — pulsing glow ring when open, red dot when closed */}
+            <div
+              className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-black uppercase tracking-[0.24em] ${
+                isOpen()
+                  ? 'border-fuchsia-400/50 bg-fuchsia-400/12 text-fuchsia-100'
+                  : 'border-red-400/40 bg-red-400/10 text-red-200'
+              }`}
+              style={isOpen() ? { animation: 'glowRingPulse 2.4s ease-in-out infinite' } : undefined}
+            >
+              {isOpen() ? (
+                <BellRing className="h-4 w-4" />
+              ) : (
+                <span
+                  className="inline-block h-2 w-2 rounded-full bg-red-400"
+                  style={{ animation: 'redDotPulse 1.3s ease-in-out infinite' }}
+                />
+              )}
               {isOpen() ? 'Pre-orders Open' : 'Pre-orders Closed'}
             </div>
             <h1 className="mt-4 text-5xl font-black uppercase leading-[0.88] tracking-[-0.04em] md:text-7xl">
@@ -756,7 +804,11 @@ export default function PreOrdersPage() {
 
       {/* How it works */}
       <section className="mx-auto max-w-7xl px-6 pt-10 pb-4">
-        <div className="grid gap-3 md:grid-cols-4">
+        {/* Dashed connecting line between steps */}
+        <div className="hidden md:block relative mb-0">
+          <div className="absolute top-[2.1rem] left-[12.5%] right-[12.5%] border-t border-dashed border-cyan-400/20 z-0" />
+        </div>
+        <div className="grid gap-3 md:grid-cols-4 relative z-10">
           {[
             { n: '01', icon: BellRing, label: 'Reserve', desc: 'Pick your item & qty. Agree to terms.' },
             { n: '02', icon: CreditCard, label: 'Pay 30% DP', desc: `Send via Wise to ${WISE_HANDLE}` },
@@ -764,7 +816,10 @@ export default function PreOrdersPage() {
             { n: '04', icon: Truck, label: 'Ships on release', desc: 'Pay remaining 70% before we ship.' },
           ].map(({ n, icon: Icon, label, desc }) => (
             <div key={n} className="rounded-[22px] border border-white/8 bg-white/4 p-4 flex gap-3">
-              <div className="text-2xl font-black text-white/15 shrink-0">{n}</div>
+              <div
+                className="text-3xl font-black shrink-0 bg-gradient-to-r from-cyan-400 to-fuchsia-400 bg-clip-text text-transparent"
+                style={{ animation: 'stepGlow 3s ease-in-out infinite' }}
+              >{n}</div>
               <div>
                 <div className="flex items-center gap-1.5 mb-1">
                   <Icon className="h-3.5 w-3.5 text-fuchsia-300" />
@@ -796,8 +851,20 @@ export default function PreOrdersPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.45, delay: idx * 0.1 }}
-              className="group relative overflow-hidden rounded-[32px] border border-fuchsia-400/20 bg-[linear-gradient(180deg,#0d0520,#14081d)]"
+              className="group relative overflow-hidden rounded-[32px] border border-fuchsia-400/20 bg-[linear-gradient(180deg,#0d0520,#14081d)] transition-all duration-300 hover:border-fuchsia-400/60 hover:shadow-[0_0_30px_rgba(168,85,247,0.3)]"
             >
+              {/* Energy slash decorative element */}
+              <div
+                className="pointer-events-none absolute inset-0 z-0"
+                style={{
+                  transform: 'rotate(45deg) scaleX(2)',
+                  background: 'linear-gradient(90deg, transparent 0%, rgba(168,85,247,0.06) 50%, transparent 100%)',
+                  top: '-40%',
+                  left: '-30%',
+                  width: '60%',
+                  height: '180%',
+                }}
+              />
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-fuchsia-400 via-pink-400 to-cyan-300" />
               <div className="relative overflow-hidden">
                 <img src={item.image} alt={item.title} onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/product-fallback.svg'; }} className="h-[260px] w-full object-cover saturate-[1.3] transition duration-500 group-hover:scale-105" />
@@ -845,7 +912,7 @@ export default function PreOrdersPage() {
                   return (
                     <button
                       disabled={!canReserve}
-                      onClick={() => setSelected(item)}
+                      onClick={() => { if (!user) { navigate('/account', { state: { redirect: '/pre-orders' } }); return; } setSelected(item); }}
                       className={`mt-4 flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black uppercase tracking-[0.08em] transition ${
                         canReserve
                           ? 'bg-gradient-to-r from-fuchsia-500 via-pink-400 to-cyan-400 text-white hover:opacity-95'
@@ -863,7 +930,7 @@ export default function PreOrdersPage() {
 
         {/* Policy footer */}
         <div className="mt-10 rounded-[22px] border border-white/8 bg-white/4 p-5 text-sm text-white/45 leading-6 space-y-1">
-          <div className="font-black text-white/65 uppercase tracking-[0.12em] text-xs mb-2">Pre-order Policy</div>
+          <div className="font-black text-white/65 uppercase tracking-[0.12em] text-xs mb-2 pl-3 border-l-2 border-fuchsia-400" style={{ textShadow: '0 0 12px rgba(232,121,249,0.5)' }}>Pre-order Policy</div>
           <p>· <strong className="text-white/55">Downpayment:</strong> 30% of the total order price, sent via Wise to {WISE_HANDLE}. DP is non-refundable.</p>
           <p>· <strong className="text-white/55">Balance:</strong> Remaining 70% is collected before your order ships. We'll email you when ready.</p>
           <p>· <strong className="text-white/55">Shipping:</strong> International shipping, customs duties, and import taxes are the buyer's responsibility.</p>
