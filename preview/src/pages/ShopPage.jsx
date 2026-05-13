@@ -612,6 +612,22 @@ function NotifyMeModal({ item, onClose }) {
   );
 }
 
+// Normalize a Supabase products row to the shape the UI expects
+function normalizeDbProduct(row) {
+  return {
+    id:       row.id,
+    title:    row.title,
+    subtitle: row.subtitle ?? '',
+    language: row.language ?? 'English',
+    price:    Number(row.price) || 0,
+    badge:    row.badge ?? (row.in_stock ? 'In Stock' : 'Sold Out'),
+    inStock:  row.in_stock,
+    stock:    0, // products table has no stock column — use in_stock flag
+    image:    row.image_url ?? '/product-fallback.svg',
+    tag:      row.tag ?? 'One Piece',
+  };
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function ShopPage() {
   const { user } = useAuth();
@@ -653,21 +669,31 @@ export default function ShopPage() {
       return;
     }
 
-    supabase.from('stock').select('*').then(({ data, error }) => {
-      if (error) {
-        setStockSyncError('Inventory may not be current — check back soon.');
-        return;
-      }
-      if (!data?.length) {
+    // Try loading from the new `products` table first; fall back to `stock` overlay on hardcoded data
+    supabase.from('products').select('*').then(({ data: prodData, error: prodError }) => {
+      if (!prodError && prodData && prodData.length > 0) {
+        // Products table exists and has data — use it as source of truth
         setStockSyncError('');
+        setProducts(prodData.map(normalizeDbProduct));
         return;
       }
-      setStockSyncError('');
-      setProducts(allProducts.map(p => {
-        const row = data.find(r => r.id === p.id);
-        if (!row) return p;
-        return { ...p, inStock: row.in_stock, stock: row.quantity, badge: row.in_stock ? 'In Stock' : 'Sold Out' };
-      }));
+      // Fall back: overlay stock table onto hardcoded allProducts
+      supabase.from('stock').select('*').then(({ data, error }) => {
+        if (error) {
+          setStockSyncError('Inventory may not be current — check back soon.');
+          return;
+        }
+        if (!data?.length) {
+          setStockSyncError('');
+          return;
+        }
+        setStockSyncError('');
+        setProducts(allProducts.map(p => {
+          const row = data.find(r => r.id === p.id);
+          if (!row) return p;
+          return { ...p, inStock: row.in_stock, stock: row.quantity, badge: row.in_stock ? 'In Stock' : 'Sold Out' };
+        }));
+      });
     });
   }, []);
 

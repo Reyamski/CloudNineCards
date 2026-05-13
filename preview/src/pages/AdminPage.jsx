@@ -1,5 +1,5 @@
 import {useEffect, useRef, useState} from 'react';
-import {ShieldCheck, Save, RotateCcw, Eye, EyeOff, Youtube, Loader2, Sparkles, Upload, X, Check} from 'lucide-react';
+import {ShieldCheck, Save, RotateCcw, Eye, EyeOff, Youtube, Loader2, Sparkles, Upload, X, Check, Package} from 'lucide-react';
 import {supabase, supabaseEnabled} from '../lib/supabase';
 import heic2any from 'heic2any';
 
@@ -127,7 +127,7 @@ export default function AdminPage() {
   const [editVal, setEditVal]               = useState('');
   const BLANK_FORM = { card_name: '', set_name: '', set_code: '', card_number: '', game: 'One Piece', language: 'English', condition: 'NM', rarity: '', price: '', stock: '1', image_url: '' };
   const [addForm, setAddForm]               = useState(BLANK_FORM);
-  // ── AI image analysis state ───────────────────────────────────────────────
+  // ── AI image analysis state (singles) ────────────────────────────────────
   const [imagePreview, setImagePreview]     = useState('');
   const [analyzing, setAnalyzing]           = useState(false);
   const [analyzed, setAnalyzed]             = useState(false);
@@ -135,6 +135,48 @@ export default function AdminPage() {
   const [uploadingImg, setUploadingImg]     = useState(false);
   const [dragOver, setDragOver]             = useState(false);
   const fileInputRef                        = useRef(null);
+
+  // ── Pre-Orders state ──────────────────────────────────────────────────────
+  const [preorders, setPreorders]                   = useState([]);
+  const [preordersLoaded, setPreordersLoaded]       = useState(false);
+  const [preordersLoading, setPreordersLoading]     = useState(false);
+  const [preordersError, setPreordersError]         = useState('');
+  const [showAddPreorder, setShowAddPreorder]       = useState(false);
+  const [savingPreorder, setSavingPreorder]         = useState(false);
+  const [deletingPreorderId, setDeletingPreorderId] = useState('');
+  const [poEditCell, setPoEditCell]                 = useState({ id: '', field: '' });
+  const [poEditVal, setPoEditVal]                   = useState('');
+  const BLANK_PO = { id: '', title: '', subtitle: '', sold_out: false, price_tba: false, price: '', usd_price: '', aud_price: '', currency: 'CAD', eta: '', deadline: '', image_url: '', hype: '', notes: '', display_order: '0' };
+  const [addPoForm, setAddPoForm]                   = useState(BLANK_PO);
+  // AI state for preorders form
+  const [poImagePreview, setPoImagePreview]         = useState('');
+  const [poAnalyzing, setPoAnalyzing]               = useState(false);
+  const [poAnalyzed, setPoAnalyzed]                 = useState(false);
+  const [poAnalyzeError, setPoAnalyzeError]         = useState('');
+  const [poUploadingImg, setPoUploadingImg]         = useState(false);
+  const [poDragOver, setPoDragOver]                 = useState(false);
+  const poFileInputRef                              = useRef(null);
+
+  // ── Products (on-hand) state ──────────────────────────────────────────────
+  const [dbProducts, setDbProducts]                     = useState([]);
+  const [dbProductsLoaded, setDbProductsLoaded]         = useState(false);
+  const [dbProductsLoading, setDbProductsLoading]       = useState(false);
+  const [dbProductsError, setDbProductsError]           = useState('');
+  const [showAddProduct, setShowAddProduct]             = useState(false);
+  const [savingProduct, setSavingProduct]               = useState(false);
+  const [deletingProductId, setDeletingProductId]       = useState('');
+  const [prodEditCell, setProdEditCell]                 = useState({ id: '', field: '' });
+  const [prodEditVal, setProdEditVal]                   = useState('');
+  const BLANK_PROD = { id: '', title: '', subtitle: '', language: 'English', price: '', badge: 'In Stock', in_stock: true, image_url: '', tag: 'One Piece' };
+  const [addProdForm, setAddProdForm]                   = useState(BLANK_PROD);
+  // AI state for products form
+  const [prodImagePreview, setProdImagePreview]         = useState('');
+  const [prodAnalyzing, setProdAnalyzing]               = useState(false);
+  const [prodAnalyzed, setProdAnalyzed]                 = useState(false);
+  const [prodAnalyzeError, setProdAnalyzeError]         = useState('');
+  const [prodUploadingImg, setProdUploadingImg]         = useState(false);
+  const [prodDragOver, setProdDragOver]                 = useState(false);
+  const prodFileInputRef                                = useRef(null);
 
   function fileToBase64(file) {
     return new Promise((resolve, reject) => {
@@ -269,6 +311,226 @@ export default function AdminPage() {
     setAnalyzed(false);
     setAnalyzeError('');
     setUploadingImg(false);
+  }
+
+  // ── Generic AI analysis for a given setter bundle ────────────────────────
+  // Used by both the Pre-Orders and Products add forms.
+  // setters: { setPreview, setAnalyzing, setAnalyzed, setError, setUploading, setForm, bucket }
+  async function analyzeForForm(rawFile, setters) {
+    if (!rawFile) return;
+    const { setPreview, setAnalyzing, setAnalyzed, setError, setUploading, setForm, bucket } = setters;
+
+    const HEIC_TYPES = ['image/heic', 'image/heif', 'image/heic-sequence', 'image/heif-sequence'];
+    const heicByContent = await isHeicByMagicBytes(rawFile);
+    const isHeic = HEIC_TYPES.includes(rawFile.type) || /\.heic$/i.test(rawFile.name) || heicByContent;
+
+    let file = rawFile;
+    let serverMediaType = null;
+
+    if (isHeic) {
+      setPreview(URL.createObjectURL(rawFile));
+      setAnalyzing(true); setAnalyzed(false); setError('');
+      try {
+        let blob;
+        try { blob = await heic2any({ blob: rawFile, toType: 'image/jpeg', quality: 0.85 }); }
+        catch { blob = await heicToJpegViaCanvas(rawFile); }
+        file = new File([Array.isArray(blob) ? blob[0] : blob], rawFile.name.replace(/\.heic$/i, '.jpg'), { type: 'image/jpeg' });
+      } catch { serverMediaType = 'image/heic'; }
+    }
+
+    if (!file.type.startsWith('image/')) return;
+    const SUPPORTED = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!serverMediaType && !SUPPORTED.includes(file.type)) {
+      setError(`Unsupported format: ${file.type}`);
+      setPreview(URL.createObjectURL(file));
+      return;
+    }
+    if (file.size > 20_000_000) {
+      setError(`Image too large (${(file.size/1e6).toFixed(1)}MB). Max 20MB.`);
+      setPreview(URL.createObjectURL(file));
+      return;
+    }
+
+    if (!isHeic) setPreview(URL.createObjectURL(file));
+    setAnalyzing(true); setAnalyzed(false); setError('');
+
+    try {
+      const base64 = await fileToBase64(file);
+      const res = await fetch('/api/analyze-card', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: base64, mediaType: serverMediaType ?? file.type }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.detail != null ? `${result.error}: ${result.detail}` : result.error || 'Analysis failed');
+      // For preorders/products we only use the title hint from AI
+      setForm(f => ({
+        ...f,
+        title: f.title || result.card_name || f.title,
+      }));
+      setAnalyzed(true);
+    } catch (err) {
+      setError(err.message || 'Analysis failed — fill fields manually.');
+    }
+
+    if (supabaseEnabled && supabase) {
+      setUploading(true);
+      const filename = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
+      const { error: uploadErr } = await supabase.storage.from(bucket).upload(filename, file, { contentType: file.type });
+      if (!uploadErr) {
+        const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(filename);
+        setForm(f => ({ ...f, image_url: publicUrl }));
+      }
+      setUploading(false);
+    }
+
+    setAnalyzing(false);
+  }
+
+  // ── Pre-Orders CRUD ───────────────────────────────────────────────────────
+  async function loadPreorders() {
+    if (!supabaseEnabled || !supabase) { setPreordersError('Supabase not configured.'); return; }
+    setPreordersLoading(true);
+    const { data, error } = await supabase.from('preorders').select('*').order('display_order', { ascending: true });
+    if (error) setPreordersError(`Load failed: ${error.message}`);
+    else { setPreorders(data ?? []); setPreordersError(''); }
+    setPreordersLoading(false);
+    setPreordersLoaded(true);
+  }
+
+  async function addPreorder(e) {
+    e.preventDefault();
+    if (!supabaseEnabled || !supabase) return;
+    setSavingPreorder(true);
+    const notesArr = addPoForm.notes
+      ? addPoForm.notes.split('\n').map(n => n.trim()).filter(Boolean)
+      : [];
+    const payload = {
+      id:            addPoForm.id.trim() || `po-${Date.now()}`,
+      title:         addPoForm.title.trim(),
+      subtitle:      addPoForm.subtitle.trim() || null,
+      sold_out:      addPoForm.sold_out,
+      price_tba:     addPoForm.price_tba,
+      price:         parseFloat(addPoForm.price) || null,
+      usd_price:     parseFloat(addPoForm.usd_price) || null,
+      aud_price:     parseFloat(addPoForm.aud_price) || null,
+      currency:      addPoForm.currency || 'CAD',
+      eta:           addPoForm.eta.trim() || null,
+      deadline:      addPoForm.deadline || null,
+      image_url:     addPoForm.image_url.trim() || null,
+      hype:          addPoForm.hype.trim() || null,
+      notes:         notesArr.length ? notesArr : null,
+      display_order: parseInt(addPoForm.display_order, 10) || 0,
+    };
+    const { data, error } = await supabase.from('preorders').insert(payload).select().single();
+    if (error) { setPreordersError(`Add failed: ${error.message}`); }
+    else {
+      setPreorders(prev => [...prev, data].sort((a, b) => a.display_order - b.display_order));
+      setAddPoForm(BLANK_PO);
+      setShowAddPreorder(false);
+      setPreordersError('');
+      setPoImagePreview(''); setPoAnalyzed(false); setPoAnalyzeError('');
+    }
+    setSavingPreorder(false);
+  }
+
+  async function updatePreorder(id, field, value) {
+    if (!supabaseEnabled || !supabase) return;
+    let parsed = value;
+    if (field === 'price' || field === 'usd_price' || field === 'aud_price') parsed = parseFloat(value) || null;
+    if (field === 'display_order') parsed = parseInt(value, 10) || 0;
+    const { error } = await supabase.from('preorders').update({ [field]: parsed }).eq('id', id);
+    if (error) setPreordersError(`Update failed: ${error.message}`);
+    else {
+      setPreorders(prev => prev.map(p => p.id === id ? { ...p, [field]: parsed } : p));
+      setPreordersError('');
+    }
+    setPoEditCell({ id: '', field: '' }); setPoEditVal('');
+  }
+
+  async function togglePreorderSoldOut(id, current) {
+    if (!supabaseEnabled || !supabase) return;
+    const { error } = await supabase.from('preorders').update({ sold_out: !current }).eq('id', id);
+    if (error) setPreordersError(`Update failed: ${error.message}`);
+    else setPreorders(prev => prev.map(p => p.id === id ? { ...p, sold_out: !current } : p));
+  }
+
+  async function deletePreorder(id) {
+    if (!supabaseEnabled || !supabase) return;
+    setDeletingPreorderId(id);
+    const { error } = await supabase.from('preorders').delete().eq('id', id);
+    if (error) setPreordersError(`Delete failed: ${error.message}`);
+    else { setPreorders(prev => prev.filter(p => p.id !== id)); setPreordersError(''); }
+    setDeletingPreorderId('');
+  }
+
+  // ── Products CRUD ─────────────────────────────────────────────────────────
+  async function loadDbProducts() {
+    if (!supabaseEnabled || !supabase) { setDbProductsError('Supabase not configured.'); return; }
+    setDbProductsLoading(true);
+    const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: true });
+    if (error) setDbProductsError(`Load failed: ${error.message}`);
+    else { setDbProducts(data ?? []); setDbProductsError(''); }
+    setDbProductsLoading(false);
+    setDbProductsLoaded(true);
+  }
+
+  async function addDbProduct(e) {
+    e.preventDefault();
+    if (!supabaseEnabled || !supabase) return;
+    setSavingProduct(true);
+    const payload = {
+      id:        addProdForm.id.trim() || `prod-${Date.now()}`,
+      title:     addProdForm.title.trim(),
+      subtitle:  addProdForm.subtitle.trim() || null,
+      language:  addProdForm.language || 'English',
+      price:     parseFloat(addProdForm.price) || 0,
+      badge:     addProdForm.in_stock ? 'In Stock' : 'Sold Out',
+      in_stock:  addProdForm.in_stock,
+      image_url: addProdForm.image_url.trim() || null,
+      tag:       addProdForm.tag || 'One Piece',
+    };
+    const { data, error } = await supabase.from('products').insert(payload).select().single();
+    if (error) { setDbProductsError(`Add failed: ${error.message}`); }
+    else {
+      setDbProducts(prev => [...prev, data]);
+      setAddProdForm(BLANK_PROD);
+      setShowAddProduct(false);
+      setDbProductsError('');
+      setProdImagePreview(''); setProdAnalyzed(false); setProdAnalyzeError('');
+    }
+    setSavingProduct(false);
+  }
+
+  async function updateDbProduct(id, field, value) {
+    if (!supabaseEnabled || !supabase) return;
+    let parsed = value;
+    if (field === 'price') parsed = parseFloat(value) || 0;
+    const extra = field === 'in_stock' ? { badge: value ? 'In Stock' : 'Sold Out' } : {};
+    const { error } = await supabase.from('products').update({ [field]: parsed, ...extra }).eq('id', id);
+    if (error) setDbProductsError(`Update failed: ${error.message}`);
+    else {
+      setDbProducts(prev => prev.map(p => p.id === id ? { ...p, [field]: parsed, ...extra } : p));
+      setDbProductsError('');
+    }
+    setProdEditCell({ id: '', field: '' }); setProdEditVal('');
+  }
+
+  async function toggleProductInStock(id, current) {
+    if (!supabaseEnabled || !supabase) return;
+    const next = !current;
+    const { error } = await supabase.from('products').update({ in_stock: next, badge: next ? 'In Stock' : 'Sold Out' }).eq('id', id);
+    if (error) setDbProductsError(`Update failed: ${error.message}`);
+    else setDbProducts(prev => prev.map(p => p.id === id ? { ...p, in_stock: next, badge: next ? 'In Stock' : 'Sold Out' } : p));
+  }
+
+  async function deleteDbProduct(id) {
+    if (!supabaseEnabled || !supabase) return;
+    setDeletingProductId(id);
+    const { error } = await supabase.from('products').delete().eq('id', id);
+    if (error) setDbProductsError(`Delete failed: ${error.message}`);
+    else { setDbProducts(prev => prev.filter(p => p.id !== id)); setDbProductsError(''); }
+    setDeletingProductId('');
   }
 
   useEffect(() => {
@@ -816,6 +1078,22 @@ export default function AdminPage() {
             >
               Singles
             </button>
+            <button
+              onClick={() => { setActiveTab('preorders'); if (!preordersLoaded) loadPreorders(); }}
+              className={`rounded-2xl px-4 py-2.5 text-sm font-black uppercase tracking-[0.08em] transition ${
+                activeTab === 'preorders' ? 'bg-gradient-to-r from-pink-400 via-fuchsia-400 to-rose-400 text-black' : 'border border-white/15 bg-white/5 text-white/70 hover:bg-white/10'
+              }`}
+            >
+              Pre-Orders
+            </button>
+            <button
+              onClick={() => { setActiveTab('products'); if (!dbProductsLoaded) loadDbProducts(); }}
+              className={`rounded-2xl px-4 py-2.5 text-sm font-black uppercase tracking-[0.08em] transition ${
+                activeTab === 'products' ? 'bg-gradient-to-r from-cyan-300 via-sky-300 to-emerald-400 text-black' : 'border border-white/15 bg-white/5 text-white/70 hover:bg-white/10'
+              }`}
+            >
+              Products
+            </button>
           </div>
         </div>
 
@@ -1331,6 +1609,453 @@ export default function AdminPage() {
               </div>
             )}
             <p className="mt-3 text-xs text-white/25">Click price or stock to edit inline. Press Enter to save, Escape to cancel.</p>
+          </div>
+        ) : null}
+
+        {/* ── Pre-Orders tab ───────────────────────────────────────────────── */}
+        {activeTab === 'preorders' ? (
+          <div>
+            {preordersError ? <div className="mb-4 rounded-2xl border border-red-400/25 bg-red-400/10 px-4 py-3 text-sm text-red-200">{preordersError}</div> : null}
+
+            <div className="mb-5 flex items-center justify-between gap-4">
+              <div>
+                <div className="text-xs font-black uppercase tracking-[0.2em] text-pink-300/70">Pre-Orders</div>
+                <div className="mt-0.5 text-2xl font-black">{preorders.length} item{preorders.length !== 1 ? 's' : ''}</div>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => loadPreorders()} disabled={preordersLoading}
+                  className="rounded-2xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-black uppercase text-white/70 hover:bg-white/10 disabled:opacity-40">
+                  {preordersLoading ? 'Loading…' : 'Refresh'}
+                </button>
+                <button onClick={() => { setShowAddPreorder(v => !v); setAddPoForm(BLANK_PO); setPoImagePreview(''); setPoAnalyzed(false); setPoAnalyzeError(''); }}
+                  className="rounded-2xl bg-gradient-to-r from-pink-400 via-fuchsia-400 to-rose-400 px-5 py-2.5 text-sm font-black uppercase text-black transition hover:opacity-90">
+                  {showAddPreorder ? 'Cancel' : '+ Add Preorder'}
+                </button>
+              </div>
+            </div>
+
+            {/* Add Pre-Order form */}
+            {showAddPreorder && (
+              <form onSubmit={addPreorder} className="mb-6 rounded-[24px] border border-pink-400/25 bg-pink-400/8 p-5">
+                <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-pink-300 mb-4">
+                  <Sparkles className="h-3.5 w-3.5" /> New Pre-Order
+                </div>
+
+                {/* Image drop zone */}
+                <input ref={poFileInputRef} type="file" accept="image/*,.heic,.heif" className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) analyzeForForm(f, { setPreview: setPoImagePreview, setAnalyzing: setPoAnalyzing, setAnalyzed: setPoAnalyzed, setError: setPoAnalyzeError, setUploading: setPoUploadingImg, setForm: setAddPoForm, bucket: 'preorders' }); e.target.value = ''; }} />
+
+                {poImagePreview ? (
+                  <div className="mb-4 flex gap-4 items-start">
+                    <div className="relative shrink-0">
+                      <img src={poImagePreview} alt="Preview" className="h-32 w-24 rounded-xl object-contain bg-black/40 border border-white/10" />
+                      <button type="button" onClick={() => { setPoImagePreview(''); setPoAnalyzed(false); setPoAnalyzeError(''); setAddPoForm(f => ({ ...f, image_url: '' })); }}
+                        className="absolute -top-2 -right-2 rounded-full border border-white/20 bg-black/80 p-0.5 hover:bg-white/20">
+                        <X className="h-3 w-3 text-white/60" />
+                      </button>
+                    </div>
+                    <div className="flex-1">
+                      {poAnalyzing ? <div className="flex items-center gap-2 text-sm text-pink-300"><Loader2 className="h-4 w-4 animate-spin" /> Analyzing…</div>
+                        : poAnalyzed ? <div className="flex items-center gap-2 text-sm text-emerald-300"><Check className="h-4 w-4" /> AI filled title — review below.</div>
+                        : poAnalyzeError ? <div className="text-sm text-red-300">{poAnalyzeError}</div> : null}
+                      {poUploadingImg && <div className="mt-1 flex items-center gap-2 text-xs text-white/40"><Loader2 className="h-3 w-3 animate-spin" /> Uploading…</div>}
+                      {addPoForm.image_url && !poUploadingImg && <div className="mt-1 text-xs text-emerald-400/70">Image uploaded</div>}
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    className={`mb-4 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed py-6 transition ${poDragOver ? 'border-pink-400/60 bg-pink-400/10' : 'border-white/15 bg-white/3 hover:border-pink-400/40 hover:bg-pink-400/6'}`}
+                    onClick={() => poFileInputRef.current?.click()}
+                    onDragOver={e => { e.preventDefault(); setPoDragOver(true); }}
+                    onDragLeave={() => setPoDragOver(false)}
+                    onDrop={e => { e.preventDefault(); setPoDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) analyzeForForm(f, { setPreview: setPoImagePreview, setAnalyzing: setPoAnalyzing, setAnalyzed: setPoAnalyzed, setError: setPoAnalyzeError, setUploading: setPoUploadingImg, setForm: setAddPoForm, bucket: 'preorders' }); }}
+                  >
+                    <Upload className="h-6 w-6 text-pink-300/50" />
+                    <div className="text-sm font-black uppercase tracking-[0.14em] text-white/50">Drop product image or click to upload</div>
+                  </div>
+                )}
+
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <div>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">ID (leave blank to auto-generate)</label>
+                    <input value={addPoForm.id} onChange={e => setAddPoForm(f => ({ ...f, id: e.target.value }))}
+                      placeholder="op17jp" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
+                  </div>
+                  <div className="lg:col-span-2">
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Title *</label>
+                    <input required value={addPoForm.title} onChange={e => setAddPoForm(f => ({ ...f, title: e.target.value }))}
+                      placeholder="One Piece Card Game OP-17 Booster Box [Japanese]"
+                      className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Subtitle</label>
+                    <input value={addPoForm.subtitle} onChange={e => setAddPoForm(f => ({ ...f, subtitle: e.target.value }))}
+                      placeholder="4th Anniversary Set" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Hype badge</label>
+                    <input value={addPoForm.hype} onChange={e => setAddPoForm(f => ({ ...f, hype: e.target.value }))}
+                      placeholder="Limited Allocation" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">ETA</label>
+                    <input value={addPoForm.eta} onChange={e => setAddPoForm(f => ({ ...f, eta: e.target.value }))}
+                      placeholder="Est. Aug 31, 2026" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Deadline (datetime-local)</label>
+                    <input type="datetime-local" value={addPoForm.deadline} onChange={e => setAddPoForm(f => ({ ...f, deadline: e.target.value }))}
+                      className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-pink-400/40" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Price (CAD)</label>
+                    <input type="number" step="0.01" min="0" value={addPoForm.price} onChange={e => setAddPoForm(f => ({ ...f, price: e.target.value }))}
+                      placeholder="93.00" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">USD Price</label>
+                    <input type="number" step="0.01" min="0" value={addPoForm.usd_price} onChange={e => setAddPoForm(f => ({ ...f, usd_price: e.target.value }))}
+                      placeholder="68.00" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">AUD Price</label>
+                    <input type="number" step="0.01" min="0" value={addPoForm.aud_price} onChange={e => setAddPoForm(f => ({ ...f, aud_price: e.target.value }))}
+                      placeholder="96.00" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Display order</label>
+                    <input type="number" min="0" value={addPoForm.display_order} onChange={e => setAddPoForm(f => ({ ...f, display_order: e.target.value }))}
+                      placeholder="0" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Image URL</label>
+                    <input value={addPoForm.image_url} onChange={e => setAddPoForm(f => ({ ...f, image_url: e.target.value }))}
+                      placeholder="Auto-filled after upload"
+                      className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
+                  </div>
+                  <div className="flex items-center gap-4 pt-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={addPoForm.sold_out} onChange={e => setAddPoForm(f => ({ ...f, sold_out: e.target.checked }))} className="h-4 w-4 accent-pink-400" />
+                      <span className="text-xs font-black uppercase tracking-[0.12em] text-white/60">Sold Out</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={addPoForm.price_tba} onChange={e => setAddPoForm(f => ({ ...f, price_tba: e.target.checked }))} className="h-4 w-4 accent-pink-400" />
+                      <span className="text-xs font-black uppercase tracking-[0.12em] text-white/60">Price TBA</span>
+                    </label>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Notes (one per line)</label>
+                    <textarea rows={3} value={addPoForm.notes} onChange={e => setAddPoForm(f => ({ ...f, notes: e.target.value }))}
+                      placeholder="Pre-orders are not guaranteed...&#10;Buyer shoulders shipping fees..."
+                      className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40 resize-none" />
+                  </div>
+                </div>
+                <button type="submit" disabled={savingPreorder || poAnalyzing}
+                  className="mt-4 rounded-2xl bg-gradient-to-r from-pink-400 via-fuchsia-400 to-rose-400 px-6 py-2.5 text-sm font-black uppercase text-black disabled:opacity-60">
+                  {savingPreorder ? 'Saving…' : 'Add Pre-Order'}
+                </button>
+              </form>
+            )}
+
+            {/* Pre-orders table */}
+            {preordersLoading ? (
+              <div className="py-16 text-center text-white/40 text-sm">Loading pre-orders…</div>
+            ) : preorders.length === 0 ? (
+              <div className="py-16 text-center">
+                <div className="text-4xl mb-3">📦</div>
+                <div className="text-lg font-black uppercase text-white/60">No pre-orders yet</div>
+                <p className="mt-1 text-sm text-white/35">Run the SQL migration, then add your first pre-order above.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-[20px] border border-white/10">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-white/10 bg-white/5 text-left">
+                      {['Title', 'ETA', 'Price', 'Deadline', 'Status', 'Order', 'Actions'].map(h => (
+                        <th key={h} className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.16em] text-white/40">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {preorders.map(po => (
+                      <tr key={po.id} className="border-b border-white/5 hover:bg-white/3 transition">
+                        <td className="px-4 py-3 max-w-[200px]">
+                          <div className="truncate font-black text-white">{po.title}</div>
+                          {po.subtitle && <div className="text-[10px] text-white/35 truncate">{po.subtitle}</div>}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-white/55">{po.eta ?? '—'}</td>
+
+                        {/* Inline-editable price */}
+                        <td className="px-4 py-3">
+                          {poEditCell.id === po.id && poEditCell.field === 'price' ? (
+                            <input type="number" step="0.01" min="0" autoFocus value={poEditVal}
+                              onChange={e => setPoEditVal(e.target.value)}
+                              onBlur={() => updatePreorder(po.id, 'price', poEditVal)}
+                              onKeyDown={e => { if (e.key === 'Enter') updatePreorder(po.id, 'price', poEditVal); if (e.key === 'Escape') { setPoEditCell({id:'',field:''}); setPoEditVal(''); } }}
+                              className="w-20 rounded-lg border border-pink-400/40 bg-black/40 px-2 py-1 text-sm text-white outline-none" />
+                          ) : (
+                            <button onClick={() => { setPoEditCell({id: po.id, field: 'price'}); setPoEditVal(String(po.price ?? '')); }}
+                              className="text-cyan-300 font-black hover:text-cyan-200 text-sm">
+                              {po.price_tba ? 'TBA' : po.price != null ? `$${Number(po.price).toFixed(2)}` : '—'}
+                            </button>
+                          )}
+                        </td>
+
+                        {/* Inline-editable deadline */}
+                        <td className="px-4 py-3 text-xs text-white/50">
+                          {poEditCell.id === po.id && poEditCell.field === 'deadline' ? (
+                            <input type="datetime-local" autoFocus value={poEditVal}
+                              onChange={e => setPoEditVal(e.target.value)}
+                              onBlur={() => updatePreorder(po.id, 'deadline', poEditVal || null)}
+                              onKeyDown={e => { if (e.key === 'Enter') updatePreorder(po.id, 'deadline', poEditVal || null); if (e.key === 'Escape') { setPoEditCell({id:'',field:''}); setPoEditVal(''); } }}
+                              className="rounded-lg border border-pink-400/40 bg-black/40 px-2 py-1 text-xs text-white outline-none" />
+                          ) : (
+                            <button onClick={() => { setPoEditCell({id: po.id, field: 'deadline'}); setPoEditVal(po.deadline ? new Date(po.deadline).toISOString().slice(0,16) : ''); }}
+                              className="hover:text-white/80 transition text-left">
+                              {po.deadline ? new Date(po.deadline).toLocaleDateString() : '—'}
+                            </button>
+                          )}
+                        </td>
+
+                        {/* Sold-out toggle */}
+                        <td className="px-4 py-3">
+                          <button onClick={() => togglePreorderSoldOut(po.id, po.sold_out)}
+                            className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] transition ${
+                              po.sold_out
+                                ? 'border-red-400/30 bg-red-400/10 text-red-300 hover:bg-red-400/20'
+                                : 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300 hover:bg-emerald-400/20'
+                            }`}>
+                            {po.sold_out ? 'Sold Out' : 'Open'}
+                          </button>
+                        </td>
+
+                        {/* Inline-editable display order */}
+                        <td className="px-4 py-3">
+                          {poEditCell.id === po.id && poEditCell.field === 'display_order' ? (
+                            <input type="number" min="0" autoFocus value={poEditVal}
+                              onChange={e => setPoEditVal(e.target.value)}
+                              onBlur={() => updatePreorder(po.id, 'display_order', poEditVal)}
+                              onKeyDown={e => { if (e.key === 'Enter') updatePreorder(po.id, 'display_order', poEditVal); if (e.key === 'Escape') { setPoEditCell({id:'',field:''}); setPoEditVal(''); } }}
+                              className="w-14 rounded-lg border border-pink-400/40 bg-black/40 px-2 py-1 text-sm text-white outline-none" />
+                          ) : (
+                            <button onClick={() => { setPoEditCell({id: po.id, field: 'display_order'}); setPoEditVal(String(po.display_order)); }}
+                              className="text-white/50 font-black hover:text-white/80 text-sm">
+                              #{po.display_order}
+                            </button>
+                          )}
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <button onClick={() => { if (window.confirm(`Delete "${po.title}"?`)) deletePreorder(po.id); }}
+                            disabled={deletingPreorderId === po.id}
+                            className="rounded-lg border border-red-400/25 bg-red-400/8 px-2.5 py-1 text-[10px] font-black uppercase text-red-300 hover:bg-red-400/15 disabled:opacity-40 transition">
+                            {deletingPreorderId === po.id ? '…' : 'Delete'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <p className="mt-3 text-xs text-white/25">Click price, deadline, or order # to edit inline. Click status badge to toggle sold-out.</p>
+          </div>
+        ) : null}
+
+        {/* ── Products (on-hand) tab ────────────────────────────────────────── */}
+        {activeTab === 'products' ? (
+          <div>
+            {dbProductsError ? <div className="mb-4 rounded-2xl border border-red-400/25 bg-red-400/10 px-4 py-3 text-sm text-red-200">{dbProductsError}</div> : null}
+
+            <div className="mb-5 flex items-center justify-between gap-4">
+              <div>
+                <div className="text-xs font-black uppercase tracking-[0.2em] text-emerald-300/70">Products (On-Hand)</div>
+                <div className="mt-0.5 text-2xl font-black">{dbProducts.length} product{dbProducts.length !== 1 ? 's' : ''}</div>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => loadDbProducts()} disabled={dbProductsLoading}
+                  className="rounded-2xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-black uppercase text-white/70 hover:bg-white/10 disabled:opacity-40">
+                  {dbProductsLoading ? 'Loading…' : 'Refresh'}
+                </button>
+                <button onClick={() => { setShowAddProduct(v => !v); setAddProdForm(BLANK_PROD); setProdImagePreview(''); setProdAnalyzed(false); setProdAnalyzeError(''); }}
+                  className="rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-emerald-400 px-5 py-2.5 text-sm font-black uppercase text-black transition hover:opacity-90">
+                  {showAddProduct ? 'Cancel' : '+ Add Product'}
+                </button>
+              </div>
+            </div>
+
+            {/* Add Product form */}
+            {showAddProduct && (
+              <form onSubmit={addDbProduct} className="mb-6 rounded-[24px] border border-cyan-400/25 bg-cyan-400/8 p-5">
+                <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-cyan-300 mb-4">
+                  <Package className="h-3.5 w-3.5" /> New Product — AI Reader
+                </div>
+
+                <input ref={prodFileInputRef} type="file" accept="image/*,.heic,.heif" className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) analyzeForForm(f, { setPreview: setProdImagePreview, setAnalyzing: setProdAnalyzing, setAnalyzed: setProdAnalyzed, setError: setProdAnalyzeError, setUploading: setProdUploadingImg, setForm: setAddProdForm, bucket: 'products' }); e.target.value = ''; }} />
+
+                {prodImagePreview ? (
+                  <div className="mb-4 flex gap-4 items-start">
+                    <div className="relative shrink-0">
+                      <img src={prodImagePreview} alt="Preview" className="h-32 w-24 rounded-xl object-contain bg-black/40 border border-white/10" />
+                      <button type="button" onClick={() => { setProdImagePreview(''); setProdAnalyzed(false); setProdAnalyzeError(''); setAddProdForm(f => ({ ...f, image_url: '' })); }}
+                        className="absolute -top-2 -right-2 rounded-full border border-white/20 bg-black/80 p-0.5 hover:bg-white/20">
+                        <X className="h-3 w-3 text-white/60" />
+                      </button>
+                    </div>
+                    <div className="flex-1">
+                      {prodAnalyzing ? <div className="flex items-center gap-2 text-sm text-cyan-300"><Loader2 className="h-4 w-4 animate-spin" /> Analyzing…</div>
+                        : prodAnalyzed ? <div className="flex items-center gap-2 text-sm text-emerald-300"><Check className="h-4 w-4" /> AI filled title — review below.</div>
+                        : prodAnalyzeError ? <div className="text-sm text-red-300">{prodAnalyzeError}</div> : null}
+                      {prodUploadingImg && <div className="mt-1 flex items-center gap-2 text-xs text-white/40"><Loader2 className="h-3 w-3 animate-spin" /> Uploading…</div>}
+                      {addProdForm.image_url && !prodUploadingImg && <div className="mt-1 text-xs text-emerald-400/70">Image uploaded</div>}
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    className={`mb-4 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed py-6 transition ${prodDragOver ? 'border-cyan-400/60 bg-cyan-400/10' : 'border-white/15 bg-white/3 hover:border-cyan-400/40 hover:bg-cyan-400/6'}`}
+                    onClick={() => prodFileInputRef.current?.click()}
+                    onDragOver={e => { e.preventDefault(); setProdDragOver(true); }}
+                    onDragLeave={() => setProdDragOver(false)}
+                    onDrop={e => { e.preventDefault(); setProdDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) analyzeForForm(f, { setPreview: setProdImagePreview, setAnalyzing: setProdAnalyzing, setAnalyzed: setProdAnalyzed, setError: setProdAnalyzeError, setUploading: setProdUploadingImg, setForm: setAddProdForm, bucket: 'products' }); }}
+                  >
+                    <Upload className="h-6 w-6 text-cyan-300/50" />
+                    <div className="text-sm font-black uppercase tracking-[0.14em] text-white/50">Drop product image or click to upload</div>
+                    <div className="flex items-center gap-1.5 text-xs text-cyan-300/60">
+                      <Sparkles className="h-3 w-3" /> AI will read product name
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <div>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">ID (leave blank to auto-generate)</label>
+                    <input value={addProdForm.id} onChange={e => setAddProdForm(f => ({ ...f, id: e.target.value }))}
+                      placeholder="op15jp" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-cyan-400/40" />
+                  </div>
+                  <div className="lg:col-span-2">
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Title *</label>
+                    <input required value={addProdForm.title} onChange={e => setAddProdForm(f => ({ ...f, title: e.target.value }))}
+                      placeholder="One Piece Card Game OP-15 Booster Box"
+                      className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-cyan-400/40" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Subtitle</label>
+                    <input value={addProdForm.subtitle} onChange={e => setAddProdForm(f => ({ ...f, subtitle: e.target.value }))}
+                      placeholder="Japanese" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-cyan-400/40" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Language</label>
+                    <select value={addProdForm.language} onChange={e => setAddProdForm(f => ({ ...f, language: e.target.value }))}
+                      className="w-full rounded-xl border border-white/10 bg-white px-3 py-2 text-sm text-black outline-none">
+                      {['English', 'Japanese', 'Asian English', 'N/A'].map(l => <option key={l}>{l}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Tag</label>
+                    <select value={addProdForm.tag} onChange={e => setAddProdForm(f => ({ ...f, tag: e.target.value }))}
+                      className="w-full rounded-xl border border-white/10 bg-white px-3 py-2 text-sm text-black outline-none">
+                      {['One Piece', 'Pokemon', 'Dragon Ball', 'Yu-Gi-Oh!', 'Accessories'].map(t => <option key={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/30">Price (CAD) *</label>
+                    <input type="number" step="0.01" min="0" required value={addProdForm.price}
+                      onChange={e => setAddProdForm(f => ({ ...f, price: e.target.value }))}
+                      placeholder="129.00"
+                      className="w-full rounded-xl border border-yellow-400/30 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-yellow-400/50" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Image URL</label>
+                    <input value={addProdForm.image_url} onChange={e => setAddProdForm(f => ({ ...f, image_url: e.target.value }))}
+                      placeholder="Auto-filled after upload"
+                      className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-cyan-400/40" />
+                  </div>
+                  <div className="flex items-center gap-2 pt-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={addProdForm.in_stock} onChange={e => setAddProdForm(f => ({ ...f, in_stock: e.target.checked }))} className="h-4 w-4 accent-cyan-400" />
+                      <span className="text-xs font-black uppercase tracking-[0.12em] text-white/60">In Stock</span>
+                    </label>
+                  </div>
+                </div>
+                <button type="submit" disabled={savingProduct || prodAnalyzing}
+                  className="mt-4 rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-emerald-400 px-6 py-2.5 text-sm font-black uppercase text-black disabled:opacity-60">
+                  {savingProduct ? 'Saving…' : 'Add Product'}
+                </button>
+              </form>
+            )}
+
+            {/* Products table */}
+            {dbProductsLoading ? (
+              <div className="py-16 text-center text-white/40 text-sm">Loading products…</div>
+            ) : dbProducts.length === 0 ? (
+              <div className="py-16 text-center">
+                <div className="text-4xl mb-3">📦</div>
+                <div className="text-lg font-black uppercase text-white/60">No products yet</div>
+                <p className="mt-1 text-sm text-white/35">Run the SQL migration and seed script, then manage products here.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-[20px] border border-white/10">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-white/10 bg-white/5 text-left">
+                      {['Product', 'Language', 'Tag', 'Price', 'Status', 'Actions'].map(h => (
+                        <th key={h} className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.16em] text-white/40">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dbProducts.map(prod => (
+                      <tr key={prod.id} className="border-b border-white/5 hover:bg-white/3 transition">
+                        <td className="px-4 py-3 max-w-[220px]">
+                          <div className="truncate font-black text-white">{prod.title}</div>
+                          {prod.subtitle && <div className="text-[10px] text-white/35 truncate">{prod.subtitle}</div>}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-white/55">{prod.language === 'Japanese' ? '🇯🇵 JP' : prod.language === 'English' ? '🇺🇸 EN' : prod.language ?? '—'}</td>
+                        <td className="px-4 py-3 text-xs text-white/50">{prod.tag ?? '—'}</td>
+
+                        {/* Inline-editable price */}
+                        <td className="px-4 py-3">
+                          {prodEditCell.id === prod.id && prodEditCell.field === 'price' ? (
+                            <input type="number" step="0.01" min="0" autoFocus value={prodEditVal}
+                              onChange={e => setProdEditVal(e.target.value)}
+                              onBlur={() => updateDbProduct(prod.id, 'price', prodEditVal)}
+                              onKeyDown={e => { if (e.key === 'Enter') updateDbProduct(prod.id, 'price', prodEditVal); if (e.key === 'Escape') { setProdEditCell({id:'',field:''}); setProdEditVal(''); } }}
+                              className="w-20 rounded-lg border border-cyan-400/40 bg-black/40 px-2 py-1 text-sm text-white outline-none" />
+                          ) : (
+                            <button onClick={() => { setProdEditCell({id: prod.id, field: 'price'}); setProdEditVal(String(prod.price)); }}
+                              className="text-cyan-300 font-black hover:text-cyan-200 text-sm">
+                              ${Number(prod.price).toFixed(2)}
+                            </button>
+                          )}
+                        </td>
+
+                        {/* In-stock toggle */}
+                        <td className="px-4 py-3">
+                          <button onClick={() => toggleProductInStock(prod.id, prod.in_stock)}
+                            className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] transition ${
+                              prod.in_stock
+                                ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300 hover:bg-red-400/10 hover:border-red-400/30 hover:text-red-300'
+                                : 'border-red-400/30 bg-red-400/10 text-red-300 hover:bg-emerald-400/10 hover:border-emerald-400/30 hover:text-emerald-300'
+                            }`}>
+                            {prod.in_stock ? 'In Stock' : 'Sold Out'}
+                          </button>
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <button onClick={() => { if (window.confirm(`Delete "${prod.title}"?`)) deleteDbProduct(prod.id); }}
+                            disabled={deletingProductId === prod.id}
+                            className="rounded-lg border border-red-400/25 bg-red-400/8 px-2.5 py-1 text-[10px] font-black uppercase text-red-300 hover:bg-red-400/15 disabled:opacity-40 transition">
+                            {deletingProductId === prod.id ? '…' : 'Delete'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <p className="mt-3 text-xs text-white/25">Click price to edit inline. Click status badge to toggle in-stock. Press Enter to save, Escape to cancel.</p>
           </div>
         ) : null}
 
