@@ -332,6 +332,7 @@ function PreOrderModal({ item, onClose, userEmail }) {
           const { error: dbErr } = await supabase.from('orders').insert({
             order_number:     orderNumber,
             order_type:       'pre_order',
+            total_price:      grandTotal,
             buyer_email:      email.trim().toLowerCase(),
             buyer_name:       name,
             buyer_phone:      phone,
@@ -339,9 +340,11 @@ function PreOrderModal({ item, onClose, userEmail }) {
             delivery_country: country,
             item_title:       item.title,
             quantity:         qty,
-            full_price:       `CAD $${totalPrice}`,
-            dp_amount:        `CAD $${totalDp}`,
-            balance_due:      `CAD $${totalRemaining}`,
+            full_price:       grandTotal,
+            dp_amount:        grandTotal * DP_PERCENT,
+            balance_due:      grandTotal * (1 - DP_PERCENT),
+            delivery_fee:     shippingFee,
+            tax_amount:       taxAmount,
             eta:              item.eta,
             payment_status:   'awaiting_payment',
           });
@@ -851,6 +854,21 @@ export default function PreOrdersPage() {
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Cancellation / DP policy — prominent callout */}
+      <section className="mx-auto max-w-7xl px-6 pt-6 pb-2">
+        <div className="rounded-[22px] border border-red-400/35 bg-red-400/8 px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex items-center gap-2 shrink-0">
+            <AlertTriangle className="h-5 w-5 text-red-400" />
+            <span className="text-xs font-black uppercase tracking-[0.18em] text-red-300">DP Policy</span>
+          </div>
+          <p className="text-xs text-white/65 leading-5">
+            <strong className="text-red-300">30% downpayment is non-refundable</strong> once received. Balance (70%) is due before shipment.
+            Allocation is not guaranteed — if a publisher cuts your set, we issue a <strong className="text-white/80">full refund</strong> including DP.
+            Pre-orders cannot be cancelled after DP is paid unless publisher allocation is cut.
+          </p>
         </div>
       </section>
 

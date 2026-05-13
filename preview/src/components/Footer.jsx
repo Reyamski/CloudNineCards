@@ -53,6 +53,7 @@ export default function Footer() {
             <div className="flex flex-col gap-2.5">
               <div className="text-[10px] text-white/25 mb-1">Account</div>
               <Link to="/account" className="transition hover:text-cyan-300">My Orders</Link>
+              <Link to="/buylist" className="transition hover:text-yellow-300">Sell Cards</Link>
               <Link to="/contact" className="transition hover:text-cyan-300">Contact Us</Link>
             </div>
           </div>

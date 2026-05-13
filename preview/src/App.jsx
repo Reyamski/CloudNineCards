@@ -11,6 +11,7 @@ import ProductPage from './pages/ProductPage';
 import NotFoundPage from './pages/NotFoundPage';
 import AccountLoginPage from './pages/AccountLoginPage';
 import AccountOrdersPage from './pages/AccountOrdersPage';
+import BuylistPage from './pages/BuylistPage';
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
         <Route path="/account" element={<AccountLoginPage />} />
         <Route path="/account/orders" element={<AccountOrdersPage />} />
         <Route path="/shop/:id" element={<ProductPage />} />
+        <Route path="/buylist" element={<BuylistPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>

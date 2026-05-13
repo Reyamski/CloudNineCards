@@ -13,7 +13,7 @@ export default function Nav() {
     { label: 'Home', to: '/' },
     { label: 'Shop', to: '/shop' },
     { label: 'Pre-orders', to: '/pre-orders' },
-    { label: 'New Arrivals', to: '/new-arrivals' },
+    { label: 'Sell Cards', to: '/buylist' },
     { label: 'Contact', to: '/contact' },
   ];
 

@@ -7,6 +7,13 @@ import Footer from '../components/Footer';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/useAuth';
 
+function safeNum(val) {
+  if (val === null || val === undefined) return 0;
+  if (typeof val === 'number') return isFinite(val) ? val : 0;
+  const n = parseFloat(String(val).replace(/[^0-9.]/g, ''));
+  return isFinite(n) ? n : 0;
+}
+
 const STATUS_META = {
   awaiting_payment:   { label: 'Awaiting Payment',  color: 'border-white/15 bg-white/5 text-white/60',          icon: Clock },
   payment_submitted:  { label: 'Payment Submitted', color: 'border-yellow-400/30 bg-yellow-400/10 text-yellow-300', icon: AlertCircle },
@@ -137,28 +144,28 @@ export default function AccountOrdersPage() {
                   </div>
                   <div className="text-right">
                     <StatusBadge status={order.payment_status ?? order.status} />
-                    <div className="mt-2 text-3xl font-black">CAD ${Number(order.full_price ?? order.total_price ?? 0).toFixed(2)}</div>
+                    <div className="mt-2 text-3xl font-black">CAD ${safeNum(order.full_price ?? order.total_price).toFixed(2)}</div>
                   </div>
                 </div>
 
                 {/* Price breakdown */}
                 <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-1.5 border-t border-white/5 pt-4 text-sm sm:grid-cols-3">
-                  {order.dp_amount > 0 && <>
-                    <div className="text-white/40">Down payment</div>
-                    <div className="text-right font-black text-emerald-300">CAD ${Number(order.dp_amount).toFixed(2)}</div>
+                  {safeNum(order.dp_amount) > 0 && <>
+                    <div className="text-white/40">Down payment (30% DP)</div>
+                    <div className="text-right font-black text-emerald-300">CAD ${safeNum(order.dp_amount).toFixed(2)}</div>
                     <div className="hidden sm:block" />
-                    <div className="text-white/40">Balance due</div>
-                    <div className="text-right font-black text-yellow-300">CAD ${Number(order.balance_due ?? 0).toFixed(2)}</div>
+                    <div className="text-white/40">Balance on delivery (70%)</div>
+                    <div className="text-right font-black text-yellow-300">CAD ${safeNum(order.balance_due).toFixed(2)}</div>
                     <div className="hidden sm:block" />
                   </>}
-                  {order.delivery_fee > 0 && <>
+                  {safeNum(order.delivery_fee) > 0 && <>
                     <div className="text-white/40">Shipping</div>
-                    <div className="text-right text-white/70">CAD ${Number(order.delivery_fee).toFixed(2)}</div>
+                    <div className="text-right text-white/70">CAD ${safeNum(order.delivery_fee).toFixed(2)}</div>
                     <div className="hidden sm:block" />
                   </>}
-                  {order.tax_amount > 0 && <>
+                  {safeNum(order.tax_amount) > 0 && <>
                     <div className="text-white/40">Tax</div>
-                    <div className="text-right text-white/70">CAD ${Number(order.tax_amount).toFixed(2)}</div>
+                    <div className="text-right text-white/70">CAD ${safeNum(order.tax_amount).toFixed(2)}</div>
                     <div className="hidden sm:block" />
                   </>}
                   {order.buyer_address && <>
@@ -172,7 +179,7 @@ export default function AccountOrdersPage() {
                   <div className="mt-4 rounded-2xl border border-yellow-400/25 bg-yellow-400/8 px-4 py-3">
                     <div className="text-xs font-black uppercase tracking-[0.14em] text-yellow-300">Action required — send payment via Wise</div>
                     <div className="mt-1 text-sm text-white/60">
-                      Send <span className="font-black text-white">CAD ${Number(order.balance_due ?? order.full_price ?? order.total_price ?? 0).toFixed(2)}</span> to{' '}
+                      Send <span className="font-black text-white">CAD ${safeNum(order.balance_due ?? order.full_price ?? order.total_price).toFixed(2)}</span> to{' '}
                       <span className="font-black text-yellow-300">@cloudninecards</span> on Wise, then submit your payment screenshot in the shop.
                     </div>
                   </div>

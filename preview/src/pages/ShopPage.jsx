@@ -30,7 +30,8 @@ async function uploadProofImage(base64DataUrl) {
 const WISE_HANDLE    = '@cloudninecards';
 const CONTACT_EMAIL  = 'papspective@gmail.com';
 
-const tags = ['All', 'One Piece', 'Dragon Ball', 'Pokemon', 'Pre-orders'];
+const tags = ['All', 'One Piece', 'Dragon Ball', 'Pokemon', 'Pre-orders', 'Accessories'];
+const langFilters = ['All', 'Japanese', 'English'];
 
 // ── Province tax rates (Canada) ───────────────────────────────────────────────
 const PROVINCE_TAX = {
@@ -617,6 +618,7 @@ export default function ShopPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTag, setActiveTag] = useState('All');
+  const [langFilter, setLangFilter] = useState('All');
   const [selected, setSelected]   = useState(null);
   const [notifyItem, setNotifyItem] = useState(null);
   const [products, setProducts]   = useState(allProducts);
@@ -669,7 +671,9 @@ export default function ShopPage() {
     });
   }, []);
 
-  const filtered = activeTag === 'All' ? products : products.filter(p => p.tag === activeTag);
+  const filtered = products
+    .filter(p => activeTag === 'All' || p.tag === activeTag)
+    .filter(p => langFilter === 'All' || !p.language || p.language === langFilter);
 
   return (
     <div className="min-h-screen bg-[#05010c] text-white">
@@ -718,9 +722,9 @@ export default function ShopPage() {
           </div>
         )}
 
-        <div className="mb-8 flex flex-wrap gap-3">
+        <div className="mb-4 flex flex-wrap gap-3">
           {tags.map((tag) => (
-            <button key={tag} onClick={() => setActiveTag(tag)}
+            <button key={tag} onClick={() => { setActiveTag(tag); setLangFilter('All'); }}
               className={`rounded-full border px-5 py-2 text-xs font-black uppercase tracking-[0.18em] transition ${
                 activeTag === tag
                   ? 'border-purple-400/60 bg-purple-500/15 text-purple-100 shadow-[0_0_20px_rgba(168,85,247,0.5)]'
@@ -730,6 +734,23 @@ export default function ShopPage() {
             </button>
           ))}
         </div>
+
+        {/* Language sub-filter — hidden for Accessories */}
+        {activeTag !== 'Accessories' && activeTag !== 'Pre-orders' && (
+          <div className="mb-8 flex items-center gap-2">
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30">Language:</span>
+            {langFilters.map((lang) => (
+              <button key={lang} onClick={() => setLangFilter(lang)}
+                className={`rounded-full border px-3.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] transition ${
+                  langFilter === lang
+                    ? 'border-cyan-400/60 bg-cyan-500/15 text-cyan-200'
+                    : 'border-white/8 bg-white/3 text-white/40 hover:border-white/15 hover:text-white/60'
+                }`}>
+                {lang === 'Japanese' ? '🇯🇵 JP' : lang === 'English' ? '🇺🇸 EN' : 'All'}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* ── Section header — anime style ── */}
         <div className="mb-6">
