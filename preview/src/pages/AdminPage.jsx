@@ -221,15 +221,18 @@ export default function AdminPage() {
       setError(err.message || 'Analysis failed — fill fields manually.');
     }
 
-    if (supabaseEnabled && supabase) {
+    const imgbbKey = import.meta.env.VITE_IMGBB_API_KEY;
+    if (imgbbKey) {
       setUploading(true);
-      const filename = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
-      const { error: uploadErr } = await supabase.storage.from(bucket).upload(filename, file, { contentType: file.type, upsert: false });
-      if (!uploadErr) {
-        const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(filename);
-        setForm(f => ({ ...f, image_url: publicUrl }));
-      } else {
-        console.warn('Storage upload failed:', uploadErr.message);
+      try {
+        const base64 = await fileToBase64(file);
+        const body = new FormData();
+        body.append('image', base64);
+        const imgRes = await fetch(`https://api.imgbb.com/1/upload?key=${imgbbKey}`, { method: 'POST', body });
+        const imgJson = await imgRes.json();
+        if (imgJson.success) setForm(f => ({ ...f, image_url: imgJson.data.url }));
+      } catch (e) {
+        console.warn('imgbb upload failed:', e.message);
       }
       setUploading(false);
     }
