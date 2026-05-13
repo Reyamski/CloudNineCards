@@ -12,9 +12,9 @@ export default function Nav() {
   const links = [
     { label: 'Home', to: '/' },
     { label: 'Shop', to: '/shop' },
+    { label: 'Singles', to: '/singles' },
     { label: 'Pre-orders', to: '/pre-orders' },
     { label: 'Sell Cards', to: '/buylist' },
-    { label: 'Contact', to: '/contact' },
   ];
 
   return (
