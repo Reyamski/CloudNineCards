@@ -16,13 +16,21 @@
 -- or auto-created by a Supabase feature. Drop all candidates.
 -- ============================================================
 
-DROP VIEW IF EXISTS public.users CASCADE;
-DROP VIEW IF EXISTS public.user_profiles CASCADE;
-DROP VIEW IF EXISTS public.customer_profiles_view CASCADE;
-DROP VIEW IF EXISTS public.accounts CASCADE;
-DROP VIEW IF EXISTS public.profiles CASCADE;
+-- Safely drop only if the object actually exists AND is a view (not a table)
+DO $$
+DECLARE v TEXT;
+BEGIN
+  FOREACH v IN ARRAY ARRAY['users','user_profiles','customer_profiles_view','accounts','profiles'] LOOP
+    IF EXISTS (
+      SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public' AND c.relname = v AND c.relkind = 'v'
+    ) THEN
+      EXECUTE format('DROP VIEW public.%I CASCADE', v);
+    END IF;
+  END LOOP;
+END $$;
 
--- If the Supabase advisor names the exact view, drop it here:
+-- If the Supabase advisor names the exact view, add it here:
 -- DROP VIEW IF EXISTS public.<exact_view_name> CASCADE;
 
 
