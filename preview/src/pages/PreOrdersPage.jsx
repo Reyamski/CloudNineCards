@@ -945,7 +945,7 @@ export default function PreOrdersPage() {
                   </div>
                 )}
 
-                {item.deadline && <CountdownBlock deadline={item.deadline} />}
+                {item.deadline && !item.soldOut && <CountdownBlock deadline={item.deadline} />}
 
                 {(() => {
                   const canReserve = isOpen() && !item.soldOut && !item.priceTba;

@@ -8,25 +8,10 @@
  * Requires env var: ANTHROPIC_API_KEY
  */
 async function convertHeicToJpeg(base64Data) {
-  const { tmpdir } = await import('os');
-  const { join } = await import('path');
-  const { writeFileSync, readFileSync, unlinkSync } = await import('fs');
-  const { execSync } = await import('child_process');
-  const { randomUUID } = await import('crypto');
-  const { default: ffmpegBin } = await import('ffmpeg-static');
-
-  const id = randomUUID();
-  const inPath  = join(tmpdir(), `heic-in-${id}.heic`);
-  const outPath = join(tmpdir(), `heic-out-${id}.jpg`);
-  try {
-    writeFileSync(inPath, Buffer.from(base64Data, 'base64'));
-    execSync(`"${ffmpegBin}" -y -i "${inPath}" -q:v 2 "${outPath}"`, { timeout: 15000, stdio: 'pipe' });
-    const jpegData = readFileSync(outPath).toString('base64');
-    return jpegData;
-  } finally {
-    try { unlinkSync(inPath); } catch {}
-    try { unlinkSync(outPath); } catch {}
-  }
+  const { default: convert } = await import('heic-convert');
+  const inputBuffer = Buffer.from(base64Data, 'base64');
+  const outputBuffer = await convert({ buffer: inputBuffer, format: 'JPEG', quality: 0.85 });
+  return Buffer.from(outputBuffer).toString('base64');
 }
 
 export default async function handler(req, res) {
