@@ -34,12 +34,30 @@ CREATE TABLE IF NOT EXISTS products (
   subtitle    TEXT,
   language    TEXT NOT NULL DEFAULT 'English',
   price       NUMERIC(10,2) NOT NULL,
+  usd_price   NUMERIC(10,2),
+  aud_price   NUMERIC(10,2),
+  eur_price   NUMERIC(10,2),
   badge       TEXT DEFAULT 'In Stock',
   in_stock    BOOLEAN NOT NULL DEFAULT TRUE,
   image_url   TEXT,
   tag         TEXT,
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Run this if the table already exists (idempotent):
+ALTER TABLE products ADD COLUMN IF NOT EXISTS usd_price NUMERIC(10,2);
+ALTER TABLE products ADD COLUMN IF NOT EXISTS aud_price NUMERIC(10,2);
+ALTER TABLE products ADD COLUMN IF NOT EXISTS eur_price NUMERIC(10,2);
+ALTER TABLE products ADD COLUMN IF NOT EXISTS stock INTEGER NOT NULL DEFAULT 0;
+
+-- ── Mark placeholder accessories as TEST ONLY (run after migration) ──────────
+-- These are seeded as demo data. Disable them until you have real stock.
+UPDATE products SET
+  title    = '[TEST] ' || title,
+  in_stock = FALSE,
+  badge    = 'Sold Out',
+  stock    = 0
+WHERE id IN ('acc-kmc-inner','acc-dragon-matte','acc-playmat-op','acc-dice-set');
 
 ALTER TABLE products DISABLE ROW LEVEL SECURITY;
 
@@ -94,3 +112,10 @@ CREATE POLICY "Public read products"  ON storage.objects FOR SELECT USING (bucke
 CREATE POLICY "Anon upload singles"   ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'singles');
 CREATE POLICY "Anon upload preorders" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'preorders');
 CREATE POLICY "Anon upload products"  ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'products');
+
+-- ── Fix: seed default video_id into config table ──────────────────────────────
+-- Without this row the admin homepage tab fires 406 on every load.
+INSERT INTO config (key, value) VALUES ('video_id', 'OcLL44cDh7k')
+ON CONFLICT (key) DO NOTHING;
+
+ALTER TABLE config DISABLE ROW LEVEL SECURITY;

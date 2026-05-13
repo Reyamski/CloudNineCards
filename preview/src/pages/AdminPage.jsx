@@ -100,7 +100,7 @@ export default function AdminPage() {
   const [showPw, setShowPw] = useState(false);
   const [pwError, setPwError] = useState(false);
   const [activeTab, setActiveTab] = useState('orders');
-  const [orderFilter, setOrderFilter] = useState('pending');
+  const [orderFilter, setOrderFilter] = useState('all');
   const [orderTypeFilter, setOrderTypeFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [selectedOrderId, setSelectedOrderId] = useState('');
@@ -163,6 +163,15 @@ export default function AdminPage() {
       eur_price: cadToForeign(val, 'EUR'),
     }));
   }
+  function handleProdCadChange(val) {
+    setAddProdForm(f => ({
+      ...f, price: val,
+      usd_price: cadToForeign(val, 'USD'),
+      aud_price: cadToForeign(val, 'AUD'),
+      eur_price: cadToForeign(val, 'EUR'),
+    }));
+  }
+
   function etaDateToText(dateVal) {
     if (!dateVal) return '';
     const d = new Date(dateVal + 'T12:00:00');
@@ -188,7 +197,7 @@ export default function AdminPage() {
   const [deletingProductId, setDeletingProductId]       = useState('');
   const [prodEditCell, setProdEditCell]                 = useState({ id: '', field: '' });
   const [prodEditVal, setProdEditVal]                   = useState('');
-  const BLANK_PROD = { id: '', title: '', subtitle: '', language: 'English', price: '', badge: 'In Stock', in_stock: true, image_url: '', tag: 'One Piece' };
+  const BLANK_PROD = { id: '', title: '', subtitle: '', language: 'English', price: '', usd_price: '', aud_price: '', eur_price: '', stock: '0', badge: 'In Stock', in_stock: true, image_url: '', tag: 'One Piece' };
   const [addProdForm, setAddProdForm]                   = useState(BLANK_PROD);
   // AI state for products form
   const [prodImagePreview, setProdImagePreview]         = useState('');
@@ -391,6 +400,10 @@ export default function AdminPage() {
       subtitle:  addProdForm.subtitle.trim() || null,
       language:  addProdForm.language || 'English',
       price:     parseFloat(addProdForm.price) || 0,
+      usd_price: parseFloat(addProdForm.usd_price) || null,
+      aud_price: parseFloat(addProdForm.aud_price) || null,
+      eur_price: parseFloat(addProdForm.eur_price) || null,
+      stock:     parseInt(addProdForm.stock, 10) || 0,
       badge:     addProdForm.in_stock ? 'In Stock' : 'Sold Out',
       in_stock:  addProdForm.in_stock,
       image_url: addProdForm.image_url.trim() || null,
@@ -412,6 +425,8 @@ export default function AdminPage() {
     if (!supabaseEnabled || !supabase) return;
     let parsed = value;
     if (field === 'price') parsed = parseFloat(value) || 0;
+    if (field === 'usd_price' || field === 'aud_price' || field === 'eur_price') parsed = parseFloat(value) || null;
+    if (field === 'stock') parsed = parseInt(value, 10) || 0;
     const extra = field === 'in_stock' ? { badge: value ? 'In Stock' : 'Sold Out' } : {};
     const { error } = await supabase.from('products').update({ [field]: parsed, ...extra }).eq('id', id);
     if (error) setDbProductsError(`Update failed: ${error.message}`);
@@ -1867,14 +1882,35 @@ export default function AdminPage() {
                   <div>
                     <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/30">Price (CAD) *</label>
                     <input type="number" step="0.01" min="0" required value={addProdForm.price}
-                      onChange={e => setAddProdForm(f => ({ ...f, price: e.target.value }))}
+                      onChange={e => handleProdCadChange(e.target.value)}
                       placeholder="129.00"
                       className="w-full rounded-xl border border-yellow-400/30 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-yellow-400/50" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">USD Price <span className="text-white/25 normal-case font-normal">(auto +20%)</span></label>
+                    <input type="number" step="0.01" min="0" value={addProdForm.usd_price} onChange={e => setAddProdForm(f => ({ ...f, usd_price: e.target.value }))}
+                      placeholder="auto" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-cyan-400/40" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">AUD Price <span className="text-white/25 normal-case font-normal">(auto +20%)</span></label>
+                    <input type="number" step="0.01" min="0" value={addProdForm.aud_price} onChange={e => setAddProdForm(f => ({ ...f, aud_price: e.target.value }))}
+                      placeholder="auto" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-cyan-400/40" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">EUR Price <span className="text-white/25 normal-case font-normal">(auto +20%)</span></label>
+                    <input type="number" step="0.01" min="0" value={addProdForm.eur_price} onChange={e => setAddProdForm(f => ({ ...f, eur_price: e.target.value }))}
+                      placeholder="auto" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-cyan-400/40" />
                   </div>
                   <div>
                     <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Image URL</label>
                     <input value={addProdForm.image_url} onChange={e => setAddProdForm(f => ({ ...f, image_url: e.target.value }))}
                       placeholder="Auto-filled after upload"
+                      className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-cyan-400/40" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Stock Qty</label>
+                    <input type="number" min="0" value={addProdForm.stock} onChange={e => setAddProdForm(f => ({ ...f, stock: e.target.value }))}
+                      placeholder="0"
                       className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-cyan-400/40" />
                   </div>
                   <div className="flex items-center gap-2 pt-4">
@@ -1905,7 +1941,7 @@ export default function AdminPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-white/10 bg-white/5 text-left">
-                      {['Product', 'Language', 'Tag', 'Price', 'Status', 'Actions'].map(h => (
+                      {['Product', 'Language', 'Tag', 'Price', 'Stock', 'Status', 'Actions'].map(h => (
                         <th key={h} className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.16em] text-white/40">{h}</th>
                       ))}
                     </tr>
@@ -1936,6 +1972,22 @@ export default function AdminPage() {
                           )}
                         </td>
 
+                        {/* Inline-editable stock */}
+                        <td className="px-4 py-3">
+                          {prodEditCell.id === prod.id && prodEditCell.field === 'stock' ? (
+                            <input type="number" min="0" autoFocus value={prodEditVal}
+                              onChange={e => setProdEditVal(e.target.value)}
+                              onBlur={() => updateDbProduct(prod.id, 'stock', prodEditVal)}
+                              onKeyDown={e => { if (e.key === 'Enter') updateDbProduct(prod.id, 'stock', prodEditVal); if (e.key === 'Escape') { setProdEditCell({id:'',field:''}); setProdEditVal(''); } }}
+                              className="w-16 rounded-lg border border-cyan-400/40 bg-black/40 px-2 py-1 text-sm text-white outline-none" />
+                          ) : (
+                            <button onClick={() => { setProdEditCell({id: prod.id, field: 'stock'}); setProdEditVal(String(prod.stock ?? 0)); }}
+                              className="text-white/70 font-black hover:text-white text-sm min-w-[2rem] text-left">
+                              {prod.stock ?? 0}
+                            </button>
+                          )}
+                        </td>
+
                         {/* In-stock toggle */}
                         <td className="px-4 py-3">
                           <button onClick={() => toggleProductInStock(prod.id, prod.in_stock)}
@@ -1961,7 +2013,7 @@ export default function AdminPage() {
                 </table>
               </div>
             )}
-            <p className="mt-3 text-xs text-white/25">Click price to edit inline. Click status badge to toggle in-stock. Press Enter to save, Escape to cancel.</p>
+            <p className="mt-3 text-xs text-white/25">Click price or stock qty to edit inline. Click status badge to toggle in-stock/sold-out. Press Enter to save, Escape to cancel.</p>
           </div>
         ) : null}
 

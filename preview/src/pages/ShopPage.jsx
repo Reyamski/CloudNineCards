@@ -622,7 +622,7 @@ function normalizeDbProduct(row) {
     price:    Number(row.price) || 0,
     badge:    row.badge ?? (row.in_stock ? 'In Stock' : 'Sold Out'),
     inStock:  row.in_stock,
-    stock:    0, // products table has no stock column — use in_stock flag
+    stock:    row.stock ?? 0,
     image:    row.image_url ?? '/product-fallback.svg',
     tag:      row.tag ?? 'One Piece',
   };
@@ -669,32 +669,52 @@ export default function ShopPage() {
       return;
     }
 
-    // Try loading from the new `products` table first; fall back to `stock` overlay on hardcoded data
-    supabase.from('products').select('*').then(({ data: prodData, error: prodError }) => {
+    async function loadAll() {
+      // Load preorders from DB (always, regardless of products source)
+      const { data: poData } = await supabase
+        .from('preorders')
+        .select('*')
+        .order('display_order', { ascending: true });
+      const preorderProducts = (poData ?? []).map(po => ({
+        id:        po.id,
+        title:     po.title,
+        subtitle:  po.subtitle ?? '',
+        language:  null,
+        price:     Number(po.price) || 0,
+        priceTba:  po.price_tba || false,
+        badge:     po.sold_out ? 'Sold Out' : po.price_tba ? 'Price TBA' : 'Pre-order',
+        inStock:   !po.sold_out,
+        stock:     0,
+        image:     po.image_url ?? '/product-fallback.svg',
+        tag:       'Pre-orders',
+        isPreorder: true,
+        eta:       po.eta,
+      }));
+
+      // Try loading on-hand products from `products` table; fall back to `stock` overlay
+      const { data: prodData, error: prodError } = await supabase.from('products').select('*');
       if (!prodError && prodData && prodData.length > 0) {
-        // Products table exists and has data — use it as source of truth
         setStockSyncError('');
-        setProducts(prodData.map(normalizeDbProduct));
+        setProducts([...prodData.map(normalizeDbProduct), ...preorderProducts]);
         return;
       }
       // Fall back: overlay stock table onto hardcoded allProducts
-      supabase.from('stock').select('*').then(({ data, error }) => {
-        if (error) {
-          setStockSyncError('Inventory may not be current — check back soon.');
-          return;
-        }
-        if (!data?.length) {
-          setStockSyncError('');
-          return;
-        }
-        setStockSyncError('');
-        setProducts(allProducts.map(p => {
-          const row = data.find(r => r.id === p.id);
-          if (!row) return p;
-          return { ...p, inStock: row.in_stock, stock: row.quantity, badge: row.in_stock ? 'In Stock' : 'Sold Out' };
-        }));
+      const { data, error } = await supabase.from('stock').select('*');
+      if (error) {
+        setStockSyncError('Inventory may not be current — check back soon.');
+        setProducts(prev => [...prev.filter(p => !p.isPreorder), ...preorderProducts]);
+        return;
+      }
+      setStockSyncError('');
+      const merged = allProducts.map(p => {
+        const row = (data ?? []).find(r => r.id === p.id);
+        if (!row) return p;
+        return { ...p, inStock: row.in_stock, stock: row.quantity, badge: row.in_stock ? 'In Stock' : 'Sold Out' };
       });
-    });
+      setProducts([...merged, ...preorderProducts]);
+    }
+
+    loadAll();
   }, []);
 
   const filtered = products
@@ -817,7 +837,7 @@ export default function ShopPage() {
               <div className="p-5">
                 <div className="text-sm font-black uppercase tracking-[0.18em] text-cyan-300/75">{item.subtitle}</div>
                 <Link to={`/shop/${item.id}`} className="mt-2 block text-lg font-black leading-snug hover:text-cyan-200 transition">{item.title}</Link>
-                <div className="mt-4 text-3xl font-black">CAD ${item.price.toFixed(2)}</div>
+                <div className="mt-4 text-3xl font-black">{item.priceTba ? 'Price TBA' : `CAD $${item.price.toFixed(2)}`}</div>
                 <div className="mt-1 text-xs text-white/30">+ shipping & tax calculated at checkout</div>
                 <div className="mt-4">
                   {item.isPreorder ? (
