@@ -213,18 +213,25 @@ export default function HomePage() {
           .catch(() => ({ status: 'error' }))
       )
     ).then((results: any[]) => {
-      const items = results
+      const pool = results
         .filter(r => r.status === 'ok')
-        .flatMap(r => r.items.slice(0, 2))
-        .map((item: any) => ({
-          title: item.title,
-          link: item.link,
-          pubDate: item.pubDate,
-          thumbnail: item.thumbnail || '',
-          source: item.link?.includes('OnePieceTCG') ? 'r/OnePieceTCG' : 'r/PokemonTCG',
-        }))
-        .slice(0, 4);
-      if (items.length) setNews(items);
+        .flatMap(r => r.items.slice(0, 6))
+        .map((item: any) => {
+          const thumb = typeof item.thumbnail === 'string' && item.thumbnail.startsWith('http') ? item.thumbnail : '';
+          return {
+            title: item.title,
+            link: item.link,
+            pubDate: item.pubDate,
+            thumbnail: thumb,
+            source: item.link?.includes('OnePieceTCG') ? 'r/OnePieceTCG' : 'r/PokemonTCG',
+          };
+        });
+      // shuffle for variety, then pick 4
+      for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+      }
+      if (pool.length) setNews(pool.slice(0, 4));
     }).catch(() => {});
   }, []);
 
@@ -593,11 +600,23 @@ export default function HomePage() {
                   background: 'linear-gradient(to right, rgba(255,255,255,0.05), transparent)',
                 }}
               >
-                {article.thumbnail && (
-                  <div className="h-32 overflow-hidden">
-                    <img src={article.thumbnail} alt="" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
-                  </div>
-                )}
+                <div className="h-32 overflow-hidden relative flex items-center justify-center"
+                  style={{
+                    background: idx % 2 === 0
+                      ? 'linear-gradient(135deg,rgba(34,211,238,0.15),rgba(99,102,241,0.20))'
+                      : 'linear-gradient(135deg,rgba(217,70,239,0.15),rgba(99,102,241,0.20))',
+                  }}
+                >
+                  <span className="text-5xl opacity-35 select-none absolute">{(article as any).source?.includes('OnePiece') ? '🏴‍☠️' : '⚡'}</span>
+                  {article.thumbnail && (
+                    <img
+                      src={article.thumbnail}
+                      alt=""
+                      className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  )}
+                </div>
                 <div className="flex flex-1 flex-col p-4">
                   <div className="flex items-center justify-between mb-2">
                     <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/30">

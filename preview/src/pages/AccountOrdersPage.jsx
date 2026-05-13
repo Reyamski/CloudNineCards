@@ -42,6 +42,8 @@ export default function AccountOrdersPage() {
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [fetching, setFetching] = useState(true);
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   useEffect(() => { document.title = 'My Orders | CloudNineCards'; }, []);
 
@@ -121,9 +123,98 @@ export default function AccountOrdersPage() {
               Browse the Shop
             </Link>
           </div>
-        ) : (
-          <div className="flex flex-col gap-4">
-            {orders.map((order, idx) => (
+        ) : (() => {
+          const filtered = orders.filter(o => {
+            if (typeFilter !== 'all' && o.order_type !== typeFilter) return false;
+            const s = o.payment_status ?? o.status;
+            if (statusFilter !== 'all' && s !== statusFilter) return false;
+            return true;
+          });
+
+          const countOf = (type, status) => orders.filter(o => {
+            if (type !== 'all' && o.order_type !== type) return false;
+            const s = o.payment_status ?? o.status;
+            if (status !== 'all' && s !== status) return false;
+            return true;
+          }).length;
+
+          const TypePill = ({ value, label }) => {
+            const count = countOf(value, statusFilter);
+            return (
+              <button
+                onClick={() => setTypeFilter(value)}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] transition ${
+                  typeFilter === value
+                    ? 'border-cyan-300/60 bg-cyan-300/18 text-cyan-200'
+                    : 'border-white/10 bg-white/5 text-white/45 hover:border-white/20 hover:text-white/70'
+                }`}
+              >
+                {label}
+                <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-black ${typeFilter === value ? 'bg-cyan-300/20 text-cyan-200' : 'bg-white/8 text-white/35'}`}>
+                  {count}
+                </span>
+              </button>
+            );
+          };
+
+          const StatusPill = ({ value, label, color }) => {
+            const count = countOf(typeFilter, value);
+            return (
+              <button
+                onClick={() => setStatusFilter(value)}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] transition ${
+                  statusFilter === value
+                    ? `${color} opacity-100`
+                    : 'border-white/10 bg-white/5 text-white/45 hover:border-white/20 hover:text-white/70'
+                }`}
+              >
+                {label}
+                <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-black ${statusFilter === value ? 'bg-white/20 text-white/90' : 'bg-white/8 text-white/35'}`}>
+                  {count}
+                </span>
+              </button>
+            );
+          };
+
+          return (
+            <>
+              {/* Filter bar */}
+              <div className="mb-6 space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mr-1">Type</span>
+                  <TypePill value="all" label="All Orders" />
+                  <TypePill value="on_hand" label="On Hand" />
+                  <TypePill value="pre_order" label="Pre-Order" />
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mr-1">Status</span>
+                  <StatusPill value="all" label="All" color="border-white/20 bg-white/10 text-white/70" />
+                  <StatusPill value="awaiting_payment" label="Awaiting" color="border-white/20 bg-white/8 text-white/60" />
+                  <StatusPill value="payment_submitted" label="Submitted" color="border-yellow-400/40 bg-yellow-400/12 text-yellow-300" />
+                  <StatusPill value="payment_verified" label="Paid" color="border-emerald-400/40 bg-emerald-400/12 text-emerald-300" />
+                  <StatusPill value="payment_rejected" label="Rejected" color="border-red-400/40 bg-red-400/12 text-red-300" />
+                </div>
+                {(typeFilter !== 'all' || statusFilter !== 'all') && (
+                  <button
+                    onClick={() => { setTypeFilter('all'); setStatusFilter('all'); }}
+                    className="text-[10px] font-black uppercase tracking-[0.14em] text-white/30 hover:text-white/55 transition"
+                  >
+                    × Clear filters
+                  </button>
+                )}
+              </div>
+
+              {filtered.length === 0 ? (
+                <div className="py-16 text-center">
+                  <div className="text-4xl mb-3">🔍</div>
+                  <div className="text-lg font-black uppercase text-white/60">No orders match this filter</div>
+                  <button onClick={() => { setTypeFilter('all'); setStatusFilter('all'); }} className="mt-3 text-xs font-black uppercase tracking-[0.12em] text-cyan-300/70 hover:text-cyan-300 transition">
+                    Clear filters
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {filtered.map((order, idx) => (
               <motion.div
                 key={order.order_number ?? idx}
                 initial={{ opacity: 0, y: 16 }}
@@ -195,9 +286,12 @@ export default function AccountOrdersPage() {
                   </a>
                 </div>
               </motion.div>
-            ))}
-          </div>
-        )}
+                  ))}
+                </div>
+              )}
+            </>
+          );
+        })()}
       </section>
       <Footer />
     </div>
