@@ -86,7 +86,7 @@ export default function Footer() {
               <Youtube className="h-3.5 w-3.5" /> YouTube
             </a>
             <a
-              href="https://www.facebook.com/papspective"
+              href="https://www.facebook.com/NoypiPlaya/"
               target="_blank"
               rel="noreferrer"
               className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-white/45 transition hover:text-blue-400"
