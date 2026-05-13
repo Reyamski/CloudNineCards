@@ -668,7 +668,7 @@ export default function ShopPage() {
   const [langFilter, setLangFilter] = useState('All');
   const [selected, setSelected]   = useState(null);
   const [notifyItem, setNotifyItem] = useState(null);
-  const [products, setProducts]   = useState(allProducts);
+  const [products, setProducts]   = useState([]);
   const [stockSyncError, setStockSyncError] = useState('');
 
   useEffect(() => { document.title = 'Shop | CloudNineCards'; }, []);

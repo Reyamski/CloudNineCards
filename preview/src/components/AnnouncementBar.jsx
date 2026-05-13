@@ -1,12 +1,24 @@
-import {Link} from 'react-router-dom';
-import {BellRing} from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { BellRing } from 'lucide-react';
+import { supabase, supabaseEnabled } from '../lib/supabase';
 
-const PO_OPEN_DATE = new Date('2025-11-01T00:00:00');
-const PO_CLOSE_DATE = new Date('2026-04-30T23:59:59');
+const PO_OPEN_DATE  = new Date('2025-11-01T00:00:00');
+const PO_CLOSE_DATE = new Date('2026-04-30T23:59:59'); // fallback if DB not loaded
 
 export default function AnnouncementBar() {
-  const now = new Date();
-  const isOpen = now >= PO_OPEN_DATE && now <= PO_CLOSE_DATE;
+  const [closeDate, setCloseDate] = useState(PO_CLOSE_DATE);
+
+  useEffect(() => {
+    if (!supabaseEnabled || !supabase) return;
+    supabase.from('config').select('value').eq('key', 'po_close_date').single()
+      .then(({ data }) => {
+        if (data?.value) setCloseDate(new Date(data.value));
+      });
+  }, []);
+
+  const now    = new Date();
+  const isOpen = now >= PO_OPEN_DATE && now <= closeDate;
 
   return (
     <div className="relative z-50 overflow-hidden bg-gradient-to-r from-fuchsia-600 via-rose-500 to-fuchsia-600 py-2 text-center text-xs font-black uppercase tracking-[0.18em] text-white">

@@ -1,5 +1,5 @@
 import {useEffect, useRef, useState} from 'react';
-import {ShieldCheck, Save, RotateCcw, Eye, EyeOff, Youtube, Loader2, Sparkles, Upload, X, Check, Package} from 'lucide-react';
+import {ShieldCheck, Save, RotateCcw, Eye, EyeOff, Youtube, Loader2, Sparkles, Upload, X, Check, Package, BellRing} from 'lucide-react';
 import {supabase, supabaseEnabled} from '../lib/supabase';
 
 const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD;
@@ -109,6 +109,8 @@ export default function AdminPage() {
   const [saved, setSaved] = useState(false);
   const [videoId, setVideoId] = useState(DEFAULT_VIDEO_ID);
   const [videoSaved, setVideoSaved] = useState(false);
+  const [poCloseDate, setPoCloseDate] = useState('');
+  const [poCloseDateSaved, setPoCloseDateSaved] = useState(false);
   const [dbError, setDbError] = useState('');
   const [orders, setOrders] = useState([]);
   const [confirmingId, setConfirmingId] = useState('');
@@ -492,6 +494,13 @@ export default function AdminPage() {
         setVideoId(vid.value);
       }
 
+      const {data: poDate} = await supabase
+        .from('config')
+        .select('value')
+        .eq('key', 'po_close_date')
+        .single();
+      if (poDate?.value) setPoCloseDate(poDate.value.slice(0, 10));
+
       setLoading(false);
     }
 
@@ -610,6 +619,17 @@ export default function AdminPage() {
     setDbError('');
     setVideoSaved(true);
     setTimeout(() => setVideoSaved(false), 2000);
+  }
+
+  async function savePoCloseDate() {
+    if (!supabaseEnabled || !supabase || !poCloseDate) return;
+    const { error } = await supabase
+      .from('config')
+      .upsert({ key: 'po_close_date', value: poCloseDate + 'T23:59:59' }, { onConflict: 'key' });
+    if (error) { setDbError(`Save failed: ${error.message}`); return; }
+    setDbError('');
+    setPoCloseDateSaved(true);
+    setTimeout(() => setPoCloseDateSaved(false), 2000);
   }
 
   async function confirmOrder(order) {
@@ -1292,6 +1312,25 @@ export default function AdminPage() {
                     className="h-full w-full"
                   />
                 </div>
+              </div>
+            </div>
+            {/* Pre-Orders Close Date */}
+            <div className="mt-5">
+              <div className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-[0.24em] text-pink-300/75">
+                <BellRing className="h-4 w-4" /> Announcement Bar — Pre-Orders Close Date
+              </div>
+              <div className="rounded-[24px] border border-pink-400/20 bg-pink-400/5 p-5">
+                <p className="mb-3 text-xs text-white/50">Set when pre-orders close. Announcement bar switches to "closed" after this date.</p>
+                <div className="flex gap-3">
+                  <input type="date" value={poCloseDate}
+                    onChange={e => setPoCloseDate(e.target.value)}
+                    className="flex-1 rounded-2xl border border-white/15 bg-black/30 px-4 py-2.5 text-sm text-white outline-none focus:border-pink-300/50" />
+                  <button onClick={savePoCloseDate} disabled={!poCloseDate}
+                    className={`flex items-center gap-2 rounded-2xl px-5 py-2.5 text-sm font-black uppercase tracking-[0.08em] transition disabled:opacity-40 ${poCloseDateSaved ? 'bg-green-400 text-black' : 'border border-pink-400/40 bg-pink-500/30 text-pink-200 hover:bg-pink-500/45'}`}>
+                    <Save className="h-4 w-4" /> {poCloseDateSaved ? 'Saved!' : 'Save'}
+                  </button>
+                </div>
+                {poCloseDate && <p className="mt-2 text-xs text-white/35">Bar shows "open" until end of <span className="text-pink-300">{poCloseDate}</span>, then "closed".</p>}
               </div>
             </div>
           </div>

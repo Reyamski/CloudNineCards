@@ -118,4 +118,7 @@ CREATE POLICY "Anon upload products"  ON storage.objects FOR INSERT WITH CHECK (
 INSERT INTO config (key, value) VALUES ('video_id', 'OcLL44cDh7k')
 ON CONFLICT (key) DO NOTHING;
 
+INSERT INTO config (key, value) VALUES ('po_close_date', '2026-04-30T23:59:59')
+ON CONFLICT (key) DO NOTHING;
+
 ALTER TABLE config DISABLE ROW LEVEL SECURITY;
