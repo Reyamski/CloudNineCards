@@ -1,7 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
 import {ShieldCheck, Save, RotateCcw, Eye, EyeOff, Youtube, Loader2, Sparkles, Upload, X, Check, Package} from 'lucide-react';
 import {supabase, supabaseEnabled} from '../lib/supabase';
-import heic2any from 'heic2any';
 
 const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD;
 const DEFAULT_VIDEO_ID = 'OcLL44cDh7k';
@@ -187,122 +186,73 @@ export default function AdminPage() {
     });
   }
 
-  // Detect HEIC/HEIF by ISO BMFF magic bytes — catches files with wrong .jpg extension
-  async function isHeicByMagicBytes(file) {
-    const buf = await file.slice(0, 12).arrayBuffer();
-    const b = new Uint8Array(buf);
-    if (b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70) {
-      const brand = String.fromCharCode(b[8], b[9], b[10], b[11]);
-      return ['heic','heis','hevc','hevx','heim','heix','hevm','hevs','mif1','msf1'].includes(brand);
-    }
-    return false;
-  }
+  const SUPPORTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
-  // Fallback: use browser's native HEIC rendering via canvas (Chrome 117+ / Safari)
-  function heicToJpegViaCanvas(file) {
-    return new Promise((resolve, reject) => {
-      const url = URL.createObjectURL(file);
-      const img = new Image();
-      img.onload = () => {
-        URL.revokeObjectURL(url);
-        const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-        canvas.getContext('2d').drawImage(img, 0, 0);
-        canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('canvas toBlob returned null')), 'image/jpeg', 0.85);
-      };
-      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Browser cannot render this HEIC file')); };
-      img.src = url;
-    });
-  }
+  async function _runAnalyzeUpload(file, {
+    setPreview, setAnalyzing, setAnalyzed, setError, setUploading, setForm, bucket,
+    mapResult,
+  }) {
+    if (!file) return;
 
-  async function analyzeCard(rawFile) {
-    if (!rawFile) return;
-
-    const HEIC_TYPES = ['image/heic', 'image/heif', 'image/heic-sequence', 'image/heif-sequence'];
-    const heicByContent = await isHeicByMagicBytes(rawFile);
-    const isHeic = HEIC_TYPES.includes(rawFile.type) || /\.heic$/i.test(rawFile.name) || heicByContent;
-
-    let file = rawFile;
-    let serverMediaType = null; // set when server must handle conversion
-
-    if (isHeic) {
-      setImagePreview(URL.createObjectURL(rawFile));
-      setAnalyzing(true);
-      setAnalyzed(false);
-      setAnalyzeError('');
-      try {
-        let blob;
-        try {
-          blob = await heic2any({ blob: rawFile, toType: 'image/jpeg', quality: 0.85 });
-        } catch {
-          blob = await heicToJpegViaCanvas(rawFile);
-        }
-        file = new File([Array.isArray(blob) ? blob[0] : blob], rawFile.name.replace(/\.heic$/i, '.jpg'), { type: 'image/jpeg' });
-      } catch {
-        // Both client-side conversions failed — send raw HEIC, server converts with sharp
-        serverMediaType = 'image/heic';
-      }
-    }
-
-    if (!file.type.startsWith('image/')) return;
-
-    const SUPPORTED = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    if (!serverMediaType && !SUPPORTED.includes(file.type)) {
-      setAnalyzeError(`Unsupported format: ${file.type}. Use JPEG, PNG, GIF, WebP, or HEIC.`);
-      setImagePreview(URL.createObjectURL(file));
+    if (!SUPPORTED_IMAGE_TYPES.includes(file.type)) {
+      setError('Only JPEG/PNG/GIF/WebP supported. Export HEIC from iPhone as JPEG first (Settings → Camera → Format → Most Compatible).');
       return;
     }
-    if (file.size > 20_000_000) {
-      setAnalyzeError(`Image too large (${(file.size/1e6).toFixed(1)}MB). Max 20MB.`);
-      setImagePreview(URL.createObjectURL(file));
+    if (file.size > 10_000_000) {
+      setError(`Image too large (${(file.size/1e6).toFixed(1)}MB). Max 10MB.`);
       return;
     }
 
-    if (!isHeic) setImagePreview(URL.createObjectURL(file));
-    setAnalyzing(true);
-    setAnalyzed(false);
-    setAnalyzeError('');
+    setPreview(URL.createObjectURL(file));
+    setAnalyzing(true); setAnalyzed(false); setError('');
 
     try {
       const base64 = await fileToBase64(file);
       const res = await fetch('/api/analyze-card', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: base64, mediaType: serverMediaType ?? file.type }),
+        body: JSON.stringify({ imageBase64: base64, mediaType: file.type }),
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.detail != null ? `${result.error}: ${result.detail}` : result.error || 'Analysis failed');
-
-      setAddForm(f => ({
-        ...f,
-        card_name:   result.card_name   || f.card_name,
-        set_name:    result.set_name    || f.set_name,
-        set_code:    result.set_code    || f.set_code,
-        card_number: result.card_number || f.card_number,
-        game:        (['One Piece','Pokemon','Dragon Ball','Yu-Gi-Oh!'].includes(result.game) ? result.game : f.game),
-        language:    (['English','Japanese'].includes(result.language) ? result.language : f.language),
-        condition:   (['NM','LP','MP','HP','D'].includes(result.condition) ? result.condition : f.condition),
-        rarity:      result.rarity      || f.rarity,
-      }));
+      setForm(f => mapResult(f, result));
       setAnalyzed(true);
     } catch (err) {
-      setAnalyzeError(err.message || 'Analysis failed — fill fields manually.');
+      setError(err.message || 'Analysis failed — fill fields manually.');
     }
 
-    // Upload to Supabase Storage regardless of analysis result
     if (supabaseEnabled && supabase) {
-      setUploadingImg(true);
+      setUploading(true);
       const filename = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
-      const { error: uploadErr } = await supabase.storage.from('singles').upload(filename, file, { contentType: file.type });
+      const { error: uploadErr } = await supabase.storage.from(bucket).upload(filename, file, { contentType: file.type, upsert: false });
       if (!uploadErr) {
-        const { data: { publicUrl } } = supabase.storage.from('singles').getPublicUrl(filename);
-        setAddForm(f => ({ ...f, image_url: publicUrl }));
+        const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(filename);
+        setForm(f => ({ ...f, image_url: publicUrl }));
+      } else {
+        console.warn('Storage upload failed:', uploadErr.message);
       }
-      setUploadingImg(false);
+      setUploading(false);
     }
 
     setAnalyzing(false);
+  }
+
+  function analyzeCard(rawFile) {
+    return _runAnalyzeUpload(rawFile, {
+      setPreview: setImagePreview, setAnalyzing, setAnalyzed, setError: setAnalyzeError,
+      setUploading: setUploadingImg, setForm: setAddForm, bucket: 'singles',
+      mapResult: (f, r) => ({
+        ...f,
+        card_name:   r.card_name   || f.card_name,
+        set_name:    r.set_name    || f.set_name,
+        set_code:    r.set_code    || f.set_code,
+        card_number: r.card_number || f.card_number,
+        game:        (['One Piece','Pokemon','Dragon Ball','Yu-Gi-Oh!'].includes(r.game) ? r.game : f.game),
+        language:    (['English','Japanese'].includes(r.language) ? r.language : f.language),
+        condition:   (['NM','LP','MP','HP','D'].includes(r.condition) ? r.condition : f.condition),
+        rarity:      r.rarity || f.rarity,
+      }),
+    });
   }
 
   function resetImageState() {
@@ -316,76 +266,14 @@ export default function AdminPage() {
   // ── Generic AI analysis for a given setter bundle ────────────────────────
   // Used by both the Pre-Orders and Products add forms.
   // setters: { setPreview, setAnalyzing, setAnalyzed, setError, setUploading, setForm, bucket }
-  async function analyzeForForm(rawFile, setters) {
-    if (!rawFile) return;
+  function analyzeForForm(rawFile, setters) {
     const { setPreview, setAnalyzing, setAnalyzed, setError, setUploading, setForm, bucket } = setters;
-
-    const HEIC_TYPES = ['image/heic', 'image/heif', 'image/heic-sequence', 'image/heif-sequence'];
-    const heicByContent = await isHeicByMagicBytes(rawFile);
-    const isHeic = HEIC_TYPES.includes(rawFile.type) || /\.heic$/i.test(rawFile.name) || heicByContent;
-
-    let file = rawFile;
-    let serverMediaType = null;
-
-    if (isHeic) {
-      setPreview(URL.createObjectURL(rawFile));
-      setAnalyzing(true); setAnalyzed(false); setError('');
-      try {
-        let blob;
-        try { blob = await heic2any({ blob: rawFile, toType: 'image/jpeg', quality: 0.85 }); }
-        catch { blob = await heicToJpegViaCanvas(rawFile); }
-        file = new File([Array.isArray(blob) ? blob[0] : blob], rawFile.name.replace(/\.heic$/i, '.jpg'), { type: 'image/jpeg' });
-      } catch { serverMediaType = 'image/heic'; }
-    }
-
-    if (!file.type.startsWith('image/')) return;
-    const SUPPORTED = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    if (!serverMediaType && !SUPPORTED.includes(file.type)) {
-      setError(`Unsupported format: ${file.type}`);
-      setPreview(URL.createObjectURL(file));
-      return;
-    }
-    if (file.size > 20_000_000) {
-      setError(`Image too large (${(file.size/1e6).toFixed(1)}MB). Max 20MB.`);
-      setPreview(URL.createObjectURL(file));
-      return;
-    }
-
-    if (!isHeic) setPreview(URL.createObjectURL(file));
-    setAnalyzing(true); setAnalyzed(false); setError('');
-
-    try {
-      const base64 = await fileToBase64(file);
-      const res = await fetch('/api/analyze-card', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: base64, mediaType: serverMediaType ?? file.type }),
-      });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.detail != null ? `${result.error}: ${result.detail}` : result.error || 'Analysis failed');
-      // For preorders/products we only use the title hint from AI
-      setForm(f => ({
-        ...f,
-        title: f.title || result.card_name || f.title,
-      }));
-      setAnalyzed(true);
-    } catch (err) {
-      setError(err.message || 'Analysis failed — fill fields manually.');
-    }
-
-    if (supabaseEnabled && supabase) {
-      setUploading(true);
-      const filename = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
-      const { error: uploadErr } = await supabase.storage.from(bucket).upload(filename, file, { contentType: file.type });
-      if (!uploadErr) {
-        const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(filename);
-        setForm(f => ({ ...f, image_url: publicUrl }));
-      }
-      setUploading(false);
-    }
-
-    setAnalyzing(false);
+    return _runAnalyzeUpload(rawFile, {
+      setPreview, setAnalyzing, setAnalyzed, setError, setUploading, setForm, bucket,
+      mapResult: (f, r) => ({ ...f, title: r.card_name || f.title }),
+    });
   }
+
 
   // ── Pre-Orders CRUD ───────────────────────────────────────────────────────
   async function loadPreorders() {

@@ -75,3 +75,22 @@ INSERT INTO products (id, title, subtitle, language, price, badge, in_stock, ima
   ('acc-playmat-op',   'One Piece TCG Official Playmat — Luffy vs Kaido',  'Accessories', 'English',   45.00, 'In Stock',  TRUE,  'https://placehold.co/400x560/070014/f97316?text=OPTCG+Playmat',          'Accessories'),
   ('acc-dice-set',     'TCG Damage Counter Dice Set (20pcs)',               'Accessories', 'English',   15.00, 'In Stock',  TRUE,  'https://placehold.co/400x560/070014/facc15?text=Dice+%26+Counter+Set',   'Accessories')
 ON CONFLICT (id) DO NOTHING;
+
+-- ── Supabase Storage buckets ──────────────────────────────────────────────────
+-- Creates public buckets for card/product images uploaded via admin panel.
+-- Run AFTER applying this migration.
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES
+  ('singles',   'singles',   true, 10485760, ARRAY['image/jpeg','image/png','image/gif','image/webp']),
+  ('preorders', 'preorders', true, 10485760, ARRAY['image/jpeg','image/png','image/gif','image/webp']),
+  ('products',  'products',  true, 10485760, ARRAY['image/jpeg','image/png','image/gif','image/webp'])
+ON CONFLICT (id) DO NOTHING;
+
+-- Allow public reads on all image buckets
+CREATE POLICY "Public read singles"   ON storage.objects FOR SELECT USING (bucket_id = 'singles');
+CREATE POLICY "Public read preorders" ON storage.objects FOR SELECT USING (bucket_id = 'preorders');
+CREATE POLICY "Public read products"  ON storage.objects FOR SELECT USING (bucket_id = 'products');
+-- Allow anon uploads (admin panel uses anon key)
+CREATE POLICY "Anon upload singles"   ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'singles');
+CREATE POLICY "Anon upload preorders" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'preorders');
+CREATE POLICY "Anon upload products"  ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'products');
