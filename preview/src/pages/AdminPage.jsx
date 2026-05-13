@@ -146,7 +146,28 @@ export default function AdminPage() {
   const [poEditCell, setPoEditCell]                 = useState({ id: '', field: '' });
   const [poEditVal, setPoEditVal]                   = useState('');
   const DEFAULT_PO_NOTES = 'Pre-orders are not guaranteed and subject to allocation.\nIf allocation is cut, down payment will be refunded in full.\nBuyer shoulders shipping fees, taxes, and import duties.';
-  const BLANK_PO = { id: '', title: '', subtitle: '', sold_out: false, price_tba: false, price: '', usd_price: '', aud_price: '', currency: 'CAD', eta: '', deadline: '', image_url: '', hype: '', notes: DEFAULT_PO_NOTES, display_order: '0' };
+  const BLANK_PO = { id: '', title: '', subtitle: '', sold_out: false, price_tba: false, price: '', usd_price: '', aud_price: '', eur_price: '', currency: 'CAD', eta: '', deadline: '', image_url: '', hype: '', notes: DEFAULT_PO_NOTES, display_order: '0' };
+
+  // Exchange rates → CAD (1 foreign unit = X CAD). Add 20% buffer to protect margins.
+  // Update these rates periodically to stay current.
+  const FX = { USD: 1.37, AUD: 0.91, EUR: 1.50 }; // 1 USD/AUD/EUR = X CAD
+  function cadToForeign(cad, currency) {
+    if (!cad || isNaN(cad)) return '';
+    return (parseFloat(cad) / FX[currency] * 1.20).toFixed(2);
+  }
+  function handleCadChange(val) {
+    setAddPoForm(f => ({
+      ...f, price: val,
+      usd_price: cadToForeign(val, 'USD'),
+      aud_price: cadToForeign(val, 'AUD'),
+      eur_price: cadToForeign(val, 'EUR'),
+    }));
+  }
+  function etaDateToText(dateVal) {
+    if (!dateVal) return '';
+    const d = new Date(dateVal + 'T12:00:00');
+    return 'Est. ' + d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  }
   const [addPoForm, setAddPoForm]                   = useState(BLANK_PO);
   // AI state for preorders form
   const [poImagePreview, setPoImagePreview]         = useState('');
@@ -262,7 +283,11 @@ export default function AdminPage() {
     const { setPreview, setAnalyzing, setAnalyzed, setError, setUploading, setForm, bucket } = setters;
     return _runAnalyzeUpload(rawFile, {
       setPreview, setAnalyzing, setAnalyzed, setError, setUploading, setForm, bucket,
-      mapResult: (f, r) => ({ ...f, title: r.card_name || f.title }),
+      mapResult: (f, r) => ({
+        ...f,
+        title:    r.card_name || f.title,
+        subtitle: r.set_name && r.set_name !== 'Unknown' ? r.set_name : f.subtitle,
+      }),
     });
   }
 
@@ -294,6 +319,7 @@ export default function AdminPage() {
       price:         parseFloat(addPoForm.price) || null,
       usd_price:     parseFloat(addPoForm.usd_price) || null,
       aud_price:     parseFloat(addPoForm.aud_price) || null,
+      eur_price:     parseFloat(addPoForm.eur_price) || null,
       currency:      addPoForm.currency || 'CAD',
       eta:           addPoForm.eta.trim() || null,
       deadline:      addPoForm.deadline || null,
@@ -1579,30 +1605,36 @@ export default function AdminPage() {
                       placeholder="4th Anniversary Set" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
                   </div>
                   <div>
-                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">ETA</label>
-                    <input value={addPoForm.eta} onChange={e => setAddPoForm(f => ({ ...f, eta: e.target.value }))}
-                      placeholder="Est. Aug 31, 2026" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">ETA (ship date)</label>
+                    <input type="date" onChange={e => setAddPoForm(f => ({ ...f, eta: etaDateToText(e.target.value) }))}
+                      className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-pink-400/40" />
+                    {addPoForm.eta && <div className="mt-1 text-[10px] text-cyan-300/60">{addPoForm.eta}</div>}
                   </div>
                   <div>
                     <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Order Deadline</label>
                     <input type="date" value={addPoForm.deadline ? addPoForm.deadline.toString().slice(0,10) : ''} onChange={e => setAddPoForm(f => ({ ...f, deadline: e.target.value ? e.target.value + 'T23:59:59' : '' }))}
                       className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-pink-400/40" />
                   </div>
-                  {/* Row 3: Prices */}
+                  {/* Prices — USD/AUD/EUR auto-calculate from CAD with 20% buffer */}
                   <div>
                     <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Price (CAD) *</label>
-                    <input type="number" step="0.01" min="0" value={addPoForm.price} onChange={e => setAddPoForm(f => ({ ...f, price: e.target.value }))}
+                    <input type="number" step="0.01" min="0" value={addPoForm.price} onChange={e => handleCadChange(e.target.value)}
                       placeholder="93.00" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
                   </div>
                   <div>
-                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">USD Price</label>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">USD Price <span className="text-white/25 normal-case font-normal">(auto +20%)</span></label>
                     <input type="number" step="0.01" min="0" value={addPoForm.usd_price} onChange={e => setAddPoForm(f => ({ ...f, usd_price: e.target.value }))}
-                      placeholder="68.00" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
+                      placeholder="auto" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
                   </div>
                   <div>
-                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">AUD Price</label>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">AUD Price <span className="text-white/25 normal-case font-normal">(auto +20%)</span></label>
                     <input type="number" step="0.01" min="0" value={addPoForm.aud_price} onChange={e => setAddPoForm(f => ({ ...f, aud_price: e.target.value }))}
-                      placeholder="96.00" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
+                      placeholder="auto" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">EUR Price <span className="text-white/25 normal-case font-normal">(auto +20%)</span></label>
+                    <input type="number" step="0.01" min="0" value={addPoForm.eur_price} onChange={e => setAddPoForm(f => ({ ...f, eur_price: e.target.value }))}
+                      placeholder="auto" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
                   </div>
                   {/* Row 4: Image URL + Sold Out toggle */}
                   <div className="sm:col-span-2">

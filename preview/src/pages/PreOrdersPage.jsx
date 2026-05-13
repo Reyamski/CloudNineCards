@@ -102,6 +102,7 @@ function normalizeDbPreorder(row) {
     price:    row.price ?? 0,
     usdPrice: row.usd_price ?? null,
     audPrice: row.aud_price ?? null,
+    eurPrice: row.eur_price ?? null,
     currency: row.currency ?? 'CAD',
     eta:      row.eta ?? '',
     deadline: row.deadline ? new Date(row.deadline) : null,
@@ -920,10 +921,11 @@ export default function PreOrdersPage() {
 
                 <div className="mt-1 text-xs text-white/35">+ international shipping & taxes (buyer's account)</div>
 
-                {(item.usdPrice || item.audPrice) && (
+                {(item.usdPrice || item.audPrice || item.eurPrice) && (
                   <div className="mt-1.5 flex gap-3 text-[11px] text-white/30">
                     {item.usdPrice && <span>USD ${item.usdPrice.toFixed(2)}</span>}
                     {item.audPrice && <span>AUD ${item.audPrice.toFixed(2)}</span>}
+                    {item.eurPrice && <span>EUR €{item.eurPrice.toFixed(2)}</span>}
                   </div>
                 )}
 
