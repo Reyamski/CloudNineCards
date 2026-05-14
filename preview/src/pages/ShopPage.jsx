@@ -836,7 +836,6 @@ export default function ShopPage() {
         {/* ── Section header — anime style ── */}
         <div className="mb-6">
           <div className="flex items-center gap-2">
-            <span className="text-fuchsia-400 text-lg leading-none select-none">⚡</span>
             <h2 className="text-2xl font-black uppercase tracking-[0.12em] bg-gradient-to-r from-cyan-300 via-fuchsia-300 to-yellow-300 bg-clip-text text-transparent">
               In Stock Now
             </h2>
@@ -910,12 +909,8 @@ export default function ShopPage() {
           <div className="rounded-[27px] bg-[#08020f] px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-6">
             {/* left — text block */}
             <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-fuchsia-400 text-base select-none">◆</span>
-                <span className="text-[10px] font-black uppercase tracking-[0.28em] text-cyan-300/60">Limited Drops · First Look</span>
-              </div>
               <div className="text-2xl font-black uppercase tracking-[0.08em] bg-gradient-to-r from-cyan-300 via-fuchsia-300 to-yellow-300 bg-clip-text text-transparent">
-                Follow the Drop
+                Follow us on Instagram
               </div>
               <p className="mt-1.5 text-sm text-white/45 max-w-sm">
                 New sealed product, restocks, and pre-orders — announced on Instagram first. Don't miss the next wave.

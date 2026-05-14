@@ -326,7 +326,7 @@ export default function HomePage() {
                   <span className="text-base leading-none">🏴‍☠️</span> One Piece
                 </span>
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-yellow-300/40 bg-yellow-400/15 px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-yellow-100 shadow-[0_0_18px_rgba(250,204,21,0.22)] backdrop-blur">
-                  <span className="text-base leading-none">⚡</span> Pokémon
+                  Pokémon
                 </span>
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-orange-400/40 bg-orange-500/15 px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-orange-200 shadow-[0_0_18px_rgba(249,115,22,0.22)] backdrop-blur">
                   <span className="text-base leading-none">🔥</span> Dragon Ball
@@ -400,12 +400,6 @@ export default function HomePage() {
       </section>
 
 
-      {/* Anime section divider */}
-      <div className="relative flex items-center justify-center py-2" aria-hidden="true">
-        <div className="absolute inset-x-0 top-1/2 h-px bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent" />
-        <span className="relative z-10 flex h-6 w-6 items-center justify-center rounded-full border border-cyan-400/40 bg-[#07030f] text-xs text-cyan-300/70 shadow-[0_0_14px_rgba(34,211,238,0.3)]">◆</span>
-      </div>
-
       <section className="mx-auto max-w-7xl px-6 pb-2 pt-6">
         <motion.div initial={{opacity: 0, y: 16}} animate={{opacity: 1, y: 0}} transition={{duration: 0.55}} className="relative overflow-hidden rounded-[32px] border border-fuchsia-500/30">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(168,85,247,0.18),transparent_50%),radial-gradient(circle_at_bottom_left,rgba(34,211,238,0.10),transparent_50%)]" />
@@ -452,12 +446,6 @@ export default function HomePage() {
           })}
         </div>
       </section>
-
-      {/* Anime section divider */}
-      <div className="relative flex items-center justify-center py-2" aria-hidden="true">
-        <div className="absolute inset-x-0 top-1/2 h-px bg-gradient-to-r from-transparent via-fuchsia-400/50 to-transparent" />
-        <span className="relative z-10 flex h-6 w-6 items-center justify-center rounded-full border border-fuchsia-400/40 bg-[#05010c] text-xs text-fuchsia-300/70 shadow-[0_0_14px_rgba(217,70,239,0.3)]">◆</span>
-      </div>
 
       <section className="relative mx-auto max-w-7xl px-6 py-10 md:py-14">
         <div className="pointer-events-none absolute inset-0 overflow-hidden hidden md:block" aria-hidden="true">
