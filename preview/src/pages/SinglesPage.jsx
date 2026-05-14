@@ -541,6 +541,20 @@ export default function SinglesPage() {
       </section>
 
       <section className="mx-auto max-w-7xl px-6 py-8">
+        {/* Game filter — always visible */}
+        <div className="mb-4 flex flex-wrap gap-2">
+          {GAMES.map(g => (
+            <button key={g} onClick={() => setGameFilter(g)}
+              className={`rounded-full border px-5 py-2 text-xs font-black uppercase tracking-[0.18em] transition ${
+                gameFilter === g
+                  ? 'border-purple-400/60 bg-purple-500/15 text-purple-100 shadow-[0_0_20px_rgba(168,85,247,0.4)]'
+                  : 'border-white/10 bg-white/5 text-white/65 hover:border-white/20 hover:text-white/85'
+              }`}>
+              {g}
+            </button>
+          ))}
+        </div>
+
         {/* Search + filter bar */}
         <div className="mb-6 flex flex-col gap-3">
           <div className="flex gap-3">
@@ -560,17 +574,6 @@ export default function SinglesPage() {
             {showFilters && (
               <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
                 <div className="rounded-[20px] border border-white/8 bg-white/3 p-4 flex flex-wrap gap-5">
-                  <div>
-                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-2">Game</div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {GAMES.map(g => (
-                        <button key={g} onClick={() => setGameFilter(g)}
-                          className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] transition ${gameFilter === g ? 'border-purple-400/60 bg-purple-500/15 text-purple-100' : 'border-white/10 bg-white/5 text-white/50 hover:text-white/70'}`}>
-                          {g}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
                   <div>
                     <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-2">Language</div>
                     <div className="flex gap-1.5">

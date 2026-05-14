@@ -11,9 +11,9 @@ export default function AnnouncementBar() {
 
   useEffect(() => {
     if (!supabaseEnabled || !supabase) return;
-    supabase.from('config').select('value').eq('key', 'po_close_date').maybeSingle()
+    supabase.from('config').select('value').eq('key', 'po_close_date').limit(1)
       .then(({ data }) => {
-        if (data?.value) setCloseDate(new Date(data.value));
+        if (data?.[0]?.value) setCloseDate(new Date(data[0].value));
       });
   }, []);
 

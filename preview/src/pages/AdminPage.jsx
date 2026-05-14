@@ -494,12 +494,12 @@ export default function AdminPage() {
         setVideoId(vid.value);
       }
 
-      const {data: poDate} = await supabase
+      const {data: poDateRows} = await supabase
         .from('config')
         .select('value')
         .eq('key', 'po_close_date')
-        .maybeSingle();
-      if (poDate?.value) setPoCloseDate(poDate.value.slice(0, 10));
+        .limit(1);
+      if (poDateRows?.[0]?.value) setPoCloseDate(poDateRows[0].value.slice(0, 10));
 
       setLoading(false);
     }

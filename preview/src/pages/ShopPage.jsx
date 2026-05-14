@@ -750,7 +750,11 @@ export default function ShopPage() {
 
   const filtered = products
     .filter(p => activeTag === 'All' || p.tag === activeTag)
-    .filter(p => langFilter === 'All' || !p.language || p.language === langFilter);
+    .filter(p => langFilter === 'All' || !p.language || p.language === langFilter)
+    .sort((a, b) => {
+      const score = p => p.inStock ? 0 : p.isPreorder ? 1 : 2;
+      return score(a) - score(b);
+    });
 
   return (
     <div className="min-h-screen bg-[#05010c] text-white">
