@@ -804,6 +804,14 @@ export default function AdminPage() {
     setEditVal('');
   }
 
+  async function toggleSingleInStock(id, current) {
+    if (!supabaseEnabled || !supabase) return;
+    const next = !current;
+    const { error } = await supabase.from('singles').update({ in_stock: next, updated_at: new Date().toISOString() }).eq('id', id);
+    if (error) setSinglesError(`Update failed: ${error.message}`);
+    else setSingles(prev => prev.map(s => s.id === id ? { ...s, in_stock: next } : s));
+  }
+
   async function deleteSingle(id) {
     if (!supabaseEnabled || !supabase) return;
     setDeletingId(id);
@@ -1505,7 +1513,7 @@ export default function AdminPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-white/10 bg-white/5 text-left">
-                      {['Card', 'Set', 'Cond', 'Lang', 'Rarity', 'Price', 'Stock', 'Actions'].map(h => (
+                      {['Card', 'Set', 'Cond', 'Lang', 'Rarity', 'Price', 'Stock', 'Status', 'Actions'].map(h => (
                         <th key={h} className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.16em] text-white/40">{h}</th>
                       ))}
                     </tr>
@@ -1562,6 +1570,18 @@ export default function AdminPage() {
                               {s.stock}
                             </button>
                           )}
+                        </td>
+
+                        {/* In-stock toggle */}
+                        <td className="px-4 py-3">
+                          <button onClick={() => toggleSingleInStock(s.id, s.in_stock)}
+                            className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] transition ${
+                              s.in_stock
+                                ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300 hover:bg-red-400/10 hover:border-red-400/30 hover:text-red-300'
+                                : 'border-red-400/30 bg-red-400/10 text-red-300 hover:bg-emerald-400/10 hover:border-emerald-400/30 hover:text-emerald-300'
+                            }`}>
+                            {s.in_stock ? 'In Stock' : 'Sold Out'}
+                          </button>
                         </td>
 
                         <td className="px-4 py-3">
