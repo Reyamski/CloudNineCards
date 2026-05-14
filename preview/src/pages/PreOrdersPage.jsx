@@ -36,6 +36,14 @@ const WISE_HANDLE = '@cloudninecards';
 const CONTACT_EMAIL = 'papspective@gmail.com';
 const DP_PERCENT = 0.30;
 
+const FX_RATES        = { USD: 1.37, AUD: 0.91, EUR: 1.50 };
+const INTL_CURRENCIES = ['USD', 'AUD', 'EUR'];
+const CURRENCY_SYMBOLS = { CAD: 'CAD $', USD: 'USD $', AUD: 'AUD $', EUR: 'EUR €' };
+function cadToFx(cad, cur) {
+  if (cur === 'CAD') return cad;
+  return Math.ceil(cad / FX_RATES[cur] * 1.03 * 100) / 100;
+}
+
 const PROVINCE_TAX = {
   'Alberta':                  { rate: 0.05,    label: 'GST'       },
   'British Columbia':         { rate: 0.12,    label: 'GST + PST' },
@@ -182,6 +190,7 @@ function PreOrderModal({ item, onClose, userEmail }) {
   const [address, setAddress] = useState('');
   const [country, setCountry] = useState('');
   const [province, setProvince] = useState('');
+  const [currency, setCurrency] = useState('CAD');
   const [submitted, setSubmitted] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState('');
@@ -230,6 +239,11 @@ function PreOrderModal({ item, onClose, userEmail }) {
   const totalPrice     = grandTotal.toFixed(2);
   const totalDp        = (grandTotal * DP_PERCENT).toFixed(2);
   const totalRemaining = (grandTotal * (1 - DP_PERCENT)).toFixed(2);
+  const sym            = CURRENCY_SYMBOLS[currency] ?? 'CAD $';
+  const fx             = (cad) => cadToFx(cad, currency).toFixed(2);
+  const fxTotal        = cadToFx(grandTotal, currency);
+  const fxDp           = cadToFx(grandTotal * DP_PERCENT, currency);
+  const fxRemaining    = cadToFx(grandTotal * (1 - DP_PERCENT), currency);
 
   function copyWise() {
     navigator.clipboard.writeText(WISE_HANDLE);
@@ -390,7 +404,7 @@ function PreOrderModal({ item, onClose, userEmail }) {
                 <div className="text-xs font-black uppercase tracking-[0.16em] text-white/40 mb-2">Shipping Destination</div>
                 <select
                   value={country}
-                  onChange={e => { setCountry(e.target.value); setProvince(''); }}
+                  onChange={e => { const c = e.target.value; setCountry(c); setProvince(''); setCurrency(c === 'Canada' ? 'CAD' : 'USD'); }}
                   className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none focus:border-fuchsia-300/40 appearance-none"
                 >
                   <option value="" disabled>Select destination…</option>
@@ -415,11 +429,26 @@ function PreOrderModal({ item, onClose, userEmail }) {
                 )}
               </div>
 
+              {/* Currency selector — non-Canada only */}
+              {country && country !== 'Canada' && (
+                <div className="mb-4">
+                  <div className="text-xs font-black uppercase tracking-[0.16em] text-white/40 mb-2">
+                    Payment Currency
+                    {country === 'United States' && <span className="ml-2 text-fuchsia-300/50 normal-case font-normal">(auto-selected)</span>}
+                  </div>
+                  <select value={currency} onChange={e => setCurrency(e.target.value)}
+                    disabled={country === 'United States'}
+                    className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none appearance-none disabled:opacity-60">
+                    {INTL_CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              )}
+
               {/* Price breakdown */}
               <div className="mb-5 rounded-2xl border border-white/8 bg-white/4 p-4 space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-white/50">Unit price</span>
-                  <span className="font-bold">CAD ${(item.price ?? 0).toFixed(2)}</span>
+                  <span className="font-bold">{sym}{fx(item.price ?? 0)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-white/50">Qty</span>
@@ -427,32 +456,35 @@ function PreOrderModal({ item, onClose, userEmail }) {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-white/50">Subtotal</span>
-                  <span className="font-bold">CAD ${subtotal.toFixed(2)}</span>
+                  <span className="font-bold">{sym}{fx(subtotal)}</span>
                 </div>
                 {taxAmount > 0 && (
                   <div className="flex justify-between text-white/60">
                     <span>Tax ({taxLabel})</span>
-                    <span>CAD ${taxAmount.toFixed(2)}</span>
+                    <span>{sym}{fx(taxAmount)}</span>
                   </div>
                 )}
                 {shippingFee > 0 && (
                   <div className="flex justify-between text-white/60">
                     <span>Est. Shipping <span className="text-white/35 text-[10px]">(+10% buffer)</span></span>
-                    <span>CAD ${shippingFee.toFixed(2)}</span>
+                    <span>{sym}{fx(shippingFee)}</span>
                   </div>
                 )}
                 {!country && <div className="text-xs text-white/35 text-center pt-1">Select destination to see shipping</div>}
                 <div className="border-t border-white/8 pt-2 flex justify-between">
                   <span className="text-white/50">Total order</span>
-                  <span className="font-bold">CAD ${country ? totalPrice : '—'}</span>
+                  <div className="text-right">
+                    <div className="font-bold">{country ? `${sym}${fxTotal.toFixed(2)}` : '—'}</div>
+                    {currency !== 'CAD' && country && <div className="text-[10px] text-white/30">≈ CAD ${totalPrice} · incl. 3% Wise fee</div>}
+                  </div>
                 </div>
                 <div className="flex justify-between text-fuchsia-300 font-black">
                   <span>30% DP due now</span>
-                  <span>CAD ${country ? totalDp : '—'}</span>
+                  <span>{country ? `${sym}${fxDp.toFixed(2)}` : '—'}</span>
                 </div>
                 <div className="flex justify-between text-white/40">
                   <span>Remaining on arrival</span>
-                  <span>CAD ${country ? totalRemaining : '—'}</span>
+                  <span>{country ? `${sym}${fxRemaining.toFixed(2)}` : '—'}</span>
                 </div>
               </div>
 
@@ -493,7 +525,8 @@ function PreOrderModal({ item, onClose, userEmail }) {
               {/* Amount to send */}
               <div className="mb-4 rounded-2xl border border-fuchsia-400/25 bg-fuchsia-400/8 p-4 text-center">
                 <div className="text-xs font-black uppercase tracking-[0.16em] text-fuchsia-300/70 mb-1">Amount to send</div>
-                <div className="text-4xl font-black text-fuchsia-200">CAD ${totalDp}</div>
+                <div className="text-4xl font-black text-fuchsia-200">{sym}{fxDp.toFixed(2)}</div>
+                {currency !== 'CAD' && <div className="text-xs text-white/30 mt-0.5">≈ CAD ${totalDp} · incl. 3% Wise fee</div>}
                 <div className="text-xs text-white/40 mt-1">30% downpayment · {qty}× {item.title.split(' ').slice(0, 4).join(' ')}...</div>
               </div>
 
@@ -523,7 +556,7 @@ function PreOrderModal({ item, onClose, userEmail }) {
               {/* Steps */}
               <div className="mb-5 space-y-2">
                 {[
-                  { n: '1', text: `Open Wise and send CAD $${totalDp} to ${WISE_HANDLE}` },
+                  { n: '1', text: `Open Wise and send ${sym}${fxDp.toFixed(2)} to ${WISE_HANDLE}` },
                   { n: '2', text: 'In the Wise reference/note, include your name and order item.' },
                   { n: '3', text: 'Take a screenshot of the completed transaction.' },
                   { n: '4', text: `Email the screenshot to ${CONTACT_EMAIL} — we confirm within 24h.` },
