@@ -103,8 +103,10 @@ export default function AdminPage() {
   const [orderFilter, setOrderFilter] = useState('all');
   const [orderTypeFilter, setOrderTypeFilter] = useState('all');
   const [search, setSearch] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo]     = useState('');
+  const [dateFrom, setDateFrom]           = useState('');
+  const [dateTo, setDateTo]               = useState('');
+  const [appliedDateFrom, setAppliedFrom] = useState('');
+  const [appliedDateTo, setAppliedTo]     = useState('');
   const [selectedOrderId, setSelectedOrderId] = useState('');
   const [products, setProducts] = useState(() => mergeProducts([]));
   const [loading, setLoading] = useState(true);
@@ -924,8 +926,8 @@ export default function AdminPage() {
     if (orderFilter === 'confirmed' && order.status !== 'confirmed') return false;
     if (orderTypeFilter === 'on_hand' && order.order_type !== 'on_hand') return false;
     if (orderTypeFilter === 'pre_order' && order.order_type !== 'pre_order') return false;
-    if (dateFrom) { const d = new Date(order.created_at); if (d < new Date(dateFrom)) return false; }
-    if (dateTo)   { const d = new Date(order.created_at); if (d > new Date(dateTo + 'T23:59:59')) return false; }
+    if (appliedDateFrom) { const d = new Date(order.created_at); if (d < new Date(appliedDateFrom)) return false; }
+    if (appliedDateTo)   { const d = new Date(order.created_at); if (d > new Date(appliedDateTo + 'T23:59:59')) return false; }
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       const matchNum = (order.order_number || '').toLowerCase().includes(q);
@@ -981,6 +983,11 @@ export default function AdminPage() {
             <div className="mt-2 text-xs text-white/45">
               {order.buyer_name} | Qty {order.quantity} | {formatMoney(order.total_price)}
             </div>
+            {order.created_at && (
+              <div className="mt-1 text-[10px] text-white/30">
+                Ordered {new Date(order.created_at).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </div>
+            )}
           </div>
           <div className="flex flex-wrap gap-2">
             <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${orderMeta.className}`}>
@@ -1179,8 +1186,13 @@ export default function AdminPage() {
                 <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
                   className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-cyan-300/50 [color-scheme:dark]" />
               </div>
-              {(dateFrom || dateTo) && (
-                <button onClick={() => { setDateFrom(''); setDateTo(''); }}
+              <button
+                onClick={() => { setAppliedFrom(dateFrom); setAppliedTo(dateTo); }}
+                className="rounded-xl bg-gradient-to-r from-cyan-300 to-fuchsia-400 px-4 py-2 text-xs font-black uppercase tracking-[0.1em] text-black transition hover:opacity-90">
+                Filter
+              </button>
+              {(appliedDateFrom || appliedDateTo) && (
+                <button onClick={() => { setDateFrom(''); setDateTo(''); setAppliedFrom(''); setAppliedTo(''); }}
                   className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-black uppercase text-white/50 hover:bg-white/10">
                   Clear
                 </button>
