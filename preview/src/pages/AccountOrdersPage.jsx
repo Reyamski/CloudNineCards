@@ -45,6 +45,7 @@ export default function AccountOrdersPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedIdx, setSelectedIdx] = useState(0);
 
   useEffect(() => { document.title = 'My Orders | CloudNineCards'; }, []);
 
@@ -232,83 +233,104 @@ export default function AccountOrdersPage() {
                     Clear filters
                   </button>
                 </div>
-              ) : (
-                <div className="flex flex-col gap-4">
-                  {filtered.map((order, idx) => (
-              <motion.div
-                key={order.order_number ?? idx}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.35, delay: idx * 0.05 }}
-                className="rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,#0b1022,#14081d)] p-6"
-              >
-                {/* Header row */}
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-xs font-black uppercase tracking-[0.18em] text-white/40">#{order.order_number ?? '—'}</span>
-                      <OrderTypeBadge type={order.order_type} />
+              ) : (() => {
+                const sel = filtered[Math.min(selectedIdx, filtered.length - 1)];
+                return (
+                  <div className="grid gap-4 xl:grid-cols-[340px_1fr] items-start">
+                    {/* ── Compact order list ─────────────────────────── */}
+                    <div className="space-y-2 xl:max-h-[calc(100vh-260px)] xl:overflow-y-auto xl:pr-1">
+                      {filtered.map((order, idx) => {
+                        const active = idx === Math.min(selectedIdx, filtered.length - 1);
+                        return (
+                          <button key={order.order_number ?? idx} onClick={() => setSelectedIdx(idx)}
+                            className={`w-full rounded-[18px] border p-4 text-left transition ${active ? 'border-cyan-300/40 bg-cyan-300/8' : 'border-white/8 bg-white/3 hover:bg-white/6'}`}>
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-[10px] font-black uppercase tracking-[0.16em] text-white/35">#{order.order_number ?? '—'}</span>
+                                  <OrderTypeBadge type={order.order_type} />
+                                </div>
+                                <div className="truncate text-sm font-black text-white">{order.item_title ?? order.product_title}</div>
+                                <div className="mt-0.5 text-xs text-white/40">Qty {order.quantity} · {order.delivery_country ?? 'Canada'}</div>
+                              </div>
+                              <div className="shrink-0 text-right">
+                                <StatusBadge status={order.payment_status ?? order.status} />
+                                <div className="mt-1 text-sm font-black text-white">CAD ${safeNum(order.full_price ?? order.total_price).toFixed(2)}</div>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
-                    <div className="mt-1.5 text-xl font-black leading-snug">{order.item_title ?? order.product_title}</div>
-                    <div className="mt-1 text-sm text-white/45">Qty: {order.quantity} · {order.delivery_country ?? 'Canada'}</div>
-                    {order.eta && <div className="mt-1 text-xs font-black text-cyan-300/70">ETA: {order.eta}</div>}
-                  </div>
-                  <div className="text-right">
-                    <StatusBadge status={order.payment_status ?? order.status} />
-                    <div className="mt-2 text-3xl font-black">CAD ${safeNum(order.full_price ?? order.total_price).toFixed(2)}</div>
-                  </div>
-                </div>
 
-                {/* Price breakdown */}
-                <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-1.5 border-t border-white/5 pt-4 text-sm sm:grid-cols-3">
-                  {safeNum(order.dp_amount) > 0 && <>
-                    <div className="text-white/40">Down payment (30% DP)</div>
-                    <div className="text-right font-black text-emerald-300">CAD ${safeNum(order.dp_amount).toFixed(2)}</div>
-                    <div className="hidden sm:block" />
-                    <div className="text-white/40">Balance on delivery (70%)</div>
-                    <div className="text-right font-black text-yellow-300">CAD ${safeNum(order.balance_due).toFixed(2)}</div>
-                    <div className="hidden sm:block" />
-                  </>}
-                  {safeNum(order.delivery_fee) > 0 && <>
-                    <div className="text-white/40">Shipping</div>
-                    <div className="text-right text-white/70">CAD ${safeNum(order.delivery_fee).toFixed(2)}</div>
-                    <div className="hidden sm:block" />
-                  </>}
-                  {safeNum(order.tax_amount) > 0 && <>
-                    <div className="text-white/40">Tax</div>
-                    <div className="text-right text-white/70">CAD ${safeNum(order.tax_amount).toFixed(2)}</div>
-                    <div className="hidden sm:block" />
-                  </>}
-                  {order.buyer_address && <>
-                    <div className="text-white/40">Ship to</div>
-                    <div className="col-span-1 text-right text-white/60 sm:col-span-2">{order.buyer_address}</div>
-                  </>}
-                </div>
+                    {/* ── Order detail pane ──────────────────────────── */}
+                    {sel && (
+                      <motion.div key={sel.order_number} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}
+                        className="rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,#0b1022,#14081d)] p-6 xl:sticky xl:top-6">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-xs font-black uppercase tracking-[0.18em] text-white/40">#{sel.order_number ?? '—'}</span>
+                              <OrderTypeBadge type={sel.order_type} />
+                            </div>
+                            <div className="mt-1.5 text-xl font-black leading-snug">{sel.item_title ?? sel.product_title}</div>
+                            <div className="mt-1 text-sm text-white/45">Qty: {sel.quantity} · {sel.delivery_country ?? 'Canada'}</div>
+                            {sel.eta && <div className="mt-1 text-xs font-black text-cyan-300/70">ETA: {sel.eta}</div>}
+                          </div>
+                          <div className="text-right">
+                            <StatusBadge status={sel.payment_status ?? sel.status} />
+                            <div className="mt-2 text-3xl font-black">CAD ${safeNum(sel.full_price ?? sel.total_price).toFixed(2)}</div>
+                          </div>
+                        </div>
 
-                {/* Payment instructions if awaiting */}
-                {(order.payment_status === 'awaiting_payment' || order.status === 'awaiting_payment') && (
-                  <div className="mt-4 rounded-2xl border border-yellow-400/25 bg-yellow-400/8 px-4 py-3">
-                    <div className="text-xs font-black uppercase tracking-[0.14em] text-yellow-300">Action required — send payment via Wise</div>
-                    <div className="mt-1 text-sm text-white/60">
-                      Send <span className="font-black text-white">CAD ${safeNum(order.balance_due ?? order.full_price ?? order.total_price).toFixed(2)}</span> to{' '}
-                      <span className="font-black text-yellow-300">@cloudninecards</span> on Wise, then submit your payment screenshot in the shop.
-                    </div>
+                        <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-1.5 border-t border-white/5 pt-4 text-sm sm:grid-cols-3">
+                          {safeNum(sel.dp_amount) > 0 && <>
+                            <div className="text-white/40">Down payment (30% DP)</div>
+                            <div className="text-right font-black text-emerald-300">CAD ${safeNum(sel.dp_amount).toFixed(2)}</div>
+                            <div className="hidden sm:block" />
+                            <div className="text-white/40">Balance on delivery (70%)</div>
+                            <div className="text-right font-black text-yellow-300">CAD ${safeNum(sel.balance_due).toFixed(2)}</div>
+                            <div className="hidden sm:block" />
+                          </>}
+                          {safeNum(sel.delivery_fee) > 0 && <>
+                            <div className="text-white/40">Shipping</div>
+                            <div className="text-right text-white/70">CAD ${safeNum(sel.delivery_fee).toFixed(2)}</div>
+                            <div className="hidden sm:block" />
+                          </>}
+                          {safeNum(sel.tax_amount) > 0 && <>
+                            <div className="text-white/40">Tax</div>
+                            <div className="text-right text-white/70">CAD ${safeNum(sel.tax_amount).toFixed(2)}</div>
+                            <div className="hidden sm:block" />
+                          </>}
+                          {sel.buyer_address && <>
+                            <div className="text-white/40">Ship to</div>
+                            <div className="col-span-1 text-right text-white/60 sm:col-span-2">{sel.buyer_address}</div>
+                          </>}
+                        </div>
+
+                        {(sel.payment_status === 'awaiting_payment' || sel.status === 'awaiting_payment') && (
+                          <div className="mt-4 rounded-2xl border border-yellow-400/25 bg-yellow-400/8 px-4 py-3">
+                            <div className="text-xs font-black uppercase tracking-[0.14em] text-yellow-300">Action required — send payment via Wise</div>
+                            <div className="mt-1 text-sm text-white/60">
+                              Send <span className="font-black text-white">CAD ${safeNum(sel.balance_due ?? sel.full_price ?? sel.total_price).toFixed(2)}</span> to{' '}
+                              <span className="font-black text-yellow-300">@cloudninecards</span> on Wise, then submit your payment screenshot in the shop.
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-3">
+                          <span className="text-xs text-white/30">
+                            Ordered {new Date(sel.created_at).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })}
+                          </span>
+                          <a href="mailto:papspective@gmail.com" className="text-xs font-black uppercase tracking-[0.1em] text-cyan-400/70 hover:text-cyan-300 transition">
+                            Contact Support →
+                          </a>
+                        </div>
+                      </motion.div>
+                    )}
                   </div>
-                )}
-
-                {/* Footer */}
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-3">
-                  <span className="text-xs text-white/30">
-                    Ordered {new Date(order.created_at).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })}
-                  </span>
-                  <a href="mailto:papspective@gmail.com" className="text-xs font-black uppercase tracking-[0.1em] text-cyan-400/70 hover:text-cyan-300 transition">
-                    Contact Support →
-                  </a>
-                </div>
-              </motion.div>
-                  ))}
-                </div>
-              )}
+                );
+              })()}
             </>
           );
         })()}

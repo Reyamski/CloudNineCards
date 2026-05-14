@@ -498,7 +498,7 @@ export default function AdminPage() {
         .from('config')
         .select('value')
         .eq('key', 'po_close_date')
-        .single();
+        .maybeSingle();
       if (poDate?.value) setPoCloseDate(poDate.value.slice(0, 10));
 
       setLoading(false);
@@ -1149,12 +1149,12 @@ export default function AdminPage() {
             ) : null}
 
             {visibleOrders.length ? (
-              <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-                <div className="space-y-3">
+              <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr] items-start">
+                <div className="space-y-3 max-h-[calc(100vh-340px)] overflow-y-auto pr-1">
                   {visibleOrders.map(renderOrderRow)}
                 </div>
 
-                <div className="rounded-[28px] border border-white/10 bg-white/5 p-5">
+                <div className="rounded-[28px] border border-white/10 bg-white/5 p-5 sticky top-6 max-h-[calc(100vh-100px)] overflow-y-auto">
                   {selectedOrder ? (
                     <>
                       <div className="flex flex-wrap items-start justify-between gap-3">
