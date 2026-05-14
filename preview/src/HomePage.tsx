@@ -34,7 +34,7 @@ const BASE_STOCK_SPOTLIGHT = [
     link: '/shop?product=ac1',
     badge: 'Featured',
     title: 'Admirable Collection AC-01',
-    body: 'Collector-focused premium stock with live quantity awareness on the storefront.',
+    body: 'Japanese booster box. In stock, ready to ship.',
     image: '/ac1.webp',
     price: 'CAD $279.00',
     subtitle: 'Japanese',
@@ -44,7 +44,7 @@ const BASE_STOCK_SPOTLIGHT = [
     link: '/shop?product=poke-ah',
     badge: 'Pokemon',
     title: 'Ascended Heroes ETB',
-    body: 'Pokemon stock joins the homepage only when it is really available for buyers.',
+    body: 'English ETB. In stock, ships from Canada.',
     image: '/ascended.jpg',
     price: 'CAD $279.00',
     subtitle: 'English',
@@ -52,10 +52,10 @@ const BASE_STOCK_SPOTLIGHT = [
 ];
 
 const trust = [
-  {icon: ShieldCheck, title: 'Verified Seller', desc: 'Real buyers, real feedback, and transparent communication before payment.'},
-  {icon: Truck, title: 'Shipping Clarity', desc: 'Shipping and tax expectations are surfaced clearly before the order is placed.'},
-  {icon: Flame, title: 'Live Inventory', desc: 'The homepage now focuses on products that are actually in stock right now.'},
-  {icon: Star, title: 'Collector First', desc: 'Sealed products, careful packaging, and a premium storefront feel from landing to checkout.'},
+  {icon: ShieldCheck, title: 'Verified Seller', desc: 'Real buyers, real orders, fast replies. You know what you\'re getting before you pay.'},
+  {icon: Truck, title: 'No Hidden Costs', desc: 'Shipping and tax are shown before you confirm. No surprises at checkout.'},
+  {icon: Flame, title: 'Live Stock', desc: 'What you see is what\'s actually available. Sold out means sold out.'},
+  {icon: Star, title: 'Packed Right', desc: 'Every order is inspected and packed carefully. Photos available on request.'},
 ];
 
 const vouches = [

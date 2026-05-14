@@ -82,7 +82,7 @@ export default function BuylistPage() {
               </span>
             </h1>
             <p className="mt-4 max-w-xl text-base text-white/65">
-              Got sealed product, singles, or collections to sell? Send us your list and we'll get back with a quote within 24–48h.
+              Selling sealed product, singles, or a collection? Send your list and we'll reply with a quote within 24–48h.
             </p>
           </motion.div>
         </div>
@@ -93,10 +93,10 @@ export default function BuylistPage() {
           {/* Info side */}
           <div className="flex flex-col gap-5">
             {[
-              { icon: DollarSign, accent: 'yellow',  title: 'Competitive Offers', desc: 'We price check current market rates and offer fair value — no low-ball nonsense.' },
-              { icon: Clock,      accent: 'cyan',    title: 'Fast Response',       desc: 'Quote within 24–48h. If we want it, we move quick — no long back-and-forths.' },
-              { icon: ShieldCheck,accent: 'fuchsia', title: 'Safe & Simple',       desc: 'Payment via Wise or e-Transfer (Canada). Shipping covered on accepted offers over $100.' },
-              { icon: Sparkles,   accent: 'yellow',  title: 'What We Buy',         desc: 'One Piece TCG (JP & EN), Pokémon, Dragon Ball. Sealed product, high-value singles, full collections.' },
+              { icon: DollarSign, accent: 'yellow',  title: 'Fair Offers',    desc: 'We check current market prices and pay fair. No lowballs.' },
+              { icon: Clock,      accent: 'cyan',    title: 'Fast Response',  desc: 'Quote within 24–48h. If we want it, we move fast.' },
+              { icon: ShieldCheck,accent: 'fuchsia', title: 'Safe & Simple',  desc: 'Paid via Wise or e-Transfer. We cover shipping on accepted offers over $100.' },
+              { icon: Sparkles,   accent: 'yellow',  title: 'What We Buy',    desc: 'One Piece (JP & EN), Pokémon, Dragon Ball. Sealed boxes, singles, full collections.' },
             ].map(({ icon: Icon, accent, title, desc }) => {
               const colors = {
                 yellow:  { border: 'border-yellow-400/20',  bg: 'bg-yellow-400/8',  icon: 'text-yellow-300' },
@@ -200,7 +200,7 @@ export default function BuylistPage() {
                   </div>
 
                   <div className="rounded-2xl border border-yellow-400/20 bg-yellow-400/8 px-4 py-3 text-xs text-yellow-100/70 leading-5">
-                    <strong className="text-yellow-300">Heads up:</strong> Submitting this form does not guarantee a purchase. We'll review your list and respond with a quote or decline within 48h. No commitment on either side until we agree on terms.
+                    <strong className="text-yellow-300">Heads up:</strong> Submitting this doesn't lock anything in. We'll review and reply within 48h with a quote or a pass. No obligation either way.
                   </div>
 
                   {sendError && <div className="rounded-xl border border-red-400/25 bg-red-400/10 px-4 py-3 text-xs text-red-300">{sendError}</div>}

@@ -454,9 +454,9 @@ function BuyNowModal({ item, onClose, userEmail }) {
               {/* Terms */}
               <div className="mb-5 space-y-2">
                 {[
-                  { icon: Globe,       text: 'International shipping & customs taxes are covered by the buyer.' },
-                  { icon: Package,     text: 'Item ships within 3–5 business days after payment is confirmed.' },
-                  { icon: ShieldCheck, text: 'All items are inspected before shipment. Photos sent on request.' },
+                  { icon: Globe,       text: 'International buyers cover shipping & customs — not included in price.' },
+                  { icon: Package,     text: 'Ships 3–5 business days after payment clears. Photos on request.' },
+                  { icon: ShieldCheck, text: 'Every item is checked before it goes out. Something wrong? We fix it.' },
                 ].map(({ icon: Icon, text }) => (
                   <div key={text} className="flex gap-2.5 rounded-xl border border-white/8 bg-white/4 p-3">
                     <Icon className="h-4 w-4 text-cyan-300/60 shrink-0 mt-0.5" />
@@ -848,7 +848,7 @@ export default function ShopPage() {
           <div className="py-20 text-center">
             <div className="text-5xl mb-4">📦</div>
             <div className="text-xl font-black uppercase">No {activeTag} stock right now</div>
-            <p className="mt-2 text-sm text-white/50">We're working on it — join the email list to get notified first.</p>
+            <p className="mt-2 text-sm text-white/50">Nothing here right now — follow us on Instagram to catch the next drop.</p>
             <button onClick={() => setActiveTag('All')} className="mt-6 rounded-2xl border border-white/15 bg-white/5 px-6 py-2.5 text-sm font-black uppercase tracking-[0.1em] text-white/75 hover:bg-white/10">
               View all products
             </button>

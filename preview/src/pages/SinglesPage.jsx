@@ -535,7 +535,7 @@ export default function SinglesPage() {
               Singles
               <span className="block bg-gradient-to-r from-cyan-300 via-fuchsia-300 to-yellow-300 bg-clip-text text-transparent">Marketplace</span>
             </h1>
-            <p className="mt-2 text-sm text-white/50 max-w-md">One Piece · Pokémon · Dragon Ball. Graded by condition. Shipped from Canada — sleeved in toploader.</p>
+            <p className="mt-2 text-sm text-white/50 max-w-md">Every card ships sleeved in a toploader from Canada. Graded honestly — NM means NM.</p>
           </div>
         </div>
       </section>
@@ -643,9 +643,9 @@ export default function SinglesPage() {
         {!loading && (
           <div className="mt-12 grid gap-4 sm:grid-cols-3">
             {[
-              { icon: Package,     title: 'Tracked Shipping',    desc: 'All singles ship sleeve + toploader via tracked mail. Canada $6 · USA $15 · International from $22.' },
-              { icon: Globe,       title: 'Ships Worldwide',     desc: 'Free domestic shipping on Canadian orders over CAD $100.' },
-              { icon: ShieldCheck, title: 'Condition Guarantee', desc: 'Cards graded honestly. Arrives worse than listed? We make it right.' },
+              { icon: Package,     title: 'Tracked Shipping',    desc: 'Sleeved in toploader, tracked mail. Canada $6 · USA $15 · International from $22.' },
+              { icon: Globe,       title: 'Ships Worldwide',     desc: 'Free shipping in Canada on orders over $100.' },
+              { icon: ShieldCheck, title: 'Condition Guarantee', desc: 'NM means NM. If it shows up worse than described, we fix it.' },
             ].map(({ icon: Icon, title, desc }) => (
               <div key={title} className="rounded-[20px] border border-white/8 bg-white/3 p-4 flex gap-3">
                 <Icon className="h-5 w-5 text-cyan-300/70 shrink-0 mt-0.5" />

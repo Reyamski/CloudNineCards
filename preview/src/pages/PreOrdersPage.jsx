@@ -491,9 +491,9 @@ function PreOrderModal({ item, onClose, userEmail }) {
               {/* Terms */}
               <div className="mb-5 space-y-2">
                 {[
-                  { icon: Globe, text: 'International shipping — all shipping fees and customs/import taxes are shouldered by the buyer.' },
-                  { icon: CreditCard, text: 'Payment via Wise only. 30% downpayment required to secure your pre-order.' },
-                  { icon: Truck, text: 'Balance (70%) is due before item ships. We will contact you when ready.' },
+                  { icon: Globe, text: 'You cover shipping & customs — not included in the price. Quoted before balance is due.' },
+                  { icon: CreditCard, text: '30% DP via Wise locks in your order. Balance due before we ship.' },
+                  { icon: Truck, text: "We'll reach out when your order is ready. ETA is estimated, not guaranteed." },
                   { icon: AlertTriangle, text: 'Pre-orders are non-refundable once the DP is received.' },
                   { icon: AlertTriangle, text: 'Allocation is not guaranteed. In case of allocation cut by the publisher, a full refund will be issued.' },
                   ...(item.notes ?? []).map(text => ({ icon: AlertTriangle, text })),
@@ -881,7 +881,7 @@ export default function PreOrdersPage() {
         <div className="flex items-start gap-3 rounded-[20px] border border-yellow-400/20 bg-yellow-400/6 p-4">
           <Globe className="h-5 w-5 text-yellow-300 shrink-0 mt-0.5" />
           <p className="text-sm text-white/65 leading-6">
-            <span className="font-black text-yellow-200">International Shipping Notice —</span> All pre-orders are shipped internationally. Shipping fees, customs duties, and import taxes are fully shouldered by the buyer and are not included in the product price. You will be quoted actual shipping cost before your balance payment is collected.
+            <span className="font-black text-yellow-200">Shipping heads up —</span> You cover shipping, customs, and import taxes. None of that is in the listed price. We'll quote you the actual shipping cost before the balance is due.
           </p>
         </div>
       </section>
@@ -897,7 +897,7 @@ export default function PreOrdersPage() {
           <div className="py-20 text-center">
             <div className="text-4xl mb-3">📦</div>
             <div className="text-lg font-black uppercase text-white/60">No pre-orders available</div>
-            <p className="mt-1 text-sm text-white/35">Check back soon for upcoming releases.</p>
+            <p className="mt-1 text-sm text-white/35">Nothing open right now — follow us on Instagram for the next drop.</p>
           </div>
         )}
         <div className="grid gap-6 md:grid-cols-3">

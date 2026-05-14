@@ -26,7 +26,7 @@ export default function Nav() {
               CLOUDNINECARDS
             </div>
             <div className="mt-1 text-xs uppercase tracking-[0.34em] text-white/45">
-              full hype anime • premium tcg drops • sealed madness
+              one piece · pokémon · dragon ball · shipped from canada
             </div>
           </div>
         </Link>
