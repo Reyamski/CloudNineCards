@@ -103,6 +103,8 @@ export default function AdminPage() {
   const [orderFilter, setOrderFilter] = useState('all');
   const [orderTypeFilter, setOrderTypeFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo]     = useState('');
   const [selectedOrderId, setSelectedOrderId] = useState('');
   const [products, setProducts] = useState(() => mergeProducts([]));
   const [loading, setLoading] = useState(true);
@@ -922,6 +924,8 @@ export default function AdminPage() {
     if (orderFilter === 'confirmed' && order.status !== 'confirmed') return false;
     if (orderTypeFilter === 'on_hand' && order.order_type !== 'on_hand') return false;
     if (orderTypeFilter === 'pre_order' && order.order_type !== 'pre_order') return false;
+    if (dateFrom) { const d = new Date(order.created_at); if (d < new Date(dateFrom)) return false; }
+    if (dateTo)   { const d = new Date(order.created_at); if (d > new Date(dateTo + 'T23:59:59')) return false; }
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       const matchNum = (order.order_number || '').toLowerCase().includes(q);
@@ -930,6 +934,22 @@ export default function AdminPage() {
     }
     return true;
   });
+
+  function exportOrdersCSV() {
+    const rows = [
+      ['Order #', 'Buyer', 'Email', 'Product', 'Variant', 'Qty', 'Total (CAD)', 'Type', 'Status', 'Payment', 'Created'],
+      ...filteredOrders.map(o => [
+        o.order_number, o.buyer_name, o.buyer_email, o.product_title, o.product_variant,
+        o.quantity, o.total_price, o.order_type, o.status, o.payment_status,
+        o.created_at ? new Date(o.created_at).toLocaleDateString() : '',
+      ]),
+    ];
+    const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `orders-${new Date().toISOString().slice(0,10)}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  }
   const visibleOrders = filteredOrders.slice(0, 50);
   const selectedOrder = visibleOrders.find((order) => order.id === selectedOrderId) || visibleOrders[0] || null;
 
@@ -1052,6 +1072,14 @@ export default function AdminPage() {
             >
               Products
             </button>
+            <button
+              onClick={() => setActiveTab('analytics')}
+              className={`rounded-2xl px-4 py-2.5 text-sm font-black uppercase tracking-[0.08em] transition ${
+                activeTab === 'analytics' ? 'bg-gradient-to-r from-yellow-300 via-amber-300 to-fuchsia-400 text-black' : 'border border-white/15 bg-white/5 text-white/70 hover:bg-white/10'
+              }`}
+            >
+              Analytics
+            </button>
           </div>
         </div>
 
@@ -1138,6 +1166,29 @@ export default function AdminPage() {
                   {filter.label}
                 </button>
               ))}
+            </div>
+
+            <div className="mb-3 flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <label className="text-[10px] font-black uppercase tracking-[0.16em] text-white/40">From</label>
+                <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                  className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-cyan-300/50 [color-scheme:dark]" />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-[10px] font-black uppercase tracking-[0.16em] text-white/40">To</label>
+                <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                  className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-cyan-300/50 [color-scheme:dark]" />
+              </div>
+              {(dateFrom || dateTo) && (
+                <button onClick={() => { setDateFrom(''); setDateTo(''); }}
+                  className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-black uppercase text-white/50 hover:bg-white/10">
+                  Clear
+                </button>
+              )}
+              <button onClick={exportOrdersCSV}
+                className="ml-auto rounded-xl border border-emerald-400/25 bg-emerald-400/8 px-4 py-2 text-xs font-black uppercase tracking-[0.1em] text-emerald-300 hover:bg-emerald-400/15 transition">
+                Export CSV
+              </button>
             </div>
 
             <div className="mb-5">
@@ -2075,6 +2126,112 @@ export default function AdminPage() {
             <p className="mt-3 text-xs text-white/25">Click price or stock qty to edit inline. Click status badge to toggle in-stock/sold-out. Press Enter to save, Escape to cancel.</p>
           </div>
         ) : null}
+
+        {/* ── Analytics tab ─────────────────────────────────────────────────── */}
+        {activeTab === 'analytics' ? (() => {
+          const confirmed = orders.filter(o => o.status === 'confirmed');
+          const totalRevenue = confirmed.reduce((s, o) => s + (parseFloat(o.total_price) || 0), 0);
+          const avgOrder = confirmed.length ? totalRevenue / confirmed.length : 0;
+          const pendingRevenue = orders.filter(o => o.status === 'pending').reduce((s, o) => s + (parseFloat(o.total_price) || 0), 0);
+
+          // Top products by revenue
+          const productMap = {};
+          confirmed.forEach(o => {
+            const k = o.product_title || 'Unknown';
+            if (!productMap[k]) productMap[k] = { count: 0, revenue: 0 };
+            productMap[k].count += o.quantity || 1;
+            productMap[k].revenue += parseFloat(o.total_price) || 0;
+          });
+          const topProducts = Object.entries(productMap).sort((a, b) => b[1].revenue - a[1].revenue).slice(0, 5);
+
+          // Daily revenue last 30 days
+          const days = Array.from({ length: 30 }, (_, i) => {
+            const d = new Date(); d.setDate(d.getDate() - (29 - i));
+            return d.toISOString().slice(0, 10);
+          });
+          const dailyMap = {};
+          confirmed.forEach(o => {
+            if (!o.created_at) return;
+            const day = o.created_at.slice(0, 10);
+            dailyMap[day] = (dailyMap[day] || 0) + (parseFloat(o.total_price) || 0);
+          });
+          const dailyData = days.map(d => ({ day: d, rev: dailyMap[d] || 0 }));
+          const maxRev = Math.max(...dailyData.map(d => d.rev), 1);
+
+          return (
+            <div>
+              <div className="mb-6 text-xs font-black uppercase tracking-[0.2em] text-yellow-300/70">Sales Analytics</div>
+
+              {/* Summary cards */}
+              <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  { label: 'Confirmed Revenue', value: `CAD $${totalRevenue.toFixed(2)}`, color: 'emerald' },
+                  { label: 'Total Orders', value: confirmed.length, color: 'cyan' },
+                  { label: 'Avg Order Value', value: `CAD $${avgOrder.toFixed(2)}`, color: 'fuchsia' },
+                  { label: 'Pending Revenue', value: `CAD $${pendingRevenue.toFixed(2)}`, color: 'yellow' },
+                ].map(({ label, value, color }) => {
+                  const c = { emerald: ['border-emerald-400/20','bg-emerald-400/8','text-emerald-300'], cyan: ['border-cyan-400/20','bg-cyan-400/8','text-cyan-300'], fuchsia: ['border-fuchsia-400/20','bg-fuchsia-400/8','text-fuchsia-300'], yellow: ['border-yellow-400/20','bg-yellow-400/8','text-yellow-300'] }[color];
+                  return (
+                    <div key={label} className={`rounded-[20px] border ${c[0]} ${c[1]} px-5 py-4`}>
+                      <div className="text-[10px] font-black uppercase tracking-[0.16em] text-white/40">{label}</div>
+                      <div className={`mt-1.5 text-2xl font-black ${c[2]}`}>{value}</div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Daily revenue bar chart */}
+              <div className="mb-8 rounded-[24px] border border-white/10 bg-white/3 p-6">
+                <div className="mb-4 text-xs font-black uppercase tracking-[0.18em] text-white/50">Daily Revenue — Last 30 Days (Confirmed)</div>
+                <div className="flex items-end gap-[3px] h-40">
+                  {dailyData.map(({ day, rev }) => (
+                    <div key={day} className="group relative flex-1 flex flex-col items-center justify-end h-full">
+                      <div
+                        className="w-full rounded-t-sm bg-gradient-to-t from-fuchsia-500/70 to-cyan-400/70 transition-all"
+                        style={{ height: `${(rev / maxRev) * 100}%`, minHeight: rev > 0 ? '3px' : '0' }}
+                      />
+                      {rev > 0 && (
+                        <div className="absolute bottom-full mb-1 hidden group-hover:block whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2 py-1 text-[10px] text-white/80 z-10">
+                          {day}<br />${rev.toFixed(0)}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 flex justify-between text-[10px] text-white/25">
+                  <span>{days[0]}</span>
+                  <span>{days[14]}</span>
+                  <span>{days[29]}</span>
+                </div>
+              </div>
+
+              {/* Top products */}
+              <div className="rounded-[24px] border border-white/10 bg-white/3 p-6">
+                <div className="mb-4 text-xs font-black uppercase tracking-[0.18em] text-white/50">Top Products by Revenue</div>
+                {topProducts.length === 0 ? (
+                  <p className="text-sm text-white/30 text-center py-6">No confirmed orders yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {topProducts.map(([name, { count, revenue }], i) => {
+                      const pct = (revenue / (topProducts[0][1].revenue || 1)) * 100;
+                      return (
+                        <div key={name}>
+                          <div className="flex justify-between text-xs mb-1">
+                            <span className="text-white/70 truncate max-w-[60%]">{i + 1}. {name}</span>
+                            <span className="text-white/50">{count} sold · <span className="text-emerald-300 font-black">${revenue.toFixed(2)}</span></span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-white/8">
+                            <div className="h-full rounded-full bg-gradient-to-r from-fuchsia-400 to-cyan-400" style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })() : null}
 
         <p className="mt-8 text-center text-xs text-white/25">Changes apply to the live shop only when this deployment can read and write Supabase successfully.</p>
       </div>

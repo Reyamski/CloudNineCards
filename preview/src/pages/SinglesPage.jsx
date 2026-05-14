@@ -394,7 +394,7 @@ function SingleCard({ card, onBuy }) {
       className={`group relative rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,#0b1022,#14081d)] overflow-hidden flex flex-col transition-transform duration-300 hover:scale-[1.02]${!card.in_stock ? ' opacity-55' : ''}`}
     >
       <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-yellow-300" />
-      <div className="relative h-[200px] overflow-hidden bg-black/20">
+      <div className="relative h-[340px] overflow-hidden bg-black/20">
         {card.image_url ? (
           <img src={card.image_url} alt={card.card_name}
             className="h-full w-full object-contain p-2 transition duration-500 group-hover:scale-105"
