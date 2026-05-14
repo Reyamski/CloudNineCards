@@ -466,7 +466,7 @@ function PreOrderModal({ item, onClose, userEmail }) {
                 )}
                 {shippingFee > 0 && (
                   <div className="flex justify-between text-white/60">
-                    <span>Est. Shipping <span className="text-white/35 text-[10px]">(+10% buffer)</span></span>
+                    <span>Est. Shipping</span>
                     <span>{sym}{fx(shippingFee)}</span>
                   </div>
                 )}
@@ -954,13 +954,6 @@ export default function PreOrdersPage() {
 
                 <div className="mt-1 text-xs text-white/35">+ international shipping & taxes (buyer's account)</div>
 
-                {(item.usdPrice || item.audPrice || item.eurPrice) && (
-                  <div className="mt-1.5 flex gap-3 text-[11px] text-white/30">
-                    {item.usdPrice && <span>USD ${item.usdPrice.toFixed(2)}</span>}
-                    {item.audPrice && <span>AUD ${item.audPrice.toFixed(2)}</span>}
-                    {item.eurPrice && <span>EUR €{item.eurPrice.toFixed(2)}</span>}
-                  </div>
-                )}
 
                 {item.deadline && !item.soldOut && <CountdownBlock deadline={item.deadline} />}
 
