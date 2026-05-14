@@ -214,6 +214,114 @@ export default function AdminPage() {
   const [prodDragOver, setProdDragOver]                 = useState(false);
   const prodFileInputRef                                = useRef(null);
 
+  // ── Bulk image upload (shared — only one tab active at a time) ────────────
+  const [showBulkPanel, setShowBulkPanel] = useState(false);
+  const [bulkFiles,     setBulkFiles]     = useState([]);   // File[]
+  const [bulkResults,   setBulkResults]   = useState([]);   // { name, preview, url, status }[]
+  const [bulkUploading, setBulkUploading] = useState(false);
+  const bulkInputRef = useRef(null);
+
+  function handleBulkSelect(files) {
+    const arr = Array.from(files).slice(0, 10);
+    setBulkFiles(arr);
+    setBulkResults(arr.map(f => ({ name: f.name, preview: URL.createObjectURL(f), url: '', status: 'pending' })));
+  }
+
+  async function runBulkUpload() {
+    if (!bulkFiles.length) return;
+    setBulkUploading(true);
+    for (let i = 0; i < bulkFiles.length; i++) {
+      setBulkResults(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'uploading' } : r));
+      try {
+        const base64 = await fileToBase64(bulkFiles[i]);
+        const res = await fetch('/api/upload-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageBase64: base64, mediaType: bulkFiles[i].type }),
+        });
+        const json = await res.json();
+        if (json.url) {
+          setBulkResults(prev => prev.map((r, idx) => idx === i ? { ...r, url: json.url, status: 'done' } : r));
+        } else {
+          setBulkResults(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'error' } : r));
+        }
+      } catch {
+        setBulkResults(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'error' } : r));
+      }
+    }
+    setBulkUploading(false);
+  }
+
+  function BulkUploadPanel({ accentClass = 'border-fuchsia-400/25 bg-fuchsia-400/6' }) {
+    return (
+      <div className={`mb-6 rounded-[24px] border ${accentClass} p-5`}>
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-xs font-black uppercase tracking-[0.18em] text-white/60">Bulk Image Upload <span className="text-white/30 normal-case font-normal">(max 10)</span></div>
+          <button onClick={() => { setShowBulkPanel(false); setBulkFiles([]); setBulkResults([]); }}
+            className="text-white/30 hover:text-white/60 transition"><X className="h-4 w-4" /></button>
+        </div>
+
+        {/* File picker */}
+        <div
+          onClick={() => bulkInputRef.current?.click()}
+          onDragOver={e => e.preventDefault()}
+          onDrop={e => { e.preventDefault(); handleBulkSelect(e.dataTransfer.files); }}
+          className="mb-4 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-white/15 bg-black/20 py-8 text-center hover:border-white/30 transition"
+        >
+          <Upload className="h-6 w-6 text-white/30" />
+          <div className="text-sm text-white/40">Drop images here or click to select</div>
+          <div className="text-xs text-white/25">JPEG · PNG · WebP · HEIC · max 10 files</div>
+        </div>
+        <input ref={bulkInputRef} type="file" accept="image/*" multiple className="hidden"
+          onChange={e => handleBulkSelect(e.target.files)} />
+
+        {bulkFiles.length > 0 && (
+          <>
+            {/* Preview grid */}
+            <div className="mb-4 grid grid-cols-5 gap-2">
+              {bulkResults.map((r, i) => (
+                <div key={i} className="relative rounded-xl overflow-hidden border border-white/10 bg-black/20 aspect-[3/4]">
+                  <img src={r.preview} alt={r.name} className="h-full w-full object-cover" />
+                  <div className={`absolute inset-0 flex items-center justify-center ${r.status === 'uploading' ? 'bg-black/50' : r.status === 'done' ? 'bg-emerald-400/15' : r.status === 'error' ? 'bg-red-400/20' : ''}`}>
+                    {r.status === 'uploading' && <Loader2 className="h-5 w-5 animate-spin text-white" />}
+                    {r.status === 'done' && <Check className="h-5 w-5 text-emerald-300" />}
+                    {r.status === 'error' && <X className="h-5 w-5 text-red-300" />}
+                  </div>
+                  <div className="absolute bottom-0 inset-x-0 bg-black/60 px-1 py-0.5 text-[9px] text-white/50 truncate">{r.name}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Upload button */}
+            {bulkResults.some(r => r.status === 'pending') && (
+              <button onClick={runBulkUpload} disabled={bulkUploading}
+                className="mb-4 w-full rounded-2xl bg-gradient-to-r from-fuchsia-400 to-cyan-400 py-2.5 text-sm font-black uppercase tracking-[0.1em] text-black disabled:opacity-50">
+                {bulkUploading ? 'Uploading…' : `Upload ${bulkFiles.length} Image${bulkFiles.length > 1 ? 's' : ''}`}
+              </button>
+            )}
+
+            {/* Results — URLs */}
+            {bulkResults.filter(r => r.status === 'done').length > 0 && (
+              <div className="space-y-2">
+                <div className="text-[10px] font-black uppercase tracking-[0.16em] text-white/40 mb-2">Uploaded URLs — click to copy</div>
+                {bulkResults.filter(r => r.status === 'done').map((r, i) => (
+                  <div key={i} className="flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/6 px-3 py-2">
+                    <img src={r.preview} alt="" className="h-8 w-6 rounded object-cover shrink-0" />
+                    <div className="min-w-0 flex-1 text-[11px] text-white/60 truncate">{r.url}</div>
+                    <button onClick={() => navigator.clipboard.writeText(r.url)}
+                      className="shrink-0 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-black uppercase text-white/50 hover:bg-white/10">
+                      Copy
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    );
+  }
+
   function fileToBase64(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -1423,10 +1531,14 @@ export default function AdminPage() {
                 <div className="text-xs font-black uppercase tracking-[0.2em] text-fuchsia-300/70">Singles Inventory</div>
                 <div className="mt-0.5 text-2xl font-black">{singles.length} card{singles.length !== 1 ? 's' : ''} listed</div>
               </div>
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-3">
                 <button onClick={() => loadSingles()} disabled={singlesLoading}
                   className="rounded-2xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-black uppercase text-white/70 hover:bg-white/10 disabled:opacity-40">
                   {singlesLoading ? 'Loading…' : 'Refresh'}
+                </button>
+                <button onClick={() => { setShowBulkPanel(v => !v); setBulkFiles([]); setBulkResults([]); }}
+                  className="rounded-2xl border border-fuchsia-400/25 bg-fuchsia-400/8 px-4 py-2.5 text-sm font-black uppercase text-fuchsia-200 hover:bg-fuchsia-400/15 transition">
+                  {showBulkPanel ? 'Close Bulk Upload' : 'Bulk Upload Images'}
                 </button>
                 <button onClick={() => { setShowAddForm(v => !v); setAddForm(BLANK_FORM); resetImageState(); }}
                   className="rounded-2xl bg-gradient-to-r from-fuchsia-400 via-purple-400 to-cyan-400 px-5 py-2.5 text-sm font-black uppercase text-black transition hover:opacity-90">
@@ -1434,6 +1546,9 @@ export default function AdminPage() {
                 </button>
               </div>
             </div>
+
+            {/* Bulk upload panel */}
+            {showBulkPanel && <BulkUploadPanel accentClass="border-fuchsia-400/25 bg-fuchsia-400/6" />}
 
             {/* Add form */}
             {showAddForm && (
@@ -1915,10 +2030,14 @@ export default function AdminPage() {
                 <div className="text-xs font-black uppercase tracking-[0.2em] text-emerald-300/70">Products (On-Hand)</div>
                 <div className="mt-0.5 text-2xl font-black">{dbProducts.length} product{dbProducts.length !== 1 ? 's' : ''}</div>
               </div>
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-3">
                 <button onClick={() => loadDbProducts()} disabled={dbProductsLoading}
                   className="rounded-2xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-black uppercase text-white/70 hover:bg-white/10 disabled:opacity-40">
                   {dbProductsLoading ? 'Loading…' : 'Refresh'}
+                </button>
+                <button onClick={() => { setShowBulkPanel(v => !v); setBulkFiles([]); setBulkResults([]); }}
+                  className="rounded-2xl border border-cyan-400/25 bg-cyan-400/8 px-4 py-2.5 text-sm font-black uppercase text-cyan-200 hover:bg-cyan-400/15 transition">
+                  {showBulkPanel ? 'Close Bulk Upload' : 'Bulk Upload Images'}
                 </button>
                 <button onClick={() => { setShowAddProduct(v => !v); setAddProdForm(BLANK_PROD); setProdImagePreview(''); setProdAnalyzed(false); setProdAnalyzeError(''); }}
                   className="rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-emerald-400 px-5 py-2.5 text-sm font-black uppercase text-black transition hover:opacity-90">
@@ -1926,6 +2045,9 @@ export default function AdminPage() {
                 </button>
               </div>
             </div>
+
+            {/* Bulk upload panel */}
+            {showBulkPanel && <BulkUploadPanel accentClass="border-cyan-400/25 bg-cyan-400/6" />}
 
             {/* Add Product form */}
             {showAddProduct && (
