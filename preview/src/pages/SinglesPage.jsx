@@ -7,6 +7,8 @@ import Nav from '../components/Nav';
 import Footer from '../components/Footer';
 import { supabase, supabaseEnabled } from '../lib/supabase';
 import { useAuth } from '../lib/useAuth';
+import { useCart } from '../contexts/CartContext';
+import { useToast } from '../components/Toast';
 
 const EMAILJS_SERVICE_ID  = import.meta.env.VITE_EMAILJS_SERVICE_ID;
 const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ONHAND;
@@ -443,7 +445,7 @@ function SingleCard({ card, onBuy }) {
           {card.in_stock && Number(card.price) > 0 ? (
             <button onClick={() => onBuy(card)}
               className="rounded-xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 px-4 py-2 text-xs font-black uppercase tracking-[0.08em] text-black transition hover:opacity-90">
-              Buy
+              Add to Cart
             </button>
           ) : (
             <button disabled className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.08em] text-white/25 cursor-not-allowed">
@@ -520,9 +522,24 @@ export default function SinglesPage() {
     });
   }, [singles, gameFilter, langFilter, condFilter, inStockOnly, search, sort]);
 
+  const { addItem } = useCart();
+  const { showToast } = useToast();
+
   function handleBuy(card) {
-    // Auth gate moved to checkout submit — anon users can browse the modal.
-    setSelected(card);
+    // Add-to-cart replaces the legacy buy modal. Buyer reviews and submits
+    // on /cart (the merged checkout page).
+    addItem({
+      key:        `singles:${card.id}`,
+      source:     'singles',
+      id:         card.id,
+      title:      card.card_name,
+      image:      card.image_url,
+      price:      Number(card.price) || 0,
+      qty:        1,
+      isPreorder: false,
+      currency:   'CAD',
+    });
+    showToast(`Added — ${card.card_name}`, { actionTo: '/cart', actionLabel: 'View Cart' });
   }
 
   return (

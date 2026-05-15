@@ -8,6 +8,8 @@ import Nav from '../components/Nav';
 import Footer from '../components/Footer';
 import { supabase } from '../lib/supabase';
 import DPCalculator from '../components/DPCalculator';
+import { useCart } from '../contexts/CartContext';
+import { useToast } from '../components/Toast';
 
 // ── EmailJS config ───────────────────────────────────────────────────────────
 const EMAILJS_SERVICE_ID  = import.meta.env.VITE_EMAILJS_SERVICE_ID;
@@ -719,6 +721,26 @@ export default function PreOrdersPage() {
   const [showCalc, setShowCalc] = useState(false);
   const [preorders, setPreorders] = useState([]);
   const [preordersLoading, setPreordersLoading] = useState(true);
+  const { addItem } = useCart();
+  const { showToast } = useToast();
+
+  function addPreorderToCart(item) {
+    addItem({
+      key:        `preorders:${item.id}`,
+      source:     'preorders',
+      id:         item.id,
+      title:      item.title,
+      image:      item.image,
+      price:      Number(item.price) || 0,
+      qty:        1,
+      isPreorder: true,
+      etaText:    item.eta ?? '',
+      currency:   'CAD',
+    });
+    showToast(`Pre-order added — ${item.title.length > 40 ? item.title.slice(0, 40) + '…' : item.title}`, {
+      actionTo: '/cart', actionLabel: 'View Cart',
+    });
+  }
 
   useEffect(() => { document.title = 'Pre-Orders | CloudNineCards'; }, []);
 
@@ -972,14 +994,14 @@ export default function PreOrdersPage() {
                   return (
                     <button
                       disabled={!canReserve}
-                      onClick={() => { setSelected(item); }}
+                      onClick={() => addPreorderToCart(item)}
                       className={`mt-4 flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black uppercase tracking-[0.08em] transition ${
                         canReserve
                           ? 'bg-gradient-to-r from-fuchsia-500 via-pink-400 to-cyan-400 text-white hover:opacity-95'
                           : 'bg-white/5 border border-white/10 text-white/30 cursor-not-allowed'
                       }`}
                     >
-                      {item.soldOut ? 'Sold Out' : item.priceTba ? 'Price TBA' : !isOpen() ? 'Pre-orders Closed' : <>Reserve Now <ChevronRight className="h-4 w-4" /></>}
+                      {item.soldOut ? 'Sold Out' : item.priceTba ? 'Price TBA' : !isOpen() ? 'Pre-orders Closed' : <>Add to Cart <ChevronRight className="h-4 w-4" /></>}
                     </button>
                   );
                 })()}

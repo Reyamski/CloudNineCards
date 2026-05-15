@@ -6,6 +6,8 @@ import Nav from '../components/Nav';
 import Footer from '../components/Footer';
 import { allProducts } from '../data/products';
 import { supabase, supabaseEnabled } from '../lib/supabase';
+import { useCart } from '../contexts/CartContext';
+import { useToast } from '../components/Toast';
 
 // Normalize a Supabase products row to the shape this page expects.
 // Mirrors ShopPage's normalizeDbProduct so the two stay in sync.
@@ -47,6 +49,9 @@ export default function ProductPage() {
   const { id } = useParams();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [qty, setQty] = useState(1);
+  const { addItem } = useCart();
+  const { showToast } = useToast();
 
   useEffect(() => {
     let ignore = false;
@@ -186,23 +191,65 @@ export default function ProductPage() {
             </div>
 
             <div className="mt-6">
-              {product.isPreorder ? (
-                <Link
-                  to="/pre-orders"
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-fuchsia-500 via-pink-400 to-cyan-400 py-4 text-sm font-black uppercase tracking-[0.12em] text-black shadow-[0_10px_30px_rgba(217,70,239,0.25)] transition hover:opacity-95"
-                >
-                  Reserve on Pre-Orders Page
-                </Link>
-              ) : product.inStock ? (
-                <Link
-                  to={`/shop?product=${product.id}`}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 py-4 text-sm font-black uppercase tracking-[0.12em] text-black shadow-[0_10px_30px_rgba(34,211,238,0.25)] transition hover:opacity-95"
-                >
-                  Buy Now — Wise
-                </Link>
+              {product.inStock && !product.priceTba ? (
+                <div className="space-y-3">
+                  {/* Qty stepper — clamps to live stock for in-stock items, defaults to 1 for preorders */}
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-black uppercase tracking-[0.14em] text-white/45">Qty</span>
+                    <div className="inline-flex items-center gap-1">
+                      <button
+                        onClick={() => setQty(q => Math.max(1, q - 1))}
+                        className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-base font-black text-white hover:bg-white/10"
+                        aria-label="Decrease quantity"
+                      >−</button>
+                      <input
+                        type="number" min={1}
+                        max={product.isPreorder ? 99 : Math.max(1, product.stock || 99)}
+                        value={qty}
+                        onChange={e => {
+                          const max = product.isPreorder ? 99 : Math.max(1, product.stock || 99);
+                          const next = Math.max(1, Math.min(max, Number(e.target.value) || 1));
+                          setQty(next);
+                        }}
+                        className="w-14 rounded-lg border border-white/10 bg-black/30 px-2 py-1.5 text-center text-base font-black text-white outline-none focus:border-cyan-300/40"
+                      />
+                      <button
+                        onClick={() => {
+                          const max = product.isPreorder ? 99 : Math.max(1, product.stock || 99);
+                          setQty(q => Math.min(max, q + 1));
+                        }}
+                        className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-base font-black text-white hover:bg-white/10"
+                        aria-label="Increase quantity"
+                      >+</button>
+                    </div>
+                    {!product.isPreorder && typeof product.stock === 'number' && product.stock > 0 && (
+                      <span className="text-[11px] text-white/35">{product.stock} in stock</span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => {
+                      addItem({
+                        key:        `${product.isPreorder ? 'preorders' : 'products'}:${product.id}`,
+                        source:     product.isPreorder ? 'preorders' : 'products',
+                        id:         product.id,
+                        title:      product.title,
+                        image:      product.image,
+                        price:      Number(product.price) || 0,
+                        qty,
+                        isPreorder: !!product.isPreorder,
+                        etaText:    product.eta ?? '',
+                        currency:   'CAD',
+                      });
+                      showToast(`Added × ${qty} to cart`, { actionTo: '/cart', actionLabel: 'View Cart' });
+                    }}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 py-4 text-sm font-black uppercase tracking-[0.12em] text-black shadow-[0_10px_30px_rgba(34,211,238,0.25)] transition hover:opacity-95"
+                  >
+                    {product.isPreorder ? 'Pre-order — Add to Cart' : 'Add to Cart'}
+                  </button>
+                </div>
               ) : (
                 <div className="rounded-2xl border border-white/8 bg-white/4 py-4 text-center text-sm font-black uppercase tracking-[0.1em] text-white/25">
-                  Currently Sold Out
+                  {product.priceTba ? 'Price TBA' : 'Currently Sold Out'}
                 </div>
               )}
             </div>

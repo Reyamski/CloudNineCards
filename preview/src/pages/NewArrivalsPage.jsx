@@ -5,6 +5,8 @@ import {Link} from 'react-router-dom';
 import Nav from '../components/Nav';
 import Footer from '../components/Footer';
 import {supabase, supabaseEnabled} from '../lib/supabase';
+import {useCart} from '../contexts/CartContext';
+import {useToast} from '../components/Toast';
 
 const BASE_NEW_ARRIVALS = [
   {
@@ -47,6 +49,8 @@ const BASE_NEW_ARRIVALS = [
 
 export default function NewArrivalsPage() {
   const [items, setItems] = useState(BASE_NEW_ARRIVALS);
+  const {addItem} = useCart();
+  const {showToast} = useToast();
 
   useEffect(() => { document.title = 'New Arrivals | CloudNineCards'; }, []);
 
@@ -147,12 +151,33 @@ export default function NewArrivalsPage() {
                 <div className="mt-2 text-lg font-black leading-snug">{item.title}</div>
                 <div className="mt-4 text-3xl font-black">CAD ${item.price.toFixed(2)}</div>
                 <div className="mt-1 text-xs text-white/35">{item.daysAgo}</div>
-                <Link
-                  to={`/shop?product=${item.id}`}
-                  className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-yellow-300 via-cyan-300 to-fuchsia-400 px-4 py-3 text-sm font-black uppercase tracking-[0.08em] text-black transition hover:opacity-95"
-                >
-                  View Product <ChevronRight className="h-4 w-4" />
-                </Link>
+                <div className="mt-5 flex flex-col gap-2">
+                  <button
+                    onClick={() => {
+                      addItem({
+                        key:        `products:${item.id}`,
+                        source:     'products',
+                        id:         item.id,
+                        title:      item.title,
+                        image:      item.image,
+                        price:      Number(item.price) || 0,
+                        qty:        1,
+                        isPreorder: false,
+                        currency:   'CAD',
+                      });
+                      showToast(`Added — ${item.title.length > 40 ? item.title.slice(0, 40) + '…' : item.title}`, {actionTo: '/cart', actionLabel: 'View Cart'});
+                    }}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-yellow-300 via-cyan-300 to-fuchsia-400 px-4 py-3 text-sm font-black uppercase tracking-[0.08em] text-black transition hover:opacity-95"
+                  >
+                    Add to Cart
+                  </button>
+                  <Link
+                    to={`/shop/${item.id}`}
+                    className="flex w-full items-center justify-center gap-1 text-[11px] font-black uppercase tracking-[0.14em] text-white/45 hover:text-cyan-300 transition"
+                  >
+                    View product <ChevronRight className="h-3 w-3" />
+                  </Link>
+                </div>
               </div>
             </motion.div>
           ))}

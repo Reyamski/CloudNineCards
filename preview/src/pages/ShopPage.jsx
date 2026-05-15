@@ -8,6 +8,8 @@ import Nav from '../components/Nav';
 import Footer from '../components/Footer';
 import { allProducts } from '../data/products';
 import { useAuth } from '../lib/useAuth';
+import { useCart } from '../contexts/CartContext';
+import { useToast } from '../components/Toast';
 
 // ── EmailJS — reuse same service, separate template for on-hand orders ───────
 const EMAILJS_SERVICE_ID   = import.meta.env.VITE_EMAILJS_SERVICE_ID;
@@ -687,6 +689,25 @@ export default function ShopPage() {
   const [notifyItem, setNotifyItem] = useState(null);
   const [products, setProducts]   = useState([]);
   const [stockSyncError, setStockSyncError] = useState('');
+  const { addItem } = useCart();
+  const { showToast } = useToast();
+
+  function addToCart(item) {
+    addItem({
+      key:        `products:${item.id}`,
+      source:     'products',
+      id:         item.id,
+      title:      item.title,
+      image:      item.image,
+      price:      Number(item.price) || 0,
+      qty:        1,
+      isPreorder: false,
+      currency:   'CAD',
+    });
+    showToast(`Added to cart — ${item.title.length > 40 ? item.title.slice(0, 40) + '…' : item.title}`, {
+      actionTo: '/cart', actionLabel: 'View Cart',
+    });
+  }
 
   useEffect(() => { document.title = 'Shop | CloudNineCards'; }, []);
 
@@ -906,14 +927,28 @@ export default function ShopPage() {
                 <div className="mt-1 text-xs text-white/30">+ shipping & tax calculated at checkout</div>
                 <div className="mt-4">
                   {item.isPreorder ? (
-                    <Link to="/pre-orders"
-                      className="flex w-full items-center justify-center rounded-2xl border border-fuchsia-400/30 bg-fuchsia-400/10 px-4 py-3 text-sm font-black uppercase tracking-[0.08em] text-fuchsia-200 transition hover:bg-fuchsia-400/15">
-                      Pre-order →
-                    </Link>
+                    <button onClick={() => {
+                      addItem({
+                        key:        `preorders:${item.id}`,
+                        source:     'preorders',
+                        id:         item.id,
+                        title:      item.title,
+                        image:      item.image,
+                        price:      Number(item.price) || 0,
+                        qty:        1,
+                        isPreorder: true,
+                        etaText:    item.eta ?? '',
+                        currency:   'CAD',
+                      });
+                      showToast(`Pre-order added — ${item.title.length > 40 ? item.title.slice(0, 40) + '…' : item.title}`, { actionTo: '/cart', actionLabel: 'View Cart' });
+                    }}
+                      className="w-full rounded-2xl border border-fuchsia-400/30 bg-fuchsia-400/10 px-4 py-3 text-sm font-black uppercase tracking-[0.08em] text-fuchsia-200 transition hover:bg-fuchsia-400/15">
+                      Pre-order — Add to Cart
+                    </button>
                   ) : item.inStock ? (
-                    <button onClick={() => openProduct(item)}
+                    <button onClick={() => addToCart(item)}
                       className="w-full rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 px-4 py-3 text-sm font-black uppercase tracking-[0.08em] text-black transition hover:opacity-95">
-                      Buy Now — Wise
+                      Add to Cart
                     </button>
                   ) : (
                     <div className="flex flex-col gap-2">
