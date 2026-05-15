@@ -178,7 +178,7 @@ function CountdownBlock({ deadline }) {
 }
 
 // ── Modal ────────────────────────────────────────────────────────────────────
-function PreOrderModal({ item, onClose, userEmail }) {
+function PreOrderModal({ item, onClose, userEmail, user, onRequireAuth }) {
   const dp = ((item.price ?? 0) * DP_PERCENT).toFixed(2);
   const remaining = ((item.price ?? 0) * (1 - DP_PERCENT)).toFixed(2);
   const [step, setStep] = useState(1); // 1=terms, 2=payment, 3=confirm
@@ -253,6 +253,11 @@ function PreOrderModal({ item, onClose, userEmail }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    // Auth gate — anon users can fill the form but must sign in to reserve.
+    if (!user) {
+      onRequireAuth?.();
+      return;
+    }
     setSending(true);
     setSendError('');
     try {
@@ -685,12 +690,17 @@ function PreOrderModal({ item, onClose, userEmail }) {
               {sendError && (
                 <div className="mb-3 rounded-xl border border-red-400/25 bg-red-400/10 px-4 py-3 text-xs text-red-300">{sendError}</div>
               )}
+              {!user && (
+                <div className="mb-3 rounded-xl border border-cyan-400/25 bg-cyan-400/10 px-4 py-3 text-xs text-cyan-200">
+                  Sign in or create an account to reserve your pre-order — it only takes a sec.
+                </div>
+              )}
               <div className="flex gap-3">
                 <button type="button" onClick={() => setStep(2)} disabled={sending} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black uppercase tracking-[0.08em] text-white/60 hover:bg-white/10 disabled:opacity-40">
                   Back
                 </button>
                 <button type="submit" disabled={sending} className="flex-1 inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 py-3 text-sm font-black uppercase tracking-[0.1em] text-black hover:opacity-95 transition disabled:opacity-60">
-                  {sending ? <><Loader2 className="h-4 w-4 animate-spin" /> Sending...</> : 'Submit Order'}
+                  {sending ? <><Loader2 className="h-4 w-4 animate-spin" /> Sending...</> : (!user ? 'Sign In to Reserve' : 'Submit Order')}
                 </button>
               </div>
             </form>
@@ -756,7 +766,7 @@ export default function PreOrdersPage() {
       `}</style>
 
       <AnimatePresence>
-        {selected && <PreOrderModal item={selected} onClose={() => setSelected(null)} userEmail={user?.email ?? ''} />}
+        {selected && <PreOrderModal item={selected} onClose={() => setSelected(null)} userEmail={user?.email ?? ''} user={user} onRequireAuth={() => navigate('/account', { state: { redirect: '/pre-orders' } })} />}
       </AnimatePresence>
       <AnimatePresence>
         {showCalc && <DPCalculator onClose={() => setShowCalc(false)} />}
@@ -962,7 +972,7 @@ export default function PreOrdersPage() {
                   return (
                     <button
                       disabled={!canReserve}
-                      onClick={() => { if (!user) { navigate('/account', { state: { redirect: '/pre-orders' } }); return; } setSelected(item); }}
+                      onClick={() => { setSelected(item); }}
                       className={`mt-4 flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black uppercase tracking-[0.08em] transition ${
                         canReserve
                           ? 'bg-gradient-to-r from-fuchsia-500 via-pink-400 to-cyan-400 text-white hover:opacity-95'

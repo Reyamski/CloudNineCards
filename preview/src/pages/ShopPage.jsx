@@ -98,7 +98,7 @@ function calcDeliveryFee(country, qty) {
 }
 
 // ── Buy Now Modal ─────────────────────────────────────────────────────────────
-function BuyNowModal({ item, onClose, userEmail }) {
+function BuyNowModal({ item, onClose, userEmail, user, onRequireAuth }) {
   const [step, setStep]           = useState(1);
   const [qty, setQty]             = useState(1);
   const [liveStock, setLiveStock] = useState(item.stock ?? 0);
@@ -195,6 +195,11 @@ function BuyNowModal({ item, onClose, userEmail }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    // Auth gate — anon users browsed the form freely, but can't place an order.
+    if (!user) {
+      onRequireAuth?.();
+      return;
+    }
     setSending(true);
     setSendError('');
     try {
@@ -539,12 +544,17 @@ function BuyNowModal({ item, onClose, userEmail }) {
               </div>
 
               {sendError && <div className="mb-3 rounded-xl border border-red-400/25 bg-red-400/10 px-4 py-3 text-xs text-red-300">{sendError}</div>}
+              {!user && (
+                <div className="mb-3 rounded-xl border border-cyan-400/25 bg-cyan-400/10 px-4 py-3 text-xs text-cyan-200">
+                  Sign in or create an account to place your order — it only takes a sec.
+                </div>
+              )}
               <div className="flex gap-3">
                 <button type="button" onClick={() => setStep(1)} disabled={sending}
                   className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black uppercase text-white/55 hover:bg-white/10 disabled:opacity-40">Back</button>
                 <button type="submit" disabled={sending}
                   className="flex-1 inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 py-3 text-sm font-black uppercase tracking-[0.1em] text-black hover:opacity-95 disabled:opacity-60">
-                  {sending ? <><Loader2 className="h-4 w-4 animate-spin" /> Sending...</> : 'Submit Order'}
+                  {sending ? <><Loader2 className="h-4 w-4 animate-spin" /> Sending...</> : (!user ? 'Sign In to Place Order' : 'Submit Order')}
                 </button>
               </div>
             </form>
@@ -691,7 +701,7 @@ export default function ShopPage() {
   }, [products, searchParams]);
 
   function openProduct(item) {
-    if (!user) { navigate('/account', { state: { redirect: `/shop?product=${item.id}` } }); return; }
+    // Auth gate moved to checkout submit — anon users can browse the modal.
     setSelected(item);
     setSearchParams({product: item.id});
   }
@@ -774,7 +784,7 @@ export default function ShopPage() {
   return (
     <div className="min-h-screen bg-[#05010c] text-white">
       <AnimatePresence>
-        {selected && <BuyNowModal item={selected} onClose={closeProduct} userEmail={user?.email ?? ''} />}
+        {selected && <BuyNowModal item={selected} onClose={closeProduct} userEmail={user?.email ?? ''} user={user} onRequireAuth={() => navigate('/account', { state: { redirect: `/shop?product=${selected.id}` } })} />}
       </AnimatePresence>
       <AnimatePresence>
         {notifyItem && <NotifyMeModal item={notifyItem} onClose={() => setNotifyItem(null)} />}
