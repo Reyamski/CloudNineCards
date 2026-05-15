@@ -340,6 +340,12 @@ export default function CartPage() {
         const etaValue = distinctEtas.length === 1 ? distinctEtas[0]
                        : distinctEtas.length > 1 ? 'Multiple'
                        : '';
+        // NOTE: the `orders` table has NOT NULL constraints on several numeric
+        // columns (delivery_fee, tax_amount, etc.). Preorder shipping + tax are
+        // genuinely TBD at checkout (computed on release), but the DB still
+        // wants a number, so we send `0` placeholders that admin updates when
+        // the preorder ships. Do not send `null` for these — RPC will fail
+        // with 23502.
         preorderPayload = {
           ...sharedBuyerFields,
           order_number:    orderNumberPreorder,
@@ -351,9 +357,9 @@ export default function CartPage() {
           item_title:      placeholderTitle,
           quantity:        preorderQty,
           subtotal:        preorderSubtotal,
-          tax_amount:      0,           // tax billed on release
-          delivery_fee:    null,        // intl shipping computed on release
-          total_price:     preorderDeposit, // "due now" portion
+          tax_amount:      0,                  // tax billed on release — placeholder
+          delivery_fee:    0,                  // intl shipping computed on release — placeholder
+          total_price:     preorderDeposit,    // "due now" portion (30% deposit)
           full_price:      preorderSubtotal,
           dp_amount:       preorderDeposit,
           balance_due:     preorderBalance,
