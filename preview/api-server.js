@@ -23,6 +23,7 @@ for (const envFile of ['.env', '.env.local']) {
 
 import fetchPricesHandler from './api/fetch-prices.js';
 import analyzeCardHandler from './api/analyze-card.js';
+import adminAuthHandler from './api/admin-auth.js';
 
 const PORT = 3001;
 
@@ -55,6 +56,10 @@ const server = http.createServer(async (req, res) => {
   } else if (url.pathname.startsWith('/api/analyze-card')) {
     const body = await readBody(req);
     handler  = analyzeCardHandler;
+    mockReq  = { body, method: req.method, url: req.url };
+  } else if (url.pathname.startsWith('/api/admin-auth')) {
+    const body = await readBody(req);
+    handler  = adminAuthHandler;
     mockReq  = { body, method: req.method, url: req.url };
   } else {
     res.writeHead(404);
