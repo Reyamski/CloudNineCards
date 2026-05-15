@@ -132,6 +132,11 @@ export default function AdminPage() {
   const [appliedDateFrom, setAppliedFrom] = useState('');
   const [appliedDateTo, setAppliedTo]     = useState('');
   const [selectedOrderId, setSelectedOrderId] = useState('');
+  // order_items rows for the currently selected order (multi-item carts).
+  // Single-item legacy orders also have rows after backfill — see
+  // docs/cart-migration.sql.
+  const [selectedOrderItems, setSelectedOrderItems] = useState([]);
+  const [selectedOrderItemsLoading, setSelectedOrderItemsLoading] = useState(false);
   const [products, setProducts] = useState(() => mergeProducts([]));
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
@@ -559,6 +564,35 @@ export default function AdminPage() {
       setSelectedOrderId(nextVisibleOrders[0].id);
     }
   }, [orders, orderFilter, orderTypeFilter, selectedOrderId]);
+
+  // Pull order_items for the currently selected order so the details panel can
+  // render the per-line breakdown. Cleared between selections to avoid showing
+  // stale lines for the wrong order while the next fetch is in flight.
+  useEffect(() => {
+    if (!selectedOrderId || !supabaseEnabled || !supabase) {
+      setSelectedOrderItems([]);
+      return;
+    }
+    let cancelled = false;
+    setSelectedOrderItemsLoading(true);
+    supabase
+      .from('order_items')
+      .select('*')
+      .eq('order_id', selectedOrderId)
+      .order('created_at', { ascending: true })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        setSelectedOrderItemsLoading(false);
+        if (error) {
+          // Surface gracefully — table may not exist yet in dev environments
+          // that haven't run docs/cart-migration.sql.
+          setSelectedOrderItems([]);
+          return;
+        }
+        setSelectedOrderItems(data ?? []);
+      });
+    return () => { cancelled = true; };
+  }, [selectedOrderId]);
 
   async function login() {
     setLoggingIn(true);
@@ -1326,6 +1360,63 @@ export default function AdminPage() {
                           </div>
                           <div className="mt-1 text-xs text-white/45">{selectedOrder.buyer_address}</div>
                         </div>
+                      </div>
+
+                      <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
+                        <div className="mb-3 flex items-center justify-between">
+                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-white/40">
+                            Line Items {selectedOrderItems.length > 0 && `(${selectedOrderItems.length})`}
+                          </div>
+                          {selectedOrderItemsLoading && (
+                            <div className="text-[10px] text-white/30">Loading…</div>
+                          )}
+                        </div>
+                        {selectedOrderItems.length > 0 ? (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="text-left text-white/40 border-b border-white/10">
+                                  <th className="pb-2 pr-2 font-black uppercase tracking-[0.1em]">Item</th>
+                                  <th className="pb-2 pr-2 text-center font-black uppercase tracking-[0.1em]">Qty</th>
+                                  <th className="pb-2 pr-2 text-right font-black uppercase tracking-[0.1em]">Unit</th>
+                                  <th className="pb-2 text-right font-black uppercase tracking-[0.1em]">Line</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {selectedOrderItems.map((line) => {
+                                  const lineTotal = (Number(line.unit_price) || 0) * (line.qty || 0);
+                                  return (
+                                    <tr key={line.id} className="border-b border-white/5 last:border-0">
+                                      <td className="py-2 pr-2 text-white/80">
+                                        <div className="flex items-center gap-2">
+                                          {line.image_snapshot ? (
+                                            <img src={line.image_snapshot} alt="" className="h-10 w-8 rounded border border-white/10 object-cover bg-black/30" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                                          ) : null}
+                                          <div className="min-w-0">
+                                            <div className="font-bold truncate max-w-[260px]">{line.title_snapshot}</div>
+                                            <div className="mt-0.5 text-[10px] uppercase tracking-[0.1em] text-white/35">
+                                              {line.source_table}
+                                              {line.is_preorder && <span className="ml-1 text-fuchsia-300">· PRE-ORDER</span>}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </td>
+                                      <td className="py-2 pr-2 text-center tabular-nums text-white/70">{line.qty}</td>
+                                      <td className="py-2 pr-2 text-right tabular-nums text-white/60">{formatMoney(line.unit_price)}</td>
+                                      <td className="py-2 text-right tabular-nums font-black text-white/85">{formatMoney(lineTotal)}</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          !selectedOrderItemsLoading && (
+                            <div className="text-xs text-white/35">
+                              No line items found for this order. (If this is a legacy single-item order, run docs/cart-migration.sql to backfill.)
+                            </div>
+                          )
+                        )}
                       </div>
 
                       <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
