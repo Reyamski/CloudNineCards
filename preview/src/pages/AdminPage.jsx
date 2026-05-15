@@ -2,8 +2,30 @@ import {useEffect, useRef, useState} from 'react';
 import {ShieldCheck, Save, RotateCcw, Eye, EyeOff, Youtube, Loader2, Sparkles, Upload, X, Check, Package, BellRing} from 'lucide-react';
 import {supabase, supabaseEnabled} from '../lib/supabase';
 
-const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD;
 const DEFAULT_VIDEO_ID = 'OcLL44cDh7k';
+const ADMIN_TOKEN_KEY = 'cnc_admin_token';
+
+// Decode a base64url-payload from our /api/admin-auth token and return its exp.
+// Returns null if token is malformed or expired.
+function readAdminTokenExp(token) {
+  if (!token || typeof token !== 'string' || !token.includes('.')) return null;
+  try {
+    const [payloadB64] = token.split('.');
+    const b64 = payloadB64.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = b64 + '='.repeat((4 - b64.length % 4) % 4);
+    const json = atob(padded);
+    const { exp } = JSON.parse(json);
+    if (typeof exp !== 'number' || exp < Date.now()) return null;
+    return exp;
+  } catch {
+    return null;
+  }
+}
+
+function hasValidAdminToken() {
+  const token = sessionStorage.getItem(ADMIN_TOKEN_KEY);
+  return readAdminTokenExp(token) !== null;
+}
 
 const PAYMENT_STATUS_META = {
   awaiting_payment: {
@@ -95,10 +117,12 @@ function normalizeOrder(order) {
 export default function AdminPage() {
   useEffect(() => { document.title = 'Admin | CloudNineCards'; }, []);
 
-  const [authed, setAuthed] = useState(() => sessionStorage.getItem('cnc_admin') === '1');
+  const [authed, setAuthed] = useState(() => hasValidAdminToken());
   const [pw, setPw] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [pwError, setPwError] = useState(false);
+  const [pwErrorMsg, setPwErrorMsg] = useState('');
+  const [loggingIn, setLoggingIn] = useState(false);
   const [activeTab, setActiveTab] = useState('orders');
   const [orderFilter, setOrderFilter] = useState('all');
   const [orderTypeFilter, setOrderTypeFilter] = useState('all');
@@ -536,13 +560,37 @@ export default function AdminPage() {
     }
   }, [orders, orderFilter, orderTypeFilter, selectedOrderId]);
 
-  function login() {
-    if (pw === ADMIN_PASSWORD) {
-      sessionStorage.setItem('cnc_admin', '1');
+  async function login() {
+    setLoggingIn(true);
+    setPwError(false);
+    setPwErrorMsg('');
+    try {
+      const res = await fetch('/api/admin-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pw }),
+      });
+      if (!res.ok) {
+        setPwError(true);
+        if (res.status === 500) setPwErrorMsg('Admin auth is not configured on the server.');
+        return;
+      }
+      const { token } = await res.json();
+      if (!token || !readAdminTokenExp(token)) {
+        setPwError(true);
+        setPwErrorMsg('Server returned an invalid token.');
+        return;
+      }
+      sessionStorage.setItem(ADMIN_TOKEN_KEY, token);
+      // Clean up any legacy flag from the old client-side check.
+      sessionStorage.removeItem('cnc_admin');
       setAuthed(true);
       setPwError(false);
-    } else {
+    } catch (err) {
       setPwError(true);
+      setPwErrorMsg('Could not reach auth server. Check your connection.');
+    } finally {
+      setLoggingIn(false);
     }
   }
 
@@ -906,18 +954,20 @@ export default function AdminPage() {
               onChange={(event) => {
                 setPw(event.target.value);
                 setPwError(false);
+                setPwErrorMsg('');
               }}
-              onKeyDown={(event) => event.key === 'Enter' && login()}
+              onKeyDown={(event) => event.key === 'Enter' && !loggingIn && login()}
               placeholder="Password"
-              className={`w-full rounded-2xl border ${pwError ? 'border-red-400/60' : 'border-white/15'} bg-black/30 px-4 py-3 pr-10 text-sm text-white outline-none focus:border-cyan-300/50`}
+              disabled={loggingIn}
+              className={`w-full rounded-2xl border ${pwError ? 'border-red-400/60' : 'border-white/15'} bg-black/30 px-4 py-3 pr-10 text-sm text-white outline-none focus:border-cyan-300/50 disabled:opacity-60`}
             />
             <button onClick={() => setShowPw((value) => !value)} className="absolute right-3 top-3 text-white/40 hover:text-white/70">
               {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
-          {pwError ? <p className="mt-2 text-xs text-red-400">Wrong password.</p> : null}
-          <button onClick={login} className="mt-4 w-full rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 py-3 text-sm font-black uppercase tracking-[0.08em] text-black">
-            Enter
+          {pwError ? <p className="mt-2 text-xs text-red-400">{pwErrorMsg || 'Wrong password.'}</p> : null}
+          <button onClick={login} disabled={loggingIn} className="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 py-3 text-sm font-black uppercase tracking-[0.08em] text-black disabled:opacity-60">
+            {loggingIn ? <><Loader2 className="h-4 w-4 animate-spin" /> Signing in…</> : 'Enter'}
           </button>
         </div>
       </div>
