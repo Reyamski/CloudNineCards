@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react';
 import {Link} from 'react-router-dom';
-import {BellRing, ChevronRight, Flame, Quote, ShieldCheck, Sparkles, Star, Truck, Zap} from 'lucide-react';
+import {BellRing, ChevronRight, Flame, Package, ShieldCheck, Sparkles, Star, Truck, Zap, Globe} from 'lucide-react';
 import {motion} from 'framer-motion';
 import {supabase, supabaseEnabled} from './lib/supabase';
 import Footer from './components/Footer';
@@ -57,52 +57,6 @@ const trust = [
   {icon: Flame, title: 'Live Stock', desc: 'What you see is what\'s actually available. Sold out means sold out.'},
   {icon: Star, title: 'Packed Right', desc: 'Every order is inspected and packed carefully. Photos available on request.'},
 ];
-
-const vouches = [
-  {
-    name: 'Philippe Ho',
-    badge: 'Top fan',
-    text: 'I preordered a few boxes of OP17. Seller explains clearly and answers questions fast.',
-    stars: 5,
-    tag: 'Pre-order buyer',
-  },
-  {
-    name: 'Art Enriquez',
-    badge: '',
-    text: 'I pre ordered OP16 and OP17, buy with confidence. Great guy and fast communication.',
-    stars: 5,
-    tag: 'Repeat buyer',
-  },
-  {
-    name: 'Daniel Cruz',
-    badge: '',
-    text: 'Got my OP15 box on time and sealed perfectly. Great packaging, zero damage.',
-    stars: 5,
-    tag: 'On-hand order',
-  },
-  {
-    name: 'Liam Nguyen',
-    badge: '',
-    text: 'Was skeptical about Wise at first but the seller walked me through everything. Cards arrived exactly as described.',
-    stars: 5,
-    tag: 'Verified buyer',
-  },
-  {
-    name: 'Grace Ong',
-    badge: '',
-    text: 'Pre-ordered OP17 and the communication was excellent throughout. The 30 percent deposit system is easy to follow.',
-    stars: 5,
-    tag: 'Pre-order buyer',
-  },
-  {
-    name: 'Trisha Reyes',
-    badge: '',
-    text: 'Ordered on-hand stock and received it faster than expected. Careful packaging and legit seller.',
-    stars: 5,
-    tag: 'On-hand order',
-  },
-];
-
 
 function EmailSignup() {
   const [email, setEmail] = useState('');
@@ -527,37 +481,52 @@ export default function HomePage() {
 
       <section className="mx-auto max-w-7xl px-6 py-10 md:py-16">
         <div className="mb-8 text-center">
-          <div className="text-sm font-black uppercase tracking-[0.24em] text-fuchsia-300/75">Buyer vouches</div>
-          <h2 className="mt-2 text-3xl font-black uppercase md:text-5xl">Real Buyers. Real Feedback.</h2>
+          <div className="text-sm font-black uppercase tracking-[0.24em] text-fuchsia-300/75">How we ship</div>
+          <h2 className="mt-2 text-3xl font-black uppercase md:text-5xl">Why CloudNineCards</h2>
           <p className="mx-auto mt-3 max-w-lg text-sm leading-7 text-white/55">
-            Buyers keep coming back because the communication is fast, the stock is legit, and the process stays clear.
+            Based in Canada. Cards ship sleeved in toploaders, sealed product ships double-boxed.
+            Free local pickup in Vancouver. Wise payments, no hidden fees at checkout.
           </p>
         </div>
         <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-          {vouches.map((vouch) => (
-            <div key={vouch.name} className="relative overflow-hidden rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.02))] p-6">
-              <div className="absolute right-4 top-4 opacity-15">
-                <Quote className="h-10 w-10 text-fuchsia-300" />
+          {[
+            {
+              icon: Truck,
+              title: 'Tracked Shipping',
+              text: 'Every order ships tracked. Canada $6 singles / $15+ sealed. USA $15+. International from $22. Free shipping in Canada on singles orders $100+ and sealed orders $300+.',
+            },
+            {
+              icon: Package,
+              title: 'Packed Right',
+              text: 'Singles sleeved in toploaders. Sealed product double-boxed with cushioning. Every order is inspected before it goes out — photos available on request.',
+            },
+            {
+              icon: ShieldCheck,
+              title: 'Condition Guarantee',
+              text: 'NM means NM. If anything shows up worse than described, we fix it. Sealed product is verified shrink-wrap intact before it leaves the shop.',
+            },
+            {
+              icon: Flame,
+              title: 'Local Pickup — Vancouver',
+              text: 'Local to Vancouver, BC? Skip shipping entirely. Message us to arrange free pickup once your Wise payment clears.',
+            },
+            {
+              icon: Globe,
+              title: 'International OK',
+              text: 'Ships worldwide. International buyers cover shipping and any customs duties — both shown clearly before you confirm.',
+            },
+            {
+              icon: ShieldCheck,
+              title: 'No Hidden Fees',
+              text: 'Shipping and tax shown before you commit. The Wise total you see in the modal is exactly what you send — no surprise add-ons after.',
+            },
+          ].map(({ icon: Icon, title, text }) => (
+            <div key={title} className="relative overflow-hidden rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.02))] p-6">
+              <div className="mb-4 inline-flex rounded-2xl border border-white/10 bg-black/25 p-3">
+                <Icon className="h-5 w-5 text-cyan-300" />
               </div>
-              <div className="mb-3 flex items-center justify-between">
-                <div className="flex gap-1">
-                  {Array.from({length: vouch.stars}).map((_, index) => (
-                    <Star key={index} className="h-3.5 w-3.5 fill-yellow-300 text-yellow-300" />
-                  ))}
-                </div>
-                {vouch.badge ? (
-                  <span className="rounded-full border border-cyan-400/25 bg-cyan-400/10 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.16em] text-cyan-200">
-                    Featured {vouch.badge}
-                  </span>
-                ) : null}
-              </div>
-              <p className="text-sm italic leading-7 text-white/80">&quot;{vouch.text}&quot;</p>
-              <div className="mt-5 flex items-center justify-between">
-                <div className="text-sm font-black text-white">{vouch.name}</div>
-                <span className="rounded-full border border-fuchsia-400/25 bg-fuchsia-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-fuchsia-200">
-                  {vouch.tag}
-                </span>
-              </div>
+              <div className="text-lg font-black uppercase">{title}</div>
+              <p className="mt-2 text-sm leading-7 text-white/65">{text}</p>
             </div>
           ))}
         </div>
