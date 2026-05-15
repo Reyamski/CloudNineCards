@@ -668,10 +668,32 @@ export default function AdminPage() {
 
         if (upsertError) throw upsertError;
 
+        // Also update singles and products tables (whichever has the matching id)
+        await supabase
+          .from('singles')
+          .update({ stock: nextQty, in_stock: nextInStock, updated_at: new Date().toISOString() })
+          .eq('id', order.product_id);
+
+        await supabase
+          .from('products')
+          .update({ stock: nextQty, in_stock: nextInStock, badge: nextInStock ? 'In Stock' : 'Sold Out' })
+          .eq('id', order.product_id);
+
+        // Update local state for both
         setProducts((prev) => prev.map((product) => (
           product.id === order.product_id
             ? {...product, stock: nextQty, inStock: nextInStock}
             : product
+        )));
+        setSingles((prev) => prev.map((s) => (
+          s.id === order.product_id
+            ? {...s, stock: nextQty, in_stock: nextInStock}
+            : s
+        )));
+        setDbProducts((prev) => prev.map((p) => (
+          p.id === order.product_id
+            ? {...p, stock: nextQty, in_stock: nextInStock, badge: nextInStock ? 'In Stock' : 'Sold Out'}
+            : p
         )));
       }
 
