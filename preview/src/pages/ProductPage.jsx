@@ -1,23 +1,116 @@
-import { useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, ShieldCheck, Truck, Globe, Package } from 'lucide-react';
 import Nav from '../components/Nav';
 import Footer from '../components/Footer';
 import { allProducts } from '../data/products';
+import { supabase, supabaseEnabled } from '../lib/supabase';
+
+// Normalize a Supabase products row to the shape this page expects.
+// Mirrors ShopPage's normalizeDbProduct so the two stay in sync.
+function normalizeDbProduct(row) {
+  return {
+    id:       row.id,
+    title:    row.title,
+    subtitle: row.subtitle ?? '',
+    language: row.language ?? 'English',
+    price:    Number(row.price) || 0,
+    badge:    row.badge ?? (row.in_stock ? 'In Stock' : 'Sold Out'),
+    inStock:  row.in_stock,
+    stock:    row.stock ?? 0,
+    image:    row.image_url ?? '/product-fallback.svg',
+    tag:      row.tag ?? 'One Piece',
+  };
+}
+
+// Normalize a preorders row → product shape used here
+function normalizePreorder(po) {
+  return {
+    id:        po.id,
+    title:     po.title,
+    subtitle:  po.subtitle ?? '',
+    language:  null,
+    price:     Number(po.price) || 0,
+    priceTba:  po.price_tba || false,
+    badge:     po.sold_out ? 'Sold Out' : po.price_tba ? 'Price TBA' : 'Pre-order',
+    inStock:   !po.sold_out,
+    stock:     0,
+    image:     po.image_url ?? '/product-fallback.svg',
+    tag:       'Pre-orders',
+    isPreorder: true,
+    eta:       po.eta,
+  };
+}
 
 export default function ProductPage() {
   const { id } = useParams();
-  const navigate = useNavigate();
-  const product = allProducts.find(p => p.id === id);
+  const [product, setProduct] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (product) {
-      document.title = `${product.title} | CloudNineCards`;
-    } else {
-      document.title = 'Product Not Found | CloudNineCards';
+    let ignore = false;
+
+    async function load() {
+      setLoading(true);
+
+      // 1. Try Supabase `products` table (DB-only items added via admin panel).
+      if (supabaseEnabled && supabase) {
+        const { data: row } = await supabase
+          .from('products')
+          .select('*')
+          .eq('id', id)
+          .maybeSingle();
+        if (!ignore && row) {
+          setProduct(normalizeDbProduct(row));
+          setLoading(false);
+          return;
+        }
+        // 2. Try `preorders` table for pre-order items.
+        const { data: poRow } = await supabase
+          .from('preorders')
+          .select('*')
+          .eq('id', id)
+          .maybeSingle();
+        if (!ignore && poRow) {
+          setProduct(normalizePreorder(poRow));
+          setLoading(false);
+          return;
+        }
+      }
+
+      // 3. Fall back to hardcoded allProducts (legacy in-stock + accessories + sold-out).
+      const fallback = allProducts.find(p => p.id === id);
+      if (!ignore) {
+        setProduct(fallback ?? null);
+        setLoading(false);
+      }
     }
-  }, [product]);
+
+    load();
+    return () => { ignore = true; };
+  }, [id]);
+
+  useEffect(() => {
+    if (loading) return;
+    document.title = product
+      ? `${product.title} | CloudNineCards`
+      : 'Product Not Found | CloudNineCards';
+  }, [product, loading]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#05010c] text-white flex flex-col">
+        <section className="px-6 pt-6 pb-12 bg-[#07030f] border-b border-white/10">
+          <div className="mx-auto max-w-7xl"><Nav /></div>
+        </section>
+        <div className="flex-1 flex items-center justify-center py-20">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-300 border-t-transparent" />
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   if (!product) {
     return (
@@ -69,7 +162,9 @@ export default function ProductPage() {
             <h1 className="mt-2 text-3xl font-black leading-snug md:text-4xl">{product.title}</h1>
 
             <div className="mt-6 flex items-end gap-4">
-              <div className="text-4xl font-black">CAD ${product.price.toFixed(2)}</div>
+              <div className="text-4xl font-black">
+                {product.priceTba ? 'Price TBA' : `CAD $${Number(product.price).toFixed(2)}`}
+              </div>
               {!product.inStock && (
                 <span className="mb-1 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-black uppercase tracking-[0.14em] text-white/40">Sold Out</span>
               )}
@@ -91,7 +186,14 @@ export default function ProductPage() {
             </div>
 
             <div className="mt-6">
-              {product.inStock ? (
+              {product.isPreorder ? (
+                <Link
+                  to="/pre-orders"
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-fuchsia-500 via-pink-400 to-cyan-400 py-4 text-sm font-black uppercase tracking-[0.12em] text-black shadow-[0_10px_30px_rgba(217,70,239,0.25)] transition hover:opacity-95"
+                >
+                  Reserve on Pre-Orders Page
+                </Link>
+              ) : product.inStock ? (
                 <Link
                   to={`/shop?product=${product.id}`}
                   className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 py-4 text-sm font-black uppercase tracking-[0.12em] text-black shadow-[0_10px_30px_rgba(34,211,238,0.25)] transition hover:opacity-95"
