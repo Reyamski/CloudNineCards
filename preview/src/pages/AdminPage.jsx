@@ -354,6 +354,8 @@ export default function AdminPage() {
     const notesArr = addPoForm.notes
       ? addPoForm.notes.split('\n').map(n => n.trim()).filter(Boolean)
       : [];
+    // Preorders schema (docs/preorders-migration.sql) exposes usd_price and
+    // aud_price for FX reference but NOT eur_price — strip it from the insert.
     const payload = {
       id:            addPoForm.id.trim() || `po-${Date.now()}`,
       title:         addPoForm.title.trim(),
@@ -363,7 +365,6 @@ export default function AdminPage() {
       price:         parseFloat(addPoForm.price) || null,
       usd_price:     parseFloat(addPoForm.usd_price) || null,
       aud_price:     parseFloat(addPoForm.aud_price) || null,
-      eur_price:     parseFloat(addPoForm.eur_price) || null,
       currency:      addPoForm.currency || 'CAD',
       eta:           addPoForm.eta.trim() || null,
       deadline:      addPoForm.deadline || null,
@@ -429,15 +430,16 @@ export default function AdminPage() {
     e.preventDefault();
     if (!supabaseEnabled || !supabase) return;
     setSavingProduct(true);
+    // Multi-currency price columns (usd/aud/eur) are intentionally NOT sent for
+    // products — the live `products` schema cache doesn't have them and the
+    // shop doesn't surface multi-currency pricing for on-hand stock. Pre-orders
+    // keep usd_price/aud_price because lead-time FX matters there.
     const payload = {
       id:        addProdForm.id.trim() || `prod-${Date.now()}`,
       title:     addProdForm.title.trim(),
       subtitle:  addProdForm.subtitle.trim() || null,
       language:  addProdForm.language || 'English',
       price:     parseFloat(addProdForm.price) || 0,
-      usd_price: parseFloat(addProdForm.usd_price) || null,
-      aud_price: parseFloat(addProdForm.aud_price) || null,
-      eur_price: parseFloat(addProdForm.eur_price) || null,
       stock:     parseInt(addProdForm.stock, 10) || 0,
       badge:     addProdForm.in_stock ? 'In Stock' : 'Sold Out',
       in_stock:  addProdForm.in_stock,
@@ -458,9 +460,15 @@ export default function AdminPage() {
 
   async function updateDbProduct(id, field, value) {
     if (!supabaseEnabled || !supabase) return;
+    // Guard against editing columns the `products` table doesn't expose. The
+    // multi-currency fields exist in the migration but the live schema cache
+    // rejects writes — only preorders surface usd/aud/eur pricing.
+    if (field === 'usd_price' || field === 'aud_price' || field === 'eur_price') {
+      setProdEditCell({ id: '', field: '' }); setProdEditVal('');
+      return;
+    }
     let parsed = value;
     if (field === 'price') parsed = parseFloat(value) || 0;
-    if (field === 'usd_price' || field === 'aud_price' || field === 'eur_price') parsed = parseFloat(value) || null;
     if (field === 'stock') parsed = parseInt(value, 10) || 0;
     const extra = field === 'in_stock' ? { badge: value ? 'In Stock' : 'Sold Out' } : {};
     const { error } = await supabase.from('products').update({ [field]: parsed, ...extra }).eq('id', id);
