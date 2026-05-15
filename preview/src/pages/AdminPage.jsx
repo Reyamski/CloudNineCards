@@ -216,18 +216,10 @@ export default function AdminPage() {
 
   // ── Bulk image upload (shared — only one tab active at a time) ────────────
   const [showBulkPanel, setShowBulkPanel] = useState(false);
-  const [bulkFiles,     setBulkFiles]     = useState([]);
-  const [bulkResults,   setBulkResults]   = useState([]);
+  const [bulkFiles,     setBulkFiles]     = useState([]);   // File[]
+  const [bulkResults,   setBulkResults]   = useState([]);   // { name, preview, url, status }[]
   const [bulkUploading, setBulkUploading] = useState(false);
-  const [bulkFillMode,  setBulkFillMode]  = useState(false); // show per-image detail forms
-  const [bulkCardForms, setBulkCardForms] = useState([]);    // singles fill forms
-  const [bulkProdForms, setBulkProdForms] = useState([]);    // products fill forms
-  const [bulkSavingAll, setBulkSavingAll] = useState(false);
-  const [bulkSaveError, setBulkSaveError] = useState('');
-  const [bulkSavedCount,setBulkSavedCount]= useState(0);
   const bulkInputRef = useRef(null);
-  const BLANK_BULK_CARD = (url, preview) => ({ card_name: '', set_name: '', set_code: '', card_number: '', rarity: '', game: 'One Piece', language: 'Japanese', condition: 'NM', price: '', stock: '1', image_url: url, preview });
-  const BLANK_BULK_PROD = (url, preview) => ({ title: '', subtitle: '', language: 'English', tag: 'One Piece', price: '', stock: '1', image_url: url, preview });
 
   function handleBulkSelect(files) {
     const arr = Array.from(files).slice(0, 10);
@@ -260,48 +252,7 @@ export default function AdminPage() {
     setBulkUploading(false);
   }
 
-  async function saveBulkCards() {
-    if (!supabaseEnabled || !supabase) return;
-    setBulkSavingAll(true); setBulkSaveError(''); setBulkSavedCount(0);
-    let saved = 0;
-    for (const f of bulkCardForms) {
-      if (!f.card_name.trim() || !f.set_name.trim() || !f.price) continue;
-      const payload = {
-        id: `${f.card_number || f.card_name}-${Date.now()}-${Math.random().toString(36).slice(2,6)}`.replace(/\s+/g,'-').toLowerCase(),
-        card_name: f.card_name.trim(), set_name: f.set_name.trim(), set_code: f.set_code.trim() || null,
-        card_number: f.card_number.trim() || null, rarity: f.rarity.trim() || null,
-        game: f.game, language: f.language, condition: f.condition,
-        price: parseFloat(f.price) || 0, stock: parseInt(f.stock,10) || 1,
-        in_stock: (parseInt(f.stock,10) || 1) > 0, image_url: f.image_url || null,
-      };
-      const { data, error } = await supabase.from('singles').insert(payload).select().single();
-      if (!error && data) { setSingles(prev => [data, ...prev]); saved++; }
-    }
-    setBulkSavedCount(saved); setBulkSavingAll(false);
-  }
-
-  async function saveBulkProducts() {
-    if (!supabaseEnabled || !supabase) return;
-    setBulkSavingAll(true); setBulkSaveError(''); setBulkSavedCount(0);
-    let saved = 0;
-    for (const f of bulkProdForms) {
-      if (!f.title.trim() || !f.price) continue;
-      const cad = parseFloat(f.price) || 0;
-      const payload = {
-        id: `prod-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,
-        title: f.title.trim(), subtitle: f.subtitle.trim() || null,
-        language: f.language, tag: f.tag,
-        price: cad, stock: parseInt(f.stock,10) || 0,
-        badge: (parseInt(f.stock,10)||0) > 0 ? 'In Stock' : 'Sold Out',
-        in_stock: (parseInt(f.stock,10)||0) > 0, image_url: f.image_url || null,
-      };
-      const { data, error } = await supabase.from('products').insert(payload).select().single();
-      if (!error && data) { setDbProducts(prev => [data, ...prev]); saved++; }
-    }
-    setBulkSavedCount(saved); setBulkSavingAll(false);
-  }
-
-  function BulkUploadPanel({ accentClass = 'border-fuchsia-400/25 bg-fuchsia-400/6', tab = 'singles' }) {
+  function BulkUploadPanel({ accentClass = 'border-fuchsia-400/25 bg-fuchsia-400/6' }) {
     return (
       <div className={`mb-6 rounded-[24px] border ${accentClass} p-5`}>
         <div className="flex items-center justify-between mb-4">
@@ -324,7 +275,7 @@ export default function AdminPage() {
         <input ref={bulkInputRef} type="file" accept="image/*" multiple className="hidden"
           onChange={e => handleBulkSelect(e.target.files)} />
 
-        {bulkFiles.length > 0 && !bulkFillMode && (
+        {bulkFiles.length > 0 && (
           <>
             {/* Preview grid */}
             <div className="mb-4 grid grid-cols-5 gap-2">
@@ -349,124 +300,23 @@ export default function AdminPage() {
               </button>
             )}
 
-            {/* After upload — Fill Details CTA */}
-            {!bulkUploading && bulkResults.filter(r => r.status === 'done').length > 0 && (
-              <button
-                onClick={() => {
-                  const done = bulkResults.filter(r => r.status === 'done');
-                  if (tab === 'singles') setBulkCardForms(done.map(r => BLANK_BULK_CARD(r.url, r.preview)));
-                  else setBulkProdForms(done.map(r => BLANK_BULK_PROD(r.url, r.preview)));
-                  setBulkFillMode(true); setBulkSavedCount(0); setBulkSaveError('');
-                }}
-                className="w-full rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-400 py-2.5 text-sm font-black uppercase tracking-[0.1em] text-black">
-                Fill in Details → Add to Inventory
-              </button>
+            {/* Results — URLs */}
+            {bulkResults.filter(r => r.status === 'done').length > 0 && (
+              <div className="space-y-2">
+                <div className="text-[10px] font-black uppercase tracking-[0.16em] text-white/40 mb-2">Uploaded URLs — click to copy</div>
+                {bulkResults.filter(r => r.status === 'done').map((r, i) => (
+                  <div key={i} className="flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/6 px-3 py-2">
+                    <img src={r.preview} alt="" className="h-8 w-6 rounded object-cover shrink-0" />
+                    <div className="min-w-0 flex-1 text-[11px] text-white/60 truncate">{r.url}</div>
+                    <button onClick={() => navigator.clipboard.writeText(r.url)}
+                      className="shrink-0 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-black uppercase text-white/50 hover:bg-white/10">
+                      Copy
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
           </>
-        )}
-
-        {/* ── Fill Details mode ───────────────────────────────────────────── */}
-        {bulkFillMode && (
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <div className="text-xs font-black uppercase tracking-[0.16em] text-white/60">
-                Fill details for {tab === 'singles' ? bulkCardForms.length : bulkProdForms.length} {tab === 'singles' ? 'card' : 'product'}{(tab === 'singles' ? bulkCardForms.length : bulkProdForms.length) !== 1 ? 's' : ''}
-              </div>
-              <button onClick={() => setBulkFillMode(false)} className="text-xs text-white/30 hover:text-white/60 underline">← Back</button>
-            </div>
-
-            {bulkSavedCount > 0 && (
-              <div className="mb-4 rounded-2xl border border-emerald-400/25 bg-emerald-400/8 px-4 py-3 text-sm text-emerald-300 font-black">
-                {bulkSavedCount} item{bulkSavedCount !== 1 ? 's' : ''} added to inventory!
-              </div>
-            )}
-            {bulkSaveError && <div className="mb-4 rounded-xl border border-red-400/25 bg-red-400/10 px-4 py-2 text-xs text-red-300">{bulkSaveError}</div>}
-
-            {tab === 'singles' && (
-              <div className="space-y-4">
-                {bulkCardForms.map((f, i) => (
-                  <div key={i} className="rounded-[20px] border border-white/10 bg-black/20 p-4 flex gap-4">
-                    <img src={f.preview} alt="" className="h-28 w-20 rounded-xl object-cover shrink-0 border border-white/10" />
-                    <div className="flex-1 grid gap-2 sm:grid-cols-3">
-                      <input required placeholder="Card Name *" value={f.card_name}
-                        onChange={e => setBulkCardForms(prev => prev.map((x,j) => j===i ? {...x, card_name: e.target.value} : x))}
-                        className="col-span-2 rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/25 outline-none focus:border-fuchsia-400/40" />
-                      <input placeholder="Card # (e.g. OP01-001)" value={f.card_number}
-                        onChange={e => setBulkCardForms(prev => prev.map((x,j) => j===i ? {...x, card_number: e.target.value} : x))}
-                        className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/25 outline-none focus:border-fuchsia-400/40" />
-                      <input required placeholder="Set Name *" value={f.set_name}
-                        onChange={e => setBulkCardForms(prev => prev.map((x,j) => j===i ? {...x, set_name: e.target.value} : x))}
-                        className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/25 outline-none focus:border-fuchsia-400/40" />
-                      <input placeholder="Set Code (e.g. OP-01)" value={f.set_code}
-                        onChange={e => setBulkCardForms(prev => prev.map((x,j) => j===i ? {...x, set_code: e.target.value} : x))}
-                        className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/25 outline-none focus:border-fuchsia-400/40" />
-                      <input placeholder="Rarity" value={f.rarity}
-                        onChange={e => setBulkCardForms(prev => prev.map((x,j) => j===i ? {...x, rarity: e.target.value} : x))}
-                        className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/25 outline-none focus:border-fuchsia-400/40" />
-                      <select value={f.condition} onChange={e => setBulkCardForms(prev => prev.map((x,j) => j===i ? {...x, condition: e.target.value} : x))}
-                        className="rounded-xl border border-white/10 bg-white px-3 py-2 text-sm text-black outline-none">
-                        {['NM','LP','MP','HP','D'].map(c => <option key={c}>{c}</option>)}
-                      </select>
-                      <select value={f.language} onChange={e => setBulkCardForms(prev => prev.map((x,j) => j===i ? {...x, language: e.target.value} : x))}
-                        className="rounded-xl border border-white/10 bg-white px-3 py-2 text-sm text-black outline-none">
-                        {['Japanese','English'].map(l => <option key={l}>{l}</option>)}
-                      </select>
-                      <select value={f.game} onChange={e => setBulkCardForms(prev => prev.map((x,j) => j===i ? {...x, game: e.target.value} : x))}
-                        className="rounded-xl border border-white/10 bg-white px-3 py-2 text-sm text-black outline-none">
-                        {['One Piece','Pokémon','Dragon Ball','Yu-Gi-Oh!','Magic: The Gathering','Other'].map(g => <option key={g}>{g}</option>)}
-                      </select>
-                      <input required type="number" step="0.01" min="0" placeholder="Price (CAD) *" value={f.price}
-                        onChange={e => setBulkCardForms(prev => prev.map((x,j) => j===i ? {...x, price: e.target.value} : x))}
-                        className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/25 outline-none focus:border-fuchsia-400/40" />
-                      <input type="number" min="0" placeholder="Stock" value={f.stock}
-                        onChange={e => setBulkCardForms(prev => prev.map((x,j) => j===i ? {...x, stock: e.target.value} : x))}
-                        className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/25 outline-none focus:border-fuchsia-400/40" />
-                    </div>
-                  </div>
-                ))}
-                <button onClick={saveBulkCards} disabled={bulkSavingAll}
-                  className="w-full rounded-2xl bg-gradient-to-r from-fuchsia-400 via-purple-400 to-cyan-400 py-3 text-sm font-black uppercase tracking-[0.1em] text-black disabled:opacity-50">
-                  {bulkSavingAll ? <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin"/>Saving…</span> : `Add ${bulkCardForms.length} Card${bulkCardForms.length!==1?'s':''} to Inventory`}
-                </button>
-              </div>
-            )}
-
-            {tab === 'products' && (
-              <div className="space-y-4">
-                {bulkProdForms.map((f, i) => (
-                  <div key={i} className="rounded-[20px] border border-white/10 bg-black/20 p-4 flex gap-4">
-                    <img src={f.preview} alt="" className="h-24 w-20 rounded-xl object-cover shrink-0 border border-white/10" />
-                    <div className="flex-1 grid gap-2 sm:grid-cols-3">
-                      <input required placeholder="Title *" value={f.title}
-                        onChange={e => setBulkProdForms(prev => prev.map((x,j) => j===i ? {...x, title: e.target.value} : x))}
-                        className="col-span-2 rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/25 outline-none focus:border-cyan-400/40" />
-                      <input placeholder="Subtitle (e.g. Japanese)" value={f.subtitle}
-                        onChange={e => setBulkProdForms(prev => prev.map((x,j) => j===i ? {...x, subtitle: e.target.value} : x))}
-                        className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/25 outline-none focus:border-cyan-400/40" />
-                      <select value={f.language} onChange={e => setBulkProdForms(prev => prev.map((x,j) => j===i ? {...x, language: e.target.value} : x))}
-                        className="rounded-xl border border-white/10 bg-white px-3 py-2 text-sm text-black outline-none">
-                        {['English','Japanese'].map(l => <option key={l}>{l}</option>)}
-                      </select>
-                      <select value={f.tag} onChange={e => setBulkProdForms(prev => prev.map((x,j) => j===i ? {...x, tag: e.target.value} : x))}
-                        className="rounded-xl border border-white/10 bg-white px-3 py-2 text-sm text-black outline-none">
-                        {['One Piece','Pokemon','Dragon Ball','Yu-Gi-Oh!','Accessories','Other'].map(t => <option key={t}>{t}</option>)}
-                      </select>
-                      <input required type="number" step="0.01" min="0" placeholder="Price (CAD) *" value={f.price}
-                        onChange={e => setBulkProdForms(prev => prev.map((x,j) => j===i ? {...x, price: e.target.value} : x))}
-                        className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/25 outline-none focus:border-cyan-400/40" />
-                      <input type="number" min="0" placeholder="Stock" value={f.stock}
-                        onChange={e => setBulkProdForms(prev => prev.map((x,j) => j===i ? {...x, stock: e.target.value} : x))}
-                        className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/25 outline-none focus:border-cyan-400/40" />
-                    </div>
-                  </div>
-                ))}
-                <button onClick={saveBulkProducts} disabled={bulkSavingAll}
-                  className="w-full rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-emerald-400 py-3 text-sm font-black uppercase tracking-[0.1em] text-black disabled:opacity-50">
-                  {bulkSavingAll ? <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin"/>Saving…</span> : `Add ${bulkProdForms.length} Product${bulkProdForms.length!==1?'s':''} to Inventory`}
-                </button>
-              </div>
-            )}
-          </div>
         )}
       </div>
     );
@@ -1686,7 +1536,7 @@ export default function AdminPage() {
                   className="rounded-2xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-black uppercase text-white/70 hover:bg-white/10 disabled:opacity-40">
                   {singlesLoading ? 'Loading…' : 'Refresh'}
                 </button>
-                <button onClick={() => { setShowBulkPanel(v => !v); setBulkFiles([]); setBulkResults([]); setBulkFillMode(false); setBulkSavedCount(0); }}
+                <button onClick={() => { setShowBulkPanel(v => !v); setBulkFiles([]); setBulkResults([]); }}
                   className="rounded-2xl border border-fuchsia-400/25 bg-fuchsia-400/8 px-4 py-2.5 text-sm font-black uppercase text-fuchsia-200 hover:bg-fuchsia-400/15 transition">
                   {showBulkPanel ? 'Close Bulk Upload' : 'Bulk Upload Images'}
                 </button>
@@ -1698,7 +1548,7 @@ export default function AdminPage() {
             </div>
 
             {/* Bulk upload panel */}
-            {showBulkPanel && <BulkUploadPanel accentClass="border-fuchsia-400/25 bg-fuchsia-400/6" tab="singles" />}
+            {showBulkPanel && <BulkUploadPanel accentClass="border-fuchsia-400/25 bg-fuchsia-400/6" />}
 
             {/* Add form */}
             {showAddForm && (
@@ -2185,7 +2035,7 @@ export default function AdminPage() {
                   className="rounded-2xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-black uppercase text-white/70 hover:bg-white/10 disabled:opacity-40">
                   {dbProductsLoading ? 'Loading…' : 'Refresh'}
                 </button>
-                <button onClick={() => { setShowBulkPanel(v => !v); setBulkFiles([]); setBulkResults([]); setBulkFillMode(false); setBulkSavedCount(0); }}
+                <button onClick={() => { setShowBulkPanel(v => !v); setBulkFiles([]); setBulkResults([]); }}
                   className="rounded-2xl border border-cyan-400/25 bg-cyan-400/8 px-4 py-2.5 text-sm font-black uppercase text-cyan-200 hover:bg-cyan-400/15 transition">
                   {showBulkPanel ? 'Close Bulk Upload' : 'Bulk Upload Images'}
                 </button>
@@ -2197,7 +2047,7 @@ export default function AdminPage() {
             </div>
 
             {/* Bulk upload panel */}
-            {showBulkPanel && <BulkUploadPanel accentClass="border-cyan-400/25 bg-cyan-400/6" tab="products" />}
+            {showBulkPanel && <BulkUploadPanel accentClass="border-cyan-400/25 bg-cyan-400/6" />}
 
             {/* Add Product form */}
             {showAddProduct && (
