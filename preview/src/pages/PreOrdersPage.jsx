@@ -933,7 +933,7 @@ export default function PreOrdersPage() {
               />
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-fuchsia-400 via-pink-400 to-cyan-300" />
               <div className="relative overflow-hidden">
-                <img src={item.image} alt={item.title} onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/product-fallback.svg'; }} className="h-[260px] w-full object-cover saturate-[1.3] transition duration-500 group-hover:scale-105" />
+                <img src={item.image} alt={item.title} loading="lazy" decoding="async" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/product-fallback.svg'; }} className="h-[260px] w-full object-cover saturate-[1.3] transition duration-500 group-hover:scale-105" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
                 <div className="absolute left-4 top-4 inline-flex items-center gap-1.5 rounded-full border border-fuchsia-400/30 bg-black/70 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-fuchsia-200 backdrop-blur">
                   <Zap className="h-3 w-3" /> {item.hype}

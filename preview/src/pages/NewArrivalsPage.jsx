@@ -124,6 +124,8 @@ export default function NewArrivalsPage() {
                 <img
                   src={item.image}
                   alt={item.title}
+                  loading="lazy"
+                  decoding="async"
                   onError={(e) => {
                     e.currentTarget.onerror = null;
                     e.currentTarget.src = '/product-fallback.svg';

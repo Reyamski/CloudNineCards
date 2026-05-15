@@ -452,6 +452,8 @@ export default function HomePage() {
           <img
             src="/nami.png"
             alt=""
+            loading="lazy"
+            decoding="async"
             className="absolute right-0 top-0 h-[560px] w-auto select-none"
             style={{ opacity: 0.35, filter: 'drop-shadow(0 0 40px rgba(250,204,21,0.6)) drop-shadow(0 0 80px rgba(250,204,21,0.25))' }}
             onError={(e) => { e.currentTarget.style.display = 'none'; }}
@@ -474,6 +476,8 @@ export default function HomePage() {
                 <img
                   src={item.image}
                   alt={item.title}
+                  loading="lazy"
+                  decoding="async"
                   onError={(event) => {
                     event.currentTarget.onerror = null;
                     event.currentTarget.src = '/product-fallback.svg';
@@ -600,6 +604,8 @@ export default function HomePage() {
                     <img
                       src={article.thumbnail}
                       alt=""
+                      loading="lazy"
+                      decoding="async"
                       className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
                       onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                     />

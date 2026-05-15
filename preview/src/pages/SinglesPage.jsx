@@ -407,6 +407,7 @@ function SingleCard({ card, onBuy }) {
       <div className="relative h-[340px] overflow-hidden bg-black/20">
         {card.image_url ? (
           <img src={card.image_url} alt={card.card_name}
+            loading="lazy" decoding="async"
             className="h-full w-full object-contain p-2 transition duration-500 group-hover:scale-105"
             onError={e => { e.currentTarget.style.display = 'none'; }} />
         ) : (
