@@ -164,15 +164,23 @@ export default function CartPage() {
       setPhone(prev => prev || data.buyer_phone || '');
       setCountry(prev => prev || data.delivery_country || '');
       setProvince(prev => prev || data.delivery_province || '');
-      // buyer_address is "<street>, <postal>" — split the trailing postal back
-      // out so the two form fields stay correct.
+      // buyer_address shape depends on how the order was placed:
+      //   - new cart flow: "<street>, <postal>" (exactly 2 comma parts)
+      //   - legacy buy-modal: free-form textarea, often with city/province/
+      //     country/postal all mashed in
+      // We can only confidently round-trip the cart shape. For anything else
+      // we leave both fields blank — empty beats wrong (which previously
+      // leaked "Manitoba" / "Canada" into the address field via a too-loose
+      // postal regex). Province has its own column, so it still prefills.
       if (data.buyer_address) {
         const parts = String(data.buyer_address).split(',').map(s => s.trim()).filter(Boolean);
-        const maybePostal = parts.length > 1 ? parts[parts.length - 1] : '';
-        const looksLikePostal = /^[A-Z0-9][A-Z0-9 \-]{2,9}$/i.test(maybePostal);
-        const street = looksLikePostal ? parts.slice(0, -1).join(', ') : parts.join(', ');
-        setAddress(prev => prev || street);
-        setPostal(prev => prev || (looksLikePostal ? maybePostal : ''));
+        // Canadian (A1A 1A1) or US ZIP (12345 / 12345-6789) — strict.
+        const STRICT_POSTAL = /^([A-Z]\d[A-Z][ -]?\d[A-Z]\d|\d{5}(-\d{4})?)$/i;
+        if (parts.length === 2 && STRICT_POSTAL.test(parts[1])) {
+          setAddress(prev => prev || parts[0]);
+          setPostal(prev => prev || parts[1]);
+        }
+        // else: legacy/ambiguous — leave address + postal blank.
       }
     }
     loadProfile();
