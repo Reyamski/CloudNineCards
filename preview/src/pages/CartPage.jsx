@@ -259,18 +259,9 @@ export default function CartPage() {
         wise_handle:      WISE_HANDLE,
       };
 
-      const { data: insertedOrder, error: orderError } = await supabase
-        .from('orders')
-        .insert(orderPayload)
-        .select('id')
-        .single();
-      if (orderError) throw orderError;
-      orderId = insertedOrder?.id;
-      if (!orderId) throw new Error('Order insert returned no id.');
-
-      // ── 2. Insert order_items batch ────────────────────────────────────
+      // ── 2. Build order_items payload (committed alongside the order) ──
+      // order_id is set inside the RPC once the parent row gets its id.
       const orderItemsPayload = items.map(it => ({
-        order_id:       orderId,
         source_table:   it.source,
         item_id:        it.id,
         qty:            it.qty,
@@ -279,13 +270,23 @@ export default function CartPage() {
         image_snapshot: it.image ?? null,
         is_preorder:    !!it.isPreorder,
       }));
-      const { error: itemsError } = await supabase.from('order_items').insert(orderItemsPayload);
-      if (itemsError) throw itemsError;
+
+      // Single RPC inserts the orders row + all order_items rows in one
+      // transaction (see docs/wave3a-atomic-submit.sql). If anything fails,
+      // both roll back so no orphan orders row is left behind.
+      const { data: rpcId, error: rpcError } = await supabase.rpc('submit_cart_order', {
+        order_payload: orderPayload,
+        items_payload: orderItemsPayload,
+      });
+      if (rpcError) throw rpcError;
+      orderId = rpcId;
+      if (!orderId) throw new Error('Order RPC returned no id.');
 
       // ── 3. Decrement stock for in-stock lines only ─────────────────────
-      // Mirrors the per-item pattern in AdminPage.confirmOrder (commit
-      // ecc5989c). Failures are non-fatal: order still goes through, but we
-      // flag it so the admin can reconcile.
+      // Stock writes intentionally stay OUT of the atomic RPC: if a single
+      // row decrement fails, the order still goes through and admin can
+      // reconcile (status flips to 'stock_check_failed' below). Mirrors the
+      // per-item pattern in AdminPage.confirmOrder (commit ecc5989c).
       let stockCheckFailed = false;
       for (const it of items) {
         if (it.isPreorder) continue;
