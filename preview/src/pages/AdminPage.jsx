@@ -647,18 +647,22 @@ export default function AdminPage() {
 
     try {
       if (order.product_id && order.order_type !== 'pre_order') {
-        // Find which table holds this product — singles first, then products
-        const { data: singleRow } = await supabase
-          .from('singles').select('stock, in_stock').eq('id', order.product_id).maybeSingle();
+        // Pick the right source table based on order_type
+        const isSingle = order.order_type === 'single';
 
-        if (singleRow) {
-          const nextQty = Math.max(0, (singleRow.stock ?? 0) - order.quantity);
-          const nextInStock = nextQty > 0;
-          await supabase.from('singles')
-            .update({ stock: nextQty, in_stock: nextInStock, updated_at: new Date().toISOString() })
-            .eq('id', order.product_id);
-          setSingles((prev) => prev.map((s) => s.id === order.product_id ? {...s, stock: nextQty, in_stock: nextInStock} : s));
+        if (isSingle) {
+          const { data: singleRow } = await supabase
+            .from('singles').select('stock, in_stock').eq('id', order.product_id).maybeSingle();
+          if (singleRow) {
+            const nextQty = Math.max(0, (singleRow.stock ?? 0) - order.quantity);
+            const nextInStock = nextQty > 0;
+            await supabase.from('singles')
+              .update({ stock: nextQty, in_stock: nextInStock, updated_at: new Date().toISOString() })
+              .eq('id', order.product_id);
+            setSingles((prev) => prev.map((s) => s.id === order.product_id ? {...s, stock: nextQty, in_stock: nextInStock} : s));
+          }
         } else {
+          // on_hand → products table
           const { data: prodRow } = await supabase
             .from('products').select('stock, in_stock').eq('id', order.product_id).maybeSingle();
 
