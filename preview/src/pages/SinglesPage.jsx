@@ -1,20 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Check, Loader2, Search, SlidersHorizontal, Package, Globe, ShieldCheck, Copy } from 'lucide-react';
-import emailjs from '@emailjs/browser';
+import { Search, SlidersHorizontal, Package, Globe, ShieldCheck } from 'lucide-react';
 import Nav from '../components/Nav';
 import Footer from '../components/Footer';
 import { supabase, supabaseEnabled } from '../lib/supabase';
-import { useAuth } from '../lib/useAuth';
 import { useCart } from '../contexts/CartContext';
 import { useToast } from '../components/Toast';
-
-const EMAILJS_SERVICE_ID  = import.meta.env.VITE_EMAILJS_SERVICE_ID;
-const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ONHAND;
-const EMAILJS_PUBLIC_KEY  = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
-const WISE_HANDLE    = '@cloudninecards';
-const CONTACT_EMAIL  = 'papspective@gmail.com';
 
 const GAMES      = ['All', 'One Piece', 'Pokemon', 'Dragon Ball', 'Yu-Gi-Oh!', 'Union Arena'];
 const LANGS      = ['All', 'English', 'Japanese'];
@@ -34,41 +25,6 @@ const CONDITION_COLOR = {
   D:  'border-red-400/40     bg-red-400/10     text-red-300',
 };
 
-// CAD → foreign currency rates + 3% buffer to cover Wise transfer fees
-const FX_RATES = { USD: 1.37, AUD: 0.91, EUR: 1.50 }; // 1 foreign unit = X CAD
-const INTL_CURRENCIES = ['USD', 'AUD', 'EUR'];
-const CURRENCY_SYMBOLS = { CAD: 'CAD $', USD: 'USD $', AUD: 'AUD $', EUR: 'EUR €' };
-function cadToFx(cadAmount, currency) {
-  if (currency === 'CAD') return cadAmount;
-  return Math.ceil(cadAmount / FX_RATES[currency] * 1.03 * 100) / 100;
-}
-
-// Flat per-shipment shipping (singles ship light in toploader)
-const SINGLES_SHIP = {
-  'Canada':                          6,
-  'United States':                  15,
-  'Japan / Korea / HK / Singapore': 22,
-  'Australia / NZ / SE Asia':       22,
-  'Europe / Middle East':           25,
-  'Other International':            28,
-};
-
-const PROVINCE_TAX = {
-  'Alberta':                 { rate: 0.05,    label: 'GST'       },
-  'British Columbia':        { rate: 0.12,    label: 'GST + PST' },
-  'Manitoba':                { rate: 0.12,    label: 'GST + PST' },
-  'New Brunswick':           { rate: 0.15,    label: 'HST'       },
-  'Newfoundland & Labrador': { rate: 0.15,    label: 'HST'       },
-  'Nova Scotia':             { rate: 0.15,    label: 'HST'       },
-  'Ontario':                 { rate: 0.13,    label: 'HST'       },
-  'Prince Edward Island':    { rate: 0.15,    label: 'HST'       },
-  'Quebec':                  { rate: 0.14975, label: 'GST + QST' },
-  'Saskatchewan':            { rate: 0.11,    label: 'GST + PST' },
-  'Northwest Territories':   { rate: 0.05,    label: 'GST'       },
-  'Nunavut':                 { rate: 0.05,    label: 'GST'       },
-  'Yukon':                   { rate: 0.05,    label: 'GST'       },
-};
-
 // Static fallback singles — shown while Supabase table is being set up.
 // Prices set to 0 intentionally; update in DB after migration.
 const STATIC_SINGLES = [
@@ -79,324 +35,6 @@ const STATIC_SINGLES = [
   { id: 'eb03-061', card_name: 'Uta',                set_name: 'EB-03 Heroines Edition',     card_number: 'EB03-061', rarity: 'Secret Rare',condition: 'NM', language: 'Japanese', price: 0, stock: 1, in_stock: true,  image_url: '/singles/EB03-061.webp', game: 'One Piece' },
   { id: 'op13-066', card_name: 'Silvers Rayleigh',   set_name: 'OP-13 Carrying on His Will', card_number: 'OP13-066', rarity: 'Super Rare', condition: 'NM', language: 'English',  price: 0, stock: 1, in_stock: true,  image_url: '/singles/OP13-066.webp', game: 'One Piece' },
 ];
-
-// ── Buy Modal ─────────────────────────────────────────────────────────────────
-function BuySingleModal({ card, onClose, userEmail, user, onRequireAuth }) {
-  const [qty, setQty]           = useState(1);
-  const [country, setCountry]   = useState('');
-  const [province, setProvince] = useState('');
-  const [currency, setCurrency] = useState('CAD');
-
-  function handleCountryChange(c) {
-    setCountry(c);
-    setProvince('');
-    if (c === 'Canada') setCurrency('CAD');
-    else if (c === 'United States') setCurrency('USD');
-    else setCurrency('USD'); // default for international, user can change
-  }
-  const [name, setName]         = useState('');
-  const [email, setEmail]       = useState(userEmail ?? '');
-  const [phone, setPhone]       = useState('');
-  const [address, setAddress]   = useState('');
-  const [copied, setCopied]     = useState(false);
-  const [step, setStep]         = useState(1);
-  const [sending, setSending]   = useState(false);
-  const [sendError, setSendError] = useState('');
-  const [submitted, setSubmitted] = useState(false);
-  const [orderNumber] = useState(() => {
-    const ts   = Date.now().toString(36).toUpperCase();
-    const rand = Math.random().toString(36).slice(2, 5).toUpperCase();
-    return `CNC-${ts.slice(-5)}${rand}`;
-  });
-
-  const subtotal    = Number(card.price) * qty;
-  const shipFee     = country ? (SINGLES_SHIP[country] ?? 28) : 0;
-  const freeShip    = country === 'Canada' && subtotal >= 100;
-  const deliveryFee = freeShip ? 0 : shipFee;
-  const taxRate     = country === 'Canada' && province ? (PROVINCE_TAX[province]?.rate ?? 0) : 0;
-  const taxLabel    = country === 'Canada' && province ? (PROVINCE_TAX[province]?.label ?? '') : '';
-  const taxAmount   = subtotal * taxRate;
-  const grandTotalCAD = subtotal + deliveryFee + taxAmount;
-  const grandTotal    = cadToFx(grandTotalCAD, currency);
-  const sym           = CURRENCY_SYMBOLS[currency] ?? 'CAD $';
-  const step1Ready  = country && (country !== 'Canada' || province);
-  const isIntl      = country && country !== 'Canada' && country !== 'United States';
-
-  function copyWise() {
-    navigator.clipboard.writeText(WISE_HANDLE);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    // Auth gate — anon users can fill the form but must sign in to submit.
-    if (!user) {
-      onRequireAuth?.();
-      return;
-    }
-    setSending(true);
-    setSendError('');
-    try {
-      if (!supabaseEnabled || !supabase) throw new Error('Live orders not configured.');
-
-      const { error: dbErr } = await supabase.from('orders').insert({
-        order_number:     orderNumber,
-        order_type:       'single',
-        status:           'pending',
-        payment_status:   'awaiting_payment',
-        product_id:       card.id,
-        product_title:    card.card_name,
-        product_variant:  `${card.set_name} ${card.card_number ?? ''} · ${card.condition} · ${card.language}`.trim(),
-        item_title:       `${card.card_name} — ${card.set_name}`,
-        quantity:         qty,
-        buyer_name:       name,
-        buyer_email:      email.trim().toLowerCase(),
-        buyer_phone:      phone,
-        buyer_address:    address,
-        delivery_country:  country,
-        delivery_province: province || null,
-        full_price:        grandTotal,
-        total_price:       grandTotal,
-        delivery_fee:      deliveryFee,
-        subtotal:          subtotal,
-        tax_amount:        taxAmount,
-      });
-      if (dbErr) throw dbErr;
-
-      await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
-        order_number:     orderNumber,
-        buyer_name:       name,
-        buyer_email:      email,
-        buyer_phone:      phone,
-        buyer_address:    address,
-        item_title:       `[SINGLE] ${card.card_name}`,
-        item_subtitle:    `${card.set_name} · ${card.condition} · ${card.language}`,
-        quantity:         qty,
-        subtotal:          `CAD $${subtotal.toFixed(2)}`,
-        tax_amount:        taxAmount > 0 ? `CAD $${taxAmount.toFixed(2)} (${taxLabel})` : 'N/A',
-        delivery_fee:      freeShip ? 'FREE (Canada $100+)' : `CAD $${deliveryFee.toFixed(2)}`,
-        delivery_country:  country,
-        delivery_province: province || 'N/A',
-        total_price:       currency === 'CAD'
-          ? `CAD $${grandTotalCAD.toFixed(2)}`
-          : `${sym}${grandTotal.toFixed(2)} (≈ CAD $${grandTotalCAD.toFixed(2)})`,
-        payment_proof:    'Not provided — buyer will email separately',
-        wise_handle:      WISE_HANDLE,
-        to_email:         CONTACT_EMAIL,
-      }, { publicKey: EMAILJS_PUBLIC_KEY });
-
-      setSubmitted(true);
-    } catch (err) {
-      setSendError(err?.message || 'Failed to send. Email us directly.');
-    } finally {
-      setSending(false);
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center px-4 pb-4 sm:pb-0">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
-      <motion.div
-        initial={{ opacity: 0, y: 40, scale: 0.97 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 40, scale: 0.97 }}
-        transition={{ duration: 0.28 }}
-        className="relative w-full max-w-md rounded-[32px] border border-cyan-400/20 bg-[#07030f] overflow-hidden max-h-[90vh] overflow-y-auto"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="h-1 w-full bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-yellow-300" />
-        <div className="p-6">
-          <button onClick={onClose} className="absolute right-5 top-5 rounded-xl border border-white/10 bg-white/5 p-1.5 hover:bg-white/10">
-            <X className="h-4 w-4 text-white/60" />
-          </button>
-
-          {submitted ? (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center gap-4 py-8 text-center">
-              <div className="rounded-full border border-cyan-300/30 bg-cyan-300/10 p-5">
-                <Check className="h-10 w-10 text-cyan-300" />
-              </div>
-              <div className="text-2xl font-black uppercase">Order Sent!</div>
-              <div className="rounded-xl border border-cyan-300/30 bg-cyan-300/8 px-5 py-2">
-                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300/60 mb-0.5">Order Number</div>
-                <div className="text-lg font-black text-cyan-200 tracking-widest">{orderNumber}</div>
-              </div>
-              <p className="max-w-xs text-sm text-white/60 leading-6">
-                Send <strong className="text-cyan-300">CAD ${grandTotal.toFixed(2)}</strong> to{' '}
-                <strong className="text-cyan-300">{WISE_HANDLE}</strong> on Wise, then email your screenshot to{' '}
-                <span className="text-cyan-300">{CONTACT_EMAIL}</span>.
-              </p>
-              <button onClick={onClose} className="rounded-2xl border border-white/10 bg-white/5 px-6 py-2.5 text-sm font-black uppercase text-white/65 hover:bg-white/10">Done</button>
-            </motion.div>
-
-          ) : step === 1 ? (
-            <>
-              <div className="mb-4">
-                <div className="text-xs font-black uppercase tracking-[0.2em] text-cyan-300/70 mb-1">Buy Single — Wise</div>
-                <div className="text-xl font-black leading-snug">{card.card_name}</div>
-                <div className="mt-1 flex flex-wrap gap-1.5 text-xs">
-                  <span className="text-white/45">{card.set_name}</span>
-                  {card.card_number && <span className="text-white/30">· {card.card_number}</span>}
-                  <span className={`rounded-full border px-2 py-0.5 text-[10px] font-black ${CONDITION_COLOR[card.condition] ?? CONDITION_COLOR.NM}`}>{card.condition}</span>
-                  <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] font-black text-white/50">{card.language}</span>
-                </div>
-              </div>
-
-              <div className="mb-4">
-                <div className="text-xs font-black uppercase tracking-[0.14em] text-white/40 mb-2">Quantity</div>
-                <div className="flex items-center gap-3">
-                  <button onClick={() => setQty(q => Math.max(1, q - 1))} className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-lg font-black hover:bg-white/10">−</button>
-                  <span className="text-2xl font-black w-8 text-center">{qty}</span>
-                  <button onClick={() => setQty(q => Math.min(card.stock, q + 1))} className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-lg font-black hover:bg-white/10">+</button>
-                </div>
-                <div className="mt-1 text-xs text-white/30">{card.stock} available</div>
-              </div>
-
-              <div className="mb-4">
-                <div className="text-xs font-black uppercase tracking-[0.14em] text-white/40 mb-2">Shipping Destination</div>
-                <select value={country} onChange={e => handleCountryChange(e.target.value)}
-                  className="w-full rounded-2xl border border-white/10 bg-white px-4 py-3 text-sm text-black outline-none appearance-none">
-                  <option value="" disabled>Select destination…</option>
-                  <option value="Canada">🇨🇦 Canada</option>
-                  <option value="United States">🇺🇸 United States</option>
-                  <option value="Japan / Korea / HK / Singapore">🇯🇵 Japan / Korea / HK / Singapore</option>
-                  <option value="Australia / NZ / SE Asia">🇦🇺 Australia / NZ / SE Asia</option>
-                  <option value="Europe / Middle East">🌍 Europe / Middle East</option>
-                  <option value="Other International">🌏 Other International</option>
-                </select>
-              </div>
-
-              {country === 'Canada' && (
-                <div className="mb-4">
-                  <div className="text-xs font-black uppercase tracking-[0.14em] text-white/40 mb-2">Province / Territory</div>
-                  <select value={province} onChange={e => setProvince(e.target.value)}
-                    className="w-full rounded-2xl border border-white/10 bg-white px-4 py-3 text-sm text-black outline-none appearance-none">
-                    <option value="" disabled>Select province / territory…</option>
-                    {Object.keys(PROVINCE_TAX).map(p => (
-                      <option key={p} value={p}>{p} — {PROVINCE_TAX[p].label}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Currency selector — US auto-selects USD, international gets dropdown */}
-              {country && country !== 'Canada' && (
-                <div className="mb-4">
-                  <div className="text-xs font-black uppercase tracking-[0.14em] text-white/40 mb-2">
-                    Payment Currency
-                    {country === 'United States' && <span className="ml-2 text-cyan-300/50 normal-case font-normal">(auto-selected)</span>}
-                  </div>
-                  <select value={currency} onChange={e => setCurrency(e.target.value)}
-                    disabled={country === 'United States'}
-                    className="w-full rounded-2xl border border-white/10 bg-white px-4 py-3 text-sm text-black outline-none appearance-none disabled:opacity-60">
-                    {INTL_CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-              )}
-
-              <div className="mb-4 rounded-2xl border border-cyan-300/20 bg-cyan-300/6 p-4 space-y-1.5">
-                <div className="text-xs font-black uppercase tracking-[0.16em] text-cyan-300/60 mb-2">Price Breakdown</div>
-                <div className="flex justify-between text-sm text-white/70"><span>Subtotal ({qty}×)</span><span>{sym}{cadToFx(subtotal, currency).toFixed(2)}</span></div>
-                {country && (
-                  <div className="flex justify-between text-sm text-white/70">
-                    <span>Shipping (tracked) {freeShip ? '🎉' : ''}</span>
-                    <span className={freeShip ? 'text-green-400 font-bold' : ''}>{freeShip ? 'FREE' : `${sym}${cadToFx(deliveryFee, currency).toFixed(2)}`}</span>
-                  </div>
-                )}
-                {freeShip && <div className="text-xs text-green-400 font-black text-center">Free shipping on Canadian orders $100+</div>}
-                {taxAmount > 0 && (
-                  <div className="flex justify-between text-sm text-white/70">
-                    <span>Tax ({taxLabel} — {province})</span>
-                    <span>{sym}{cadToFx(taxAmount, currency).toFixed(2)}</span>
-                  </div>
-                )}
-                <div className="border-t border-cyan-300/20 pt-2 flex justify-between items-end">
-                  <span className="font-black text-sm">Total — send via Wise</span>
-                  <div className="text-right">
-                    <div className="text-2xl font-black text-cyan-200">{step1Ready ? `${sym}${grandTotal.toFixed(2)}` : '—'}</div>
-                    {currency !== 'CAD' && step1Ready && (
-                      <div className="text-xs text-white/30 mt-0.5">≈ CAD ${grandTotalCAD.toFixed(2)} · rate incl. 3% Wise fee</div>
-                    )}
-                  </div>
-                </div>
-                {!country && <div className="text-xs text-white/35 text-center">Select destination to see total</div>}
-                {country === 'Canada' && !province && <div className="text-xs text-white/35 text-center">Select province to calculate tax</div>}
-              </div>
-
-              <div className="mb-5 rounded-2xl border border-cyan-300/20 bg-cyan-300/8 p-4 flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-xs text-white/40 mb-0.5">Send payment to</div>
-                  <div className="text-xl font-black text-cyan-200">{WISE_HANDLE}</div>
-                  <div className="text-xs text-white/30">Cloud Nine Cards · Wise</div>
-                </div>
-                <button onClick={copyWise} className="rounded-xl border border-white/10 bg-white/5 p-2.5 hover:bg-white/10 transition">
-                  {copied ? <Check className="h-4 w-4 text-cyan-300" /> : <Copy className="h-4 w-4 text-white/50" />}
-                </button>
-              </div>
-
-              <button onClick={() => setStep(2)} disabled={!step1Ready}
-                className="w-full rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 py-3.5 text-sm font-black uppercase tracking-[0.1em] text-black transition hover:opacity-95 disabled:opacity-40 disabled:cursor-not-allowed">
-                I've Sent the Payment →
-              </button>
-            </>
-
-          ) : (
-            <form onSubmit={handleSubmit}>
-              <div className="mb-5">
-                <div className="text-xs font-black uppercase tracking-[0.2em] text-cyan-300/70 mb-1">Confirm Your Order</div>
-                <div className="text-xl font-black">Your details</div>
-              </div>
-              <div className="mb-3">
-                <label className="mb-1.5 block text-xs font-black uppercase tracking-[0.14em] text-white/40">Full name</label>
-                <input required value={name} onChange={e => setName(e.target.value)} placeholder="Name used on Wise"
-                  className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder-white/25 outline-none focus:border-cyan-300/40" />
-              </div>
-              <div className="mb-3">
-                <label className="mb-1.5 block text-xs font-black uppercase tracking-[0.14em] text-white/40">Email</label>
-                <input required type="email" value={email} onChange={e => setEmail(e.target.value)} readOnly={!!userEmail}
-                  placeholder="Confirmation sent here"
-                  className={`w-full rounded-2xl border px-4 py-3 text-sm outline-none ${userEmail ? 'border-white/5 bg-white/5 text-white/50 cursor-default' : 'border-white/10 bg-black/30 text-white focus:border-cyan-300/40'} placeholder-white/25`} />
-              </div>
-              <div className="mb-3">
-                <label className="mb-1.5 block text-xs font-black uppercase tracking-[0.14em] text-white/40">Phone / WhatsApp</label>
-                <input required type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+1 234 567 8900"
-                  className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder-white/25 outline-none focus:border-cyan-300/40" />
-              </div>
-              <div className="mb-4">
-                <label className="mb-1.5 block text-xs font-black uppercase tracking-[0.14em] text-white/40">Delivery Address</label>
-                <textarea required rows={3} value={address} onChange={e => setAddress(e.target.value)} placeholder="Full delivery address"
-                  className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white placeholder-white/25 outline-none focus:border-cyan-300/40 resize-none" />
-              </div>
-
-              <div className="mb-4 rounded-2xl border border-white/8 bg-white/4 p-4 text-xs text-white/50 space-y-1">
-                <div className="font-black text-white/70 uppercase tracking-[0.12em] text-[10px] mb-2">Order Summary</div>
-                <div className="flex justify-between"><span>{card.card_name} × {qty}</span><span>CAD ${subtotal.toFixed(2)}</span></div>
-                <div className="flex justify-between"><span>Shipping ({country})</span><span>{freeShip ? 'FREE' : `CAD $${deliveryFee.toFixed(2)}`}</span></div>
-                <div className="flex justify-between text-cyan-300 font-bold border-t border-white/8 pt-1.5"><span>Total via Wise</span><span>CAD ${grandTotal.toFixed(2)}</span></div>
-              </div>
-
-              {sendError && <div className="mb-3 rounded-xl border border-red-400/25 bg-red-400/10 px-4 py-3 text-xs text-red-300">{sendError}</div>}
-              {!user && (
-                <div className="mb-3 rounded-xl border border-cyan-400/25 bg-cyan-400/10 px-4 py-3 text-xs text-cyan-200">
-                  Sign in or create an account to place your order — it only takes a sec.
-                </div>
-              )}
-              <div className="flex gap-3">
-                <button type="button" onClick={() => setStep(1)} disabled={sending}
-                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black uppercase text-white/55 hover:bg-white/10 disabled:opacity-40">Back</button>
-                <button type="submit" disabled={sending}
-                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 py-3 text-sm font-black uppercase text-black hover:opacity-95 disabled:opacity-60">
-                  {sending ? <><Loader2 className="h-4 w-4 animate-spin" /> Sending…</> : (!user ? 'Sign In to Place Order' : 'Submit Order')}
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      </motion.div>
-    </div>
-  );
-}
 
 // ── Card Tile ─────────────────────────────────────────────────────────────────
 function SingleCard({ card, onBuy }) {
@@ -460,13 +98,9 @@ function SingleCard({ card, onBuy }) {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function SinglesPage() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [singles, setSingles]         = useState(STATIC_SINGLES);
   const [loading, setLoading]         = useState(true);
   const [fetchError, setFetchError]   = useState('');
-  const [selected, setSelected]       = useState(null);
   const [search, setSearch]           = useState('');
   const [gameFilter, setGameFilter]   = useState('All');
   const [langFilter, setLangFilter]   = useState('All');
@@ -491,14 +125,6 @@ export default function SinglesPage() {
       setLoading(false);
     });
   }, []);
-
-  // Pre-open from URL ?card=id
-  useEffect(() => {
-    const id = searchParams.get('card');
-    if (!id || !singles.length) return;
-    const found = singles.find(s => s.id === id);
-    if (found) setSelected(found);
-  }, [searchParams, singles]);
 
   const filtered = useMemo(() => {
     let list = singles;
@@ -544,10 +170,6 @@ export default function SinglesPage() {
 
   return (
     <div className="min-h-screen bg-[#05010c] text-white">
-      <AnimatePresence>
-        {selected && <BuySingleModal card={selected} onClose={() => setSelected(null)} userEmail={user?.email ?? ''} user={user} onRequireAuth={() => navigate('/account', { state: { redirect: '/singles' } })} />}
-      </AnimatePresence>
-
       {/* Hero */}
       <section className="relative overflow-hidden border-b border-cyan-500/15 bg-[#07030f] px-6 pb-10 pt-6 min-h-[360px] flex flex-col justify-center">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.18),transparent_40%),radial-gradient(circle_at_left,rgba(168,85,247,0.12),transparent_40%)]" />
