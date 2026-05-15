@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, User } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../lib/useAuth';
+import CartIcon from './CartIcon';
 
 export default function Nav() {
   const { pathname } = useLocation();
@@ -44,29 +45,34 @@ export default function Nav() {
           ))}
         </div>
 
-        {/* Account link */}
-        <Link
-          to={user ? '/account/orders' : '/account'}
-          className={`hidden items-center gap-1.5 rounded-full border px-4 py-2 text-xs font-black uppercase tracking-[0.14em] transition md:flex ${
-            pathname.startsWith('/account')
-              ? 'border-cyan-300/60 bg-cyan-300/20 text-cyan-200'
-              : user
-                ? 'border-fuchsia-400/40 bg-fuchsia-400/15 text-fuchsia-200 hover:border-fuchsia-400/60 hover:bg-fuchsia-400/25'
-                : 'border-cyan-300/35 bg-cyan-300/10 text-cyan-200 hover:border-cyan-300/55 hover:bg-cyan-300/18'
-          }`}
-        >
-          <User className="h-3.5 w-3.5" />
-          {user ? 'My Orders' : 'Login'}
-        </Link>
+        <div className="flex items-center gap-2 md:gap-3">
+          {/* Cart icon — always visible, count + subtotal pill */}
+          <CartIcon />
 
-        {/* Mobile hamburger */}
-        <button
-          className="md:hidden text-white/75 hover:text-cyan-300 transition"
-          onClick={() => setIsOpen(prev => !prev)}
-          aria-label="Toggle menu"
-        >
-          {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-        </button>
+          {/* Account link */}
+          <Link
+            to={user ? '/account/orders' : '/account'}
+            className={`hidden items-center gap-1.5 rounded-full border px-4 py-2 text-xs font-black uppercase tracking-[0.14em] transition md:flex ${
+              pathname.startsWith('/account')
+                ? 'border-cyan-300/60 bg-cyan-300/20 text-cyan-200'
+                : user
+                  ? 'border-fuchsia-400/40 bg-fuchsia-400/15 text-fuchsia-200 hover:border-fuchsia-400/60 hover:bg-fuchsia-400/25'
+                  : 'border-cyan-300/35 bg-cyan-300/10 text-cyan-200 hover:border-cyan-300/55 hover:bg-cyan-300/18'
+            }`}
+          >
+            <User className="h-3.5 w-3.5" />
+            {user ? 'My Orders' : 'Login'}
+          </Link>
+
+          {/* Mobile hamburger */}
+          <button
+            className="md:hidden text-white/75 hover:text-cyan-300 transition"
+            onClick={() => setIsOpen(prev => !prev)}
+            aria-label="Toggle menu"
+          >
+            {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          </button>
+        </div>
       </div>
 
       {/* Mobile dropdown */}
