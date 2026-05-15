@@ -71,7 +71,7 @@ export default async function handler(req, res) {
         'content-type':       'application/json',
       },
       body: JSON.stringify({
-        model:      'claude-haiku-4-5-20251001',
+        model:      'claude-sonnet-4-6',
         max_tokens: 512,
         messages: [{
           role: 'user',
@@ -80,17 +80,24 @@ export default async function handler(req, res) {
             {
               type: 'text',
               text: `You are a TCG card expert for One Piece, Pokemon, Dragon Ball, and Yu-Gi-Oh!.
-Analyze this card image and return ONLY valid JSON — no explanation, no markdown, just the JSON object:
+Analyze this card image carefully. Look at ALL parts of the card:
+- Card name: usually large text at top or bottom
+- Card number: small alphanumeric code printed at the bottom-left or bottom-right corner (e.g. OP01-001, EB03-018, 025/198)
+- Set code: prefix of the card number (e.g. OP-01, EB-03, SV7) — also on the card back or set symbol
+- Rarity: indicated by the symbol/color near the card number, or text like SR, R, C, UC, L, SP
+
+Return ONLY valid JSON — no explanation, no markdown:
 {
-  "card_name": "card name in English — if the card is Japanese/Korean, translate the name to English",
+  "card_name": "card name in English — translate from Japanese/Korean if needed",
   "set_name": "full set name (e.g. 'EB-03 Heroines Edition', 'Scarlet & Violet—Stellar Crown')",
-  "set_code": "short set code (e.g. 'EB-03', 'OP-15', 'SV7')",
-  "card_number": "full card number as printed (e.g. 'EB03-018', 'OP15-001', '25/142')",
+  "set_code": "short set code (e.g. 'EB-03', 'OP-15', 'SV7') — derive from card number prefix if needed",
+  "card_number": "full card number as printed at bottom corner (e.g. 'EB03-018', 'OP15-001', '25/142') — look carefully at the bottom corners",
   "game": "one of exactly: One Piece, Pokemon, Dragon Ball, Yu-Gi-Oh!, Union Arena",
   "language": "one of exactly: English, Japanese",
-  "condition": "one of exactly: NM, LP, MP, HP, D — default NM if no damage visible",
+  "condition": "one of exactly: NM, LP, MP, HP, D — default NM if unclear",
   "rarity": "rarity (e.g. Common, Uncommon, Rare, Super Rare, Secret Rare, Leader Rare, Special Rare)"
-}`,
+}
+Only use "Unknown" if a field is truly impossible to determine from the image.`,
             },
           ],
         }],
