@@ -144,6 +144,41 @@ export default function CartPage() {
     if (user?.email && !email) setEmail(user.email);
   }, [user, email]);
 
+  // Prefill shipping fields from the user's most recent order (acts as a
+  // lightweight profile — no separate profiles table). Only fills fields the
+  // buyer hasn't already touched this session, so re-edits aren't blown away
+  // on a focus/auth re-render.
+  useEffect(() => {
+    if (!user?.email || !supabaseEnabled || !supabase) return;
+    let cancelled = false;
+    async function loadProfile() {
+      const { data } = await supabase
+        .from('orders')
+        .select('buyer_name, buyer_phone, buyer_address, delivery_country, delivery_province')
+        .ilike('buyer_email', user.email)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (cancelled || !data) return;
+      setName(prev => prev || data.buyer_name || '');
+      setPhone(prev => prev || data.buyer_phone || '');
+      setCountry(prev => prev || data.delivery_country || '');
+      setProvince(prev => prev || data.delivery_province || '');
+      // buyer_address is "<street>, <postal>" — split the trailing postal back
+      // out so the two form fields stay correct.
+      if (data.buyer_address) {
+        const parts = String(data.buyer_address).split(',').map(s => s.trim()).filter(Boolean);
+        const maybePostal = parts.length > 1 ? parts[parts.length - 1] : '';
+        const looksLikePostal = /^[A-Z0-9][A-Z0-9 \-]{2,9}$/i.test(maybePostal);
+        const street = looksLikePostal ? parts.slice(0, -1).join(', ') : parts.join(', ');
+        setAddress(prev => prev || street);
+        setPostal(prev => prev || (looksLikePostal ? maybePostal : ''));
+      }
+    }
+    loadProfile();
+    return () => { cancelled = true; };
+  }, [user?.email]);
+
   // Reset province when country changes off Canada.
   useEffect(() => {
     if (country !== 'Canada' && province) setProvince('');
