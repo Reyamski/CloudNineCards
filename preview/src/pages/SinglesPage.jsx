@@ -214,6 +214,12 @@ export default function SinglesPage() {
                 placeholder="Search by card name, set, or number…"
                 className="w-full rounded-2xl border border-white/10 bg-white/5 py-3 pl-11 pr-4 text-sm text-white placeholder-white/30 outline-none focus:border-cyan-300/40" />
             </div>
+            {/* Top-level sort dropdown — matches the /shop affordance so buyers
+                don't have to open the Filters accordion to re-sort. */}
+            <select value={sort} onChange={e => setSort(e.target.value)}
+              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-white/70 outline-none focus:border-cyan-300/40">
+              {SORTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
             <button onClick={() => setShowFilters(f => !f)}
               className={`flex items-center gap-2 rounded-2xl border px-4 py-3 text-xs font-black uppercase tracking-[0.14em] transition ${showFilters ? 'border-fuchsia-400/50 bg-fuchsia-400/15 text-fuchsia-200' : 'border-white/10 bg-white/5 text-white/60 hover:bg-white/10'}`}>
               <SlidersHorizontal className="h-4 w-4" /> Filters
@@ -253,10 +259,6 @@ export default function SinglesPage() {
                       </div>
                       <span className="text-xs font-black uppercase tracking-[0.14em] text-white/55">In Stock Only</span>
                     </label>
-                    <select value={sort} onChange={e => setSort(e.target.value)}
-                      className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-black uppercase tracking-[0.1em] text-white/60 outline-none">
-                      {SORTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                    </select>
                   </div>
                 </div>
               </motion.div>
