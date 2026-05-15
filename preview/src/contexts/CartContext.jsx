@@ -43,11 +43,12 @@ function reducer(state, action) {
     case 'add': {
       const incoming = action.item;
       const key = incoming.key || `${incoming.source}:${incoming.id}`;
-      const next = { ...incoming, key, qty: Math.max(1, Number(incoming.qty) || 1) };
+      const wantQty = Math.max(1, Number(incoming.qty) || 1);
+      const next = { ...incoming, key, qty: wantQty };
       const idx = state.findIndex(it => it.key === key);
       if (idx === -1) return [...state, next];
       const merged = [...state];
-      merged[idx] = { ...merged[idx], qty: merged[idx].qty + next.qty };
+      merged[idx] = { ...merged[idx], qty: merged[idx].qty + wantQty };
       return merged;
     }
     case 'remove':
@@ -87,9 +88,30 @@ export function CartProvider({ children }) {
     const itemCount = items.reduce((sum, it) => sum + it.qty, 0);
     const lineCount = items.length;
 
+    // addItem returns a status so call sites can show an appropriate toast:
+    //   { ok: true,  added: N }                       — added N units
+    //   { ok: false, reason: 'stock', available: N }  — refused (cap hit)
+    // Preorder items skip the stock check (not bounded by current stock).
+    // If maxStock isn't passed (e.g., we don't have live data yet), the add
+    // proceeds unconditionally — CartPage's "Only N left" warning is still
+    // the safety net there.
+    function addItem(item) {
+      const key = item.key || `${item.source}:${item.id}`;
+      const wantQty = Math.max(1, Number(item.qty) || 1);
+      if (!item.isPreorder && Number.isFinite(item.maxStock)) {
+        const max = Math.max(0, Math.floor(item.maxStock));
+        const current = items.find(it => it.key === key)?.qty ?? 0;
+        if (current + wantQty > max) {
+          return { ok: false, reason: 'stock', available: Math.max(0, max - current) };
+        }
+      }
+      dispatch({ type: 'add', item });
+      return { ok: true, added: wantQty };
+    }
+
     return {
       items,
-      addItem: item => dispatch({ type: 'add', item }),
+      addItem,
       removeItem: key => dispatch({ type: 'remove', key }),
       updateQty: (key, qty) => dispatch({ type: 'updateQty', key, qty }),
       clear: () => dispatch({ type: 'clear' }),

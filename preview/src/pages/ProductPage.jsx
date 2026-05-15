@@ -228,7 +228,7 @@ export default function ProductPage() {
                   </div>
                   <button
                     onClick={() => {
-                      addItem({
+                      const result = addItem({
                         key:        `${product.isPreorder ? 'preorders' : 'products'}:${product.id}`,
                         source:     product.isPreorder ? 'preorders' : 'products',
                         id:         product.id,
@@ -238,8 +238,17 @@ export default function ProductPage() {
                         qty,
                         isPreorder: !!product.isPreorder,
                         etaText:    product.eta ?? '',
+                        maxStock:   product.isPreorder ? undefined : (Number(product.stock) || 0),
                         currency:   'CAD',
                       });
+                      if (!result.ok && result.reason === 'stock') {
+                        showToast(
+                          result.available > 0
+                            ? `Only ${result.available} more available`
+                            : `Already at stock limit`
+                        );
+                        return;
+                      }
                       showToast(`Added × ${qty} to cart`, { actionTo: '/cart', actionLabel: 'View Cart' });
                     }}
                     className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 py-4 text-sm font-black uppercase tracking-[0.12em] text-black shadow-[0_10px_30px_rgba(34,211,238,0.25)] transition hover:opacity-95"

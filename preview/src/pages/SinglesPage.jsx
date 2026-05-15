@@ -154,7 +154,7 @@ export default function SinglesPage() {
   function handleBuy(card) {
     // Add-to-cart replaces the legacy buy modal. Buyer reviews and submits
     // on /cart (the merged checkout page).
-    addItem({
+    const result = addItem({
       key:        `singles:${card.id}`,
       source:     'singles',
       id:         card.id,
@@ -163,8 +163,17 @@ export default function SinglesPage() {
       price:      Number(card.price) || 0,
       qty:        1,
       isPreorder: false,
+      maxStock:   card.in_stock ? Number(card.stock) || 0 : 0,
       currency:   'CAD',
     });
+    if (!result.ok && result.reason === 'stock') {
+      showToast(
+        result.available > 0
+          ? `Only ${result.available} more available`
+          : `Already at stock limit`
+      );
+      return;
+    }
     showToast(`Added — ${card.card_name}`, { actionTo: '/cart', actionLabel: 'View Cart' });
   }
 

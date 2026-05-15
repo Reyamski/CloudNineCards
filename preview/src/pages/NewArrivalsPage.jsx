@@ -154,7 +154,7 @@ export default function NewArrivalsPage() {
                 <div className="mt-5 flex flex-col gap-2">
                   <button
                     onClick={() => {
-                      addItem({
+                      const result = addItem({
                         key:        `products:${item.id}`,
                         source:     'products',
                         id:         item.id,
@@ -163,8 +163,17 @@ export default function NewArrivalsPage() {
                         price:      Number(item.price) || 0,
                         qty:        1,
                         isPreorder: false,
+                        maxStock:   Number(item.quantity) || 0,
                         currency:   'CAD',
                       });
+                      if (!result.ok && result.reason === 'stock') {
+                        showToast(
+                          result.available > 0
+                            ? `Only ${result.available} more available`
+                            : `Already at stock limit`
+                        );
+                        return;
+                      }
                       showToast(`Added — ${item.title.length > 40 ? item.title.slice(0, 40) + '…' : item.title}`, {actionTo: '/cart', actionLabel: 'View Cart'});
                     }}
                     className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-yellow-300 via-cyan-300 to-fuchsia-400 px-4 py-3 text-sm font-black uppercase tracking-[0.08em] text-black transition hover:opacity-95"

@@ -140,7 +140,7 @@ export default function ShopPage() {
   const { showToast } = useToast();
 
   function addToCart(item) {
-    addItem({
+    const result = addItem({
       key:        `products:${item.id}`,
       source:     'products',
       id:         item.id,
@@ -149,8 +149,17 @@ export default function ShopPage() {
       price:      Number(item.price) || 0,
       qty:        1,
       isPreorder: false,
+      maxStock:   Number(item.stock) || 0,
       currency:   'CAD',
     });
+    if (!result.ok && result.reason === 'stock') {
+      showToast(
+        result.available > 0
+          ? `Only ${result.available} more available`
+          : `Already at stock limit`
+      );
+      return;
+    }
     showToast(`Added to cart — ${item.title.length > 40 ? item.title.slice(0, 40) + '…' : item.title}`, {
       actionTo: '/cart', actionLabel: 'View Cart',
     });
