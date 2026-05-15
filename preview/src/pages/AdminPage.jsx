@@ -646,55 +646,36 @@ export default function AdminPage() {
     setDbError('');
 
     try {
-      if (order.product_id) {
-        const existingProduct = products.find((product) => product.id === order.product_id);
-        const fallbackQty = existingProduct?.stock ?? 0;
+      if (order.product_id && order.order_type !== 'pre_order') {
+        // Find which table holds this product — singles first, then products
+        const { data: singleRow } = await supabase
+          .from('singles').select('stock, in_stock').eq('id', order.product_id).maybeSingle();
 
-        const {data: stockRow, error: stockError} = await supabase
-          .from('stock')
-          .select('*')
-          .eq('id', order.product_id)
-          .maybeSingle();
+        if (singleRow) {
+          const nextQty = Math.max(0, (singleRow.stock ?? 0) - order.quantity);
+          const nextInStock = nextQty > 0;
+          await supabase.from('singles')
+            .update({ stock: nextQty, in_stock: nextInStock, updated_at: new Date().toISOString() })
+            .eq('id', order.product_id);
+          setSingles((prev) => prev.map((s) => s.id === order.product_id ? {...s, stock: nextQty, in_stock: nextInStock} : s));
+        } else {
+          const { data: prodRow } = await supabase
+            .from('products').select('stock, in_stock').eq('id', order.product_id).maybeSingle();
 
-        if (stockError) throw stockError;
+          if (prodRow) {
+            const nextQty = Math.max(0, (prodRow.stock ?? 0) - order.quantity);
+            const nextInStock = nextQty > 0;
+            await supabase.from('products')
+              .update({ stock: nextQty, in_stock: nextInStock, badge: nextInStock ? 'In Stock' : 'Sold Out' })
+              .eq('id', order.product_id);
+            setDbProducts((prev) => prev.map((p) => p.id === order.product_id ? {...p, stock: nextQty, in_stock: nextInStock, badge: nextInStock ? 'In Stock' : 'Sold Out'} : p));
 
-        const currentQty = stockRow?.quantity ?? fallbackQty;
-        const nextQty = Math.max(0, currentQty - order.quantity);
-        const nextInStock = nextQty > 0;
-
-        const {error: upsertError} = await supabase
-          .from('stock')
-          .upsert({id: order.product_id, quantity: nextQty, in_stock: nextInStock}, {onConflict: 'id'});
-
-        if (upsertError) throw upsertError;
-
-        // Also update singles and products tables (whichever has the matching id)
-        await supabase
-          .from('singles')
-          .update({ stock: nextQty, in_stock: nextInStock, updated_at: new Date().toISOString() })
-          .eq('id', order.product_id);
-
-        await supabase
-          .from('products')
-          .update({ stock: nextQty, in_stock: nextInStock, badge: nextInStock ? 'In Stock' : 'Sold Out' })
-          .eq('id', order.product_id);
-
-        // Update local state for both
-        setProducts((prev) => prev.map((product) => (
-          product.id === order.product_id
-            ? {...product, stock: nextQty, inStock: nextInStock}
-            : product
-        )));
-        setSingles((prev) => prev.map((s) => (
-          s.id === order.product_id
-            ? {...s, stock: nextQty, in_stock: nextInStock}
-            : s
-        )));
-        setDbProducts((prev) => prev.map((p) => (
-          p.id === order.product_id
-            ? {...p, stock: nextQty, in_stock: nextInStock, badge: nextInStock ? 'In Stock' : 'Sold Out'}
-            : p
-        )));
+            // Legacy stock table — keep for Inventory tab compatibility
+            await supabase.from('stock')
+              .upsert({ id: order.product_id, quantity: nextQty, in_stock: nextInStock }, { onConflict: 'id' });
+            setProducts((prev) => prev.map((product) => product.id === order.product_id ? {...product, stock: nextQty, inStock: nextInStock} : product));
+          }
+        }
       }
 
       const confirmedAt = new Date().toISOString();
