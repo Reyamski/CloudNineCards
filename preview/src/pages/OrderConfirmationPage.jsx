@@ -15,6 +15,18 @@ export default function OrderConfirmationPage() {
   const inStockTotal = state.inStockTotal;
   const preorderTotal = state.preorderTotal;
 
+  // Wave 3a — breakdown fields handed off from CartPage. All optional so old
+  // confirmation hand-offs (and direct visits) still render gracefully.
+  const subtotal         = state.subtotal;
+  const inStockSubtotal  = state.inStockSubtotal;
+  const preorderSubtotal = state.preorderSubtotal;
+  const shippingFee      = state.shippingFee;
+  const freeShipApplied  = state.freeShipApplied;
+  const taxAmount        = state.taxAmount;
+  const taxLabel         = state.taxLabel;
+  const country          = state.country;
+  const hasBreakdown     = typeof subtotal === 'number' && typeof shippingFee === 'number';
+
   useEffect(() => { document.title = 'Order Confirmed | CloudNineCards'; }, []);
 
   return (
@@ -56,10 +68,34 @@ export default function OrderConfirmationPage() {
                   <span className="tabular-nums text-white/80">CAD ${(line.price * line.qty).toFixed(2)}</span>
                 </div>
               ))}
-              {hasPreorder && typeof inStockTotal === 'number' && (
+
+              {hasBreakdown && (
+                <div className="border-t border-white/10 mt-2 pt-2 space-y-1">
+                  <Row label="Subtotal" value={`CAD $${subtotal.toFixed(2)}`} />
+                  {typeof preorderSubtotal === 'number' && preorderSubtotal > 0 && typeof inStockSubtotal === 'number' && (
+                    <>
+                      <Row label="• In-stock" value={`CAD $${inStockSubtotal.toFixed(2)}`} subtle />
+                      <Row label="• Pre-order" value={`CAD $${preorderSubtotal.toFixed(2)}`} subtle />
+                    </>
+                  )}
+                  <Row
+                    label={`Shipping${country ? ` (${country})` : ''}`}
+                    value={freeShipApplied ? 'FREE' : `CAD $${shippingFee.toFixed(2)}`}
+                    valueClass={freeShipApplied ? 'text-green-400 font-black' : ''}
+                  />
+                  <Row
+                    label={`Tax${taxLabel ? ` (${taxLabel})` : ''}`}
+                    value={typeof taxAmount === 'number' && taxAmount > 0
+                      ? `CAD $${taxAmount.toFixed(2)}`
+                      : 'Not applicable'}
+                  />
+                </div>
+              )}
+
+              {hasPreorder && typeof inStockTotal === 'number' ? (
                 <>
                   <div className="border-t border-white/10 mt-2 pt-2 flex justify-between">
-                    <span>Due now (in-stock + shipping)</span>
+                    <span className="font-black text-white/85">Due now (in-stock + shipping + tax)</span>
                     <span className="tabular-nums text-cyan-200 font-black">CAD ${inStockTotal.toFixed(2)}</span>
                   </div>
                   {typeof preorderTotal === 'number' && preorderTotal > 0 && (
@@ -69,13 +105,12 @@ export default function OrderConfirmationPage() {
                     </div>
                   )}
                 </>
-              )}
-              {!hasPreorder && typeof total === 'number' && (
+              ) : (!hasPreorder && typeof total === 'number') ? (
                 <div className="border-t border-white/10 mt-2 pt-2 flex justify-between">
-                  <span>Total paid via Wise</span>
+                  <span className="font-black text-white/85">Total paid via Wise</span>
                   <span className="tabular-nums text-cyan-200 font-black">CAD ${total.toFixed(2)}</span>
                 </div>
-              )}
+              ) : null}
             </div>
           )}
 
@@ -91,6 +126,15 @@ export default function OrderConfirmationPage() {
       </section>
 
       <Footer />
+    </div>
+  );
+}
+
+function Row({ label, value, valueClass = '', subtle }) {
+  return (
+    <div className={`flex justify-between gap-3 ${subtle ? 'text-white/40 text-xs pl-3' : ''}`}>
+      <span>{label}</span>
+      <span className={`tabular-nums ${valueClass || (subtle ? '' : 'text-white/80')}`}>{value}</span>
     </div>
   );
 }

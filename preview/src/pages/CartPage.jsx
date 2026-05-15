@@ -379,6 +379,17 @@ export default function CartPage() {
           preorderTotal: preorderSubtotal,
           hasPreorder,
           lines: linesForConfirmation,
+          // Breakdown so the confirmation page can render subtotal / shipping
+          // / tax separately instead of one lump "due now" figure.
+          subtotal:         inStockSubtotal + preorderSubtotal,
+          inStockSubtotal,
+          preorderSubtotal,
+          shippingFee,
+          freeShipApplied,
+          taxAmount,
+          taxLabel,
+          country,
+          province,
         },
       });
     } catch (err) {
