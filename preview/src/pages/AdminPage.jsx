@@ -229,12 +229,6 @@ export default function AdminPage() {
   const BLANK_BULK_CARD = (url, preview) => ({ card_name: '', set_name: '', set_code: '', card_number: '', rarity: '', game: 'One Piece', language: 'Japanese', condition: 'NM', price: '', stock: '1', image_url: url, preview });
   const BLANK_BULK_PROD = (url, preview) => ({ title: '', subtitle: '', language: 'English', tag: 'One Piece', price: '', stock: '1', image_url: url, preview });
 
-  function resetBulk() {
-    setShowBulkPanel(false); setBulkFiles([]); setBulkResults([]);
-    setBulkFillMode(false); setBulkCardForms([]); setBulkProdForms([]);
-    setBulkSavedCount(0); setBulkSaveError('');
-  }
-
   function handleBulkSelect(files) {
     const arr = Array.from(files).slice(0, 10);
     setBulkFiles(arr);
@@ -248,14 +242,14 @@ export default function AdminPage() {
       setBulkResults(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'uploading' } : r));
       try {
         const base64 = await fileToBase64(bulkFiles[i]);
-        const res = await fetch('/api/analyze-card', {
+        const res = await fetch('/api/upload-image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ imageBase64: base64, mediaType: bulkFiles[i].type }),
         });
         const json = await res.json();
-        if (json.image_url) {
-          setBulkResults(prev => prev.map((r, idx) => idx === i ? { ...r, url: json.image_url, aiData: json, status: 'done' } : r));
+        if (json.url) {
+          setBulkResults(prev => prev.map((r, idx) => idx === i ? { ...r, url: json.url, status: 'done' } : r));
         } else {
           setBulkResults(prev => prev.map((r, idx) => idx === i ? { ...r, status: 'error' } : r));
         }
@@ -351,7 +345,7 @@ export default function AdminPage() {
             {bulkResults.some(r => r.status === 'pending') && (
               <button onClick={runBulkUpload} disabled={bulkUploading}
                 className="mb-4 w-full rounded-2xl bg-gradient-to-r from-fuchsia-400 to-cyan-400 py-2.5 text-sm font-black uppercase tracking-[0.1em] text-black disabled:opacity-50">
-                {bulkUploading ? 'Uploading & Reading Cards…' : `Upload ${bulkFiles.length} Image${bulkFiles.length > 1 ? 's' : ''} (AI Auto-Fill)`}
+                {bulkUploading ? 'Uploading…' : `Upload ${bulkFiles.length} Image${bulkFiles.length > 1 ? 's' : ''}`}
               </button>
             )}
 
@@ -360,24 +354,8 @@ export default function AdminPage() {
               <button
                 onClick={() => {
                   const done = bulkResults.filter(r => r.status === 'done');
-                  if (tab === 'singles') {
-                    setBulkCardForms(done.map(r => {
-                      const ai = r.aiData || {};
-                      return {
-                        ...BLANK_BULK_CARD(r.url, r.preview),
-                        card_name:  ai.card_name  || '',
-                        set_name:   ai.set_name   || '',
-                        set_code:   ai.set_code   || '',
-                        card_number:ai.card_number|| '',
-                        rarity:     ai.rarity     || '',
-                        condition:  ai.condition  || 'NM',
-                        language:   ai.language   || 'Japanese',
-                        game:       ai.game       || 'One Piece',
-                      };
-                    }));
-                  } else {
-                    setBulkProdForms(done.map(r => BLANK_BULK_PROD(r.url, r.preview)));
-                  }
+                  if (tab === 'singles') setBulkCardForms(done.map(r => BLANK_BULK_CARD(r.url, r.preview)));
+                  else setBulkProdForms(done.map(r => BLANK_BULK_PROD(r.url, r.preview)));
                   setBulkFillMode(true); setBulkSavedCount(0); setBulkSaveError('');
                 }}
                 className="w-full rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-400 py-2.5 text-sm font-black uppercase tracking-[0.1em] text-black">
@@ -1304,7 +1282,7 @@ export default function AdminPage() {
           </div>
           <div className="flex flex-wrap gap-3">
             <button
-              onClick={() => { setActiveTab('orders'); resetBulk(); }}
+              onClick={() => setActiveTab('orders')}
               className={`rounded-2xl px-4 py-2.5 text-sm font-black uppercase tracking-[0.08em] transition ${
                 activeTab === 'orders' ? 'bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 text-black' : 'border border-white/15 bg-white/5 text-white/70 hover:bg-white/10'
               }`}
@@ -1312,7 +1290,7 @@ export default function AdminPage() {
               Orders
             </button>
             <button
-              onClick={() => { setActiveTab('inventory'); resetBulk(); }}
+              onClick={() => setActiveTab('inventory')}
               className={`rounded-2xl px-4 py-2.5 text-sm font-black uppercase tracking-[0.08em] transition ${
                 activeTab === 'inventory' ? 'bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 text-black' : 'border border-white/15 bg-white/5 text-white/70 hover:bg-white/10'
               }`}
@@ -1320,7 +1298,7 @@ export default function AdminPage() {
               Inventory
             </button>
             <button
-              onClick={() => { setActiveTab('homepage'); resetBulk(); }}
+              onClick={() => setActiveTab('homepage')}
               className={`rounded-2xl px-4 py-2.5 text-sm font-black uppercase tracking-[0.08em] transition ${
                 activeTab === 'homepage' ? 'bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 text-black' : 'border border-white/15 bg-white/5 text-white/70 hover:bg-white/10'
               }`}
@@ -1328,7 +1306,7 @@ export default function AdminPage() {
               Homepage
             </button>
             <button
-              onClick={() => { setActiveTab('prices'); resetBulk(); }}
+              onClick={() => setActiveTab('prices')}
               className={`rounded-2xl px-4 py-2.5 text-sm font-black uppercase tracking-[0.08em] transition ${
                 activeTab === 'prices' ? 'bg-gradient-to-r from-yellow-300 via-yellow-400 to-orange-400 text-black' : 'border border-white/15 bg-white/5 text-white/70 hover:bg-white/10'
               }`}
@@ -1336,7 +1314,7 @@ export default function AdminPage() {
               Price Research
             </button>
             <button
-              onClick={() => { setActiveTab('singles'); resetBulk(); if (!singlesLoaded) loadSingles(); }}
+              onClick={() => { setActiveTab('singles'); if (!singlesLoaded) loadSingles(); }}
               className={`rounded-2xl px-4 py-2.5 text-sm font-black uppercase tracking-[0.08em] transition ${
                 activeTab === 'singles' ? 'bg-gradient-to-r from-fuchsia-400 via-purple-400 to-cyan-400 text-black' : 'border border-white/15 bg-white/5 text-white/70 hover:bg-white/10'
               }`}
@@ -1344,7 +1322,7 @@ export default function AdminPage() {
               Singles
             </button>
             <button
-              onClick={() => { setActiveTab('preorders'); resetBulk(); if (!preordersLoaded) loadPreorders(); }}
+              onClick={() => { setActiveTab('preorders'); if (!preordersLoaded) loadPreorders(); }}
               className={`rounded-2xl px-4 py-2.5 text-sm font-black uppercase tracking-[0.08em] transition ${
                 activeTab === 'preorders' ? 'bg-gradient-to-r from-pink-400 via-fuchsia-400 to-rose-400 text-black' : 'border border-white/15 bg-white/5 text-white/70 hover:bg-white/10'
               }`}
@@ -1352,7 +1330,7 @@ export default function AdminPage() {
               Pre-Orders
             </button>
             <button
-              onClick={() => { setActiveTab('products'); resetBulk(); if (!dbProductsLoaded) loadDbProducts(); }}
+              onClick={() => { setActiveTab('products'); if (!dbProductsLoaded) loadDbProducts(); }}
               className={`rounded-2xl px-4 py-2.5 text-sm font-black uppercase tracking-[0.08em] transition ${
                 activeTab === 'products' ? 'bg-gradient-to-r from-cyan-300 via-sky-300 to-emerald-400 text-black' : 'border border-white/15 bg-white/5 text-white/70 hover:bg-white/10'
               }`}
@@ -1360,7 +1338,7 @@ export default function AdminPage() {
               Products
             </button>
             <button
-              onClick={() => { setActiveTab('analytics'); resetBulk(); }}
+              onClick={() => setActiveTab('analytics')}
               className={`rounded-2xl px-4 py-2.5 text-sm font-black uppercase tracking-[0.08em] transition ${
                 activeTab === 'analytics' ? 'bg-gradient-to-r from-yellow-300 via-amber-300 to-fuchsia-400 text-black' : 'border border-white/15 bg-white/5 text-white/70 hover:bg-white/10'
               }`}
