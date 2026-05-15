@@ -114,6 +114,13 @@ export default function PreOrdersPage() {
   const { showToast } = useToast();
 
   function addPreorderToCart(item) {
+    // Prefer the human-written eta string; fall back to a "closes <date>"
+    // derived from the deadline so the cart line still surfaces a useful
+    // hint when an admin forgot to fill the eta column.
+    const deadlineStr = item.deadline instanceof Date && !isNaN(item.deadline)
+      ? `Closes ${item.deadline.toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })}`
+      : '';
+    const etaText = (item.eta && String(item.eta).trim()) || deadlineStr;
     addItem({
       key:        `preorders:${item.id}`,
       source:     'preorders',
@@ -123,7 +130,7 @@ export default function PreOrdersPage() {
       price:      Number(item.price) || 0,
       qty:        1,
       isPreorder: true,
-      etaText:    item.eta ?? '',
+      etaText,
       currency:   'CAD',
     });
     showToast(`Pre-order added — ${item.title.length > 40 ? item.title.slice(0, 40) + '…' : item.title}`, {
