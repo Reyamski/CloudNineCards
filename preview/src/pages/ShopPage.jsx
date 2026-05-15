@@ -40,6 +40,12 @@ function cadToFx(cadAmt, cur) {
 
 const tags = ['All', 'One Piece', 'Dragon Ball', 'Pokemon', 'Pre-orders', 'Accessories'];
 const langFilters = ['All', 'Japanese', 'English'];
+const SORTS = [
+  { value: 'newest',     label: 'Newest First' },
+  { value: 'price_asc',  label: 'Price: Low → High' },
+  { value: 'price_desc', label: 'Price: High → Low' },
+  { value: 'name_asc',   label: 'Name A → Z' },
+];
 
 // ── Province tax rates (Canada) ───────────────────────────────────────────────
 const PROVINCE_TAX = {
@@ -666,6 +672,7 @@ export default function ShopPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTag, setActiveTag] = useState('All');
   const [langFilter, setLangFilter] = useState('All');
+  const [sort, setSort] = useState('newest');
   const [selected, setSelected]   = useState(null);
   const [notifyItem, setNotifyItem] = useState(null);
   const [products, setProducts]   = useState([]);
@@ -752,8 +759,16 @@ export default function ShopPage() {
     .filter(p => activeTag === 'All' || p.tag === activeTag)
     .filter(p => langFilter === 'All' || !p.language || p.language === langFilter)
     .sort((a, b) => {
+      // Primary: in-stock first, then preorder, then sold-out
       const score = p => p.inStock ? 0 : p.isPreorder ? 1 : 2;
-      return score(a) - score(b);
+      const stockDiff = score(a) - score(b);
+      if (stockDiff !== 0) return stockDiff;
+      // Secondary: user-chosen sort
+      if (sort === 'price_asc')  return Number(a.price) - Number(b.price);
+      if (sort === 'price_desc') return Number(b.price) - Number(a.price);
+      if (sort === 'name_asc')   return (a.title || '').localeCompare(b.title || '');
+      // newest: prefer created_at if present, otherwise leave existing order
+      return new Date(b.created_at ?? 0) - new Date(a.created_at ?? 0);
     });
 
   return (
@@ -803,17 +818,23 @@ export default function ShopPage() {
           </div>
         )}
 
-        <div className="mb-4 flex flex-wrap gap-3">
-          {tags.map((tag) => (
-            <button key={tag} onClick={() => { setActiveTag(tag); setLangFilter('All'); }}
-              className={`rounded-full border px-5 py-2 text-xs font-black uppercase tracking-[0.18em] transition ${
-                activeTag === tag
-                  ? 'border-purple-400/60 bg-purple-500/15 text-purple-100 shadow-[0_0_20px_rgba(168,85,247,0.5)]'
-                  : 'border-white/10 bg-white/5 text-white/65 hover:border-white/20 hover:text-white/85'
-              }`}>
-              {tag}
-            </button>
-          ))}
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap gap-3">
+            {tags.map((tag) => (
+              <button key={tag} onClick={() => { setActiveTag(tag); setLangFilter('All'); }}
+                className={`rounded-full border px-5 py-2 text-xs font-black uppercase tracking-[0.18em] transition ${
+                  activeTag === tag
+                    ? 'border-purple-400/60 bg-purple-500/15 text-purple-100 shadow-[0_0_20px_rgba(168,85,247,0.5)]'
+                    : 'border-white/10 bg-white/5 text-white/65 hover:border-white/20 hover:text-white/85'
+                }`}>
+                {tag}
+              </button>
+            ))}
+          </div>
+          <select value={sort} onChange={(e) => setSort(e.target.value)}
+            className="ml-auto rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-white/70 outline-none focus:border-cyan-300/40">
+            {SORTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
         </div>
 
         {/* Language sub-filter — hidden for Accessories */}
