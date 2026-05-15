@@ -21,6 +21,7 @@ const SHIP_RATES = {
   'Other International':            28,
 };
 const FREE_SHIP_CANADA_THRESHOLD = 100;
+const PREORDER_DEPOSIT_RATE = 0.30; // 30% down at checkout, 70% on release
 
 const COUNTRIES = [
   'Canada',
@@ -57,9 +58,10 @@ const CONTACT_EMAIL = 'papspective@gmail.com';
 const FB_PAGE_USERNAME = 'NoypiPlaya';
 const MESSENGER_URL = `https://m.me/${FB_PAGE_USERNAME}`;
 
-const EMAILJS_SERVICE_ID  = import.meta.env.VITE_EMAILJS_SERVICE_ID;
-const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ONHAND;
-const EMAILJS_PUBLIC_KEY  = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
+const EMAILJS_SERVICE_ID    = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+const EMAILJS_TEMPLATE_ONHAND   = import.meta.env.VITE_EMAILJS_TEMPLATE_ONHAND;
+const EMAILJS_TEMPLATE_PREORDER = import.meta.env.VITE_EMAILJS_TEMPLATE_PREORDER;
+const EMAILJS_PUBLIC_KEY    = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
 
 function calcShipping(country, inStockSubtotal) {
   if (!country) return 0;
@@ -67,10 +69,10 @@ function calcShipping(country, inStockSubtotal) {
   return SHIP_RATES[country] ?? 28;
 }
 
-function newOrderNumber() {
+function newOrderNumber(suffix = '') {
   const ts = Date.now().toString(36).toUpperCase();
   const rand = Math.random().toString(36).slice(2, 5).toUpperCase();
-  return `CNC-${ts.slice(-5)}${rand}`;
+  return `CNC-${ts.slice(-5)}${rand}${suffix}`;
 }
 
 // Build a copy-pasteable cart summary used by the Messenger / email fallbacks.
@@ -219,16 +221,25 @@ export default function CartPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items.map(it => it.key).join('|')]);
 
-  const hasPreorder = useMemo(() => items.some(it => it.isPreorder), [items]);
-  const inStockSubtotal = totals.subtotalInStock;
-  const preorderSubtotal = totals.subtotalPreorder;
-  const shippingFee = calcShipping(country, inStockSubtotal);
-  const taxRate = country === 'Canada' && province ? (PROVINCE_TAX[province]?.rate ?? 0) : 0;
-  const taxLabel = country === 'Canada' && province ? (PROVINCE_TAX[province]?.label ?? '') : '';
+  // ── Partition cart into the two business flows ────────────────────────────
+  const inStockItems  = useMemo(() => items.filter(it => !it.isPreorder), [items]);
+  const preorderItems = useMemo(() => items.filter(it =>  it.isPreorder), [items]);
+  const hasInStock    = inStockItems.length > 0;
+  const hasPreorder   = preorderItems.length > 0;
+
+  const inStockSubtotal   = totals.subtotalInStock;
+  const preorderSubtotal  = totals.subtotalPreorder;
+  const shippingFee       = hasInStock ? calcShipping(country, inStockSubtotal) : 0;
+  const taxRate           = country === 'Canada' && province ? (PROVINCE_TAX[province]?.rate ?? 0) : 0;
+  const taxLabel          = country === 'Canada' && province ? (PROVINCE_TAX[province]?.label ?? '') : '';
   // Tax applied to in-stock subtotal + shipping (matches existing modal logic).
-  const taxAmount = country === 'Canada' && province ? (inStockSubtotal + shippingFee) * taxRate : 0;
-  const dueNow = inStockSubtotal + shippingFee + taxAmount;
-  const freeShipApplied = country === 'Canada' && inStockSubtotal >= FREE_SHIP_CANADA_THRESHOLD;
+  // Pre-orders are NOT taxed at checkout — that's collected on release.
+  const taxAmount         = hasInStock && country === 'Canada' && province ? (inStockSubtotal + shippingFee) * taxRate : 0;
+  const inStockTotal      = hasInStock ? inStockSubtotal + shippingFee + taxAmount : 0;
+  const preorderDeposit   = preorderSubtotal * PREORDER_DEPOSIT_RATE;
+  const preorderBalance   = preorderSubtotal - preorderDeposit;
+  const dueNow            = inStockTotal + preorderDeposit;
+  const freeShipApplied   = hasInStock && country === 'Canada' && inStockSubtotal >= FREE_SHIP_CANADA_THRESHOLD;
 
   function copyWise() {
     navigator.clipboard.writeText(WISE_HANDLE);
@@ -255,7 +266,6 @@ export default function CartPage() {
     setSendError('');
     if (items.length === 0) return;
     if (!validate()) {
-      // Scroll to first error if there is one.
       const firstErrEl = document.querySelector('[data-form-error="true"]');
       firstErrEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
@@ -263,76 +273,120 @@ export default function CartPage() {
 
     setSending(true);
 
-    const orderNumber = newOrderNumber();
-    let orderId = null;
+    // Two order numbers — only used when both branches are present. Single-
+    // flow carts use a clean CNC-XXX (no suffix) to match prior UX.
+    const orderNumberInStock = hasInStock ? newOrderNumber(hasPreorder ? '-A' : '') : null;
+    const orderNumberPreorder = hasPreorder ? newOrderNumber(hasPreorder && hasInStock ? '-B' : '') : null;
 
     try {
       if (!supabaseEnabled || !supabase) throw new Error('Live orders are not configured yet.');
 
-      // ── 1. Insert the parent orders row ───────────────────────────────
-      // Multi-item carts populate legacy columns with sensible placeholders.
-      // total_price tracks "due now" (in-stock + shipping + tax) only — the
-      // pre-order portion is collected later, line-by-line, by the owner.
-      const placeholderTitle = items.length === 1
-        ? items[0].title
-        : `${items.length} items — see order_items`;
-
-      const orderPayload = {
-        order_number:     orderNumber,
-        order_type:       'cart',
-        status:           'pending',
-        payment_status:   'awaiting_payment',
-        product_id:       items.length === 1 ? items[0].id : 'MULTI',
-        product_title:    placeholderTitle,
-        item_title:       placeholderTitle,
-        quantity:         totals.itemCount,
-        // Link order to auth user when logged-in. Anon checkouts stay null.
-        customer_user_id: user?.id ?? null,
-        buyer_name:       name,
-        buyer_email:      email.trim().toLowerCase(),
-        buyer_phone:      phone,
-        buyer_address:    [address, postal].filter(Boolean).join(', '),
-        delivery_country: country,
+      const sharedBuyerFields = {
+        buyer_name:        name,
+        buyer_email:       email.trim().toLowerCase(),
+        buyer_phone:       phone,
+        buyer_address:     [address, postal].filter(Boolean).join(', '),
+        delivery_country:  country,
         delivery_province: province || null,
-        subtotal:         inStockSubtotal + preorderSubtotal,
-        tax_amount:       taxAmount,
-        delivery_fee:     shippingFee,
-        total_price:      dueNow,
-        full_price:       dueNow,
-        wise_handle:      WISE_HANDLE,
+        wise_handle:       WISE_HANDLE,
+        customer_user_id:  user?.id ?? null,
       };
 
-      // ── 2. Build order_items payload (committed alongside the order) ──
-      // order_id is set inside the RPC once the parent row gets its id.
-      const orderItemsPayload = items.map(it => ({
-        source_table:   it.source,
-        item_id:        it.id,
-        qty:            it.qty,
-        unit_price:     it.price,
-        title_snapshot: it.title,
-        image_snapshot: it.image ?? null,
-        is_preorder:    !!it.isPreorder,
-      }));
+      // ── In-stock order payload (full payment due now) ─────────────────
+      let inStockPayload = null;
+      let inStockItemsPayload = [];
+      if (hasInStock) {
+        const placeholderTitle = inStockItems.length === 1
+          ? inStockItems[0].title
+          : `${inStockItems.length} items — see order_items`;
+        const inStockQty = inStockItems.reduce((s, it) => s + it.qty, 0);
+        inStockPayload = {
+          ...sharedBuyerFields,
+          order_number:    orderNumberInStock,
+          order_type:      'cart',
+          status:          'pending',
+          payment_status:  'awaiting_payment',
+          product_id:      inStockItems.length === 1 ? inStockItems[0].id : 'MULTI',
+          product_title:   placeholderTitle,
+          item_title:      placeholderTitle,
+          quantity:        inStockQty,
+          subtotal:        inStockSubtotal,
+          tax_amount:      taxAmount,
+          delivery_fee:    shippingFee,
+          total_price:     inStockTotal,
+          full_price:      inStockTotal,
+        };
+        inStockItemsPayload = inStockItems.map(it => ({
+          source_table:   it.source,
+          item_id:        it.id,
+          qty:            it.qty,
+          unit_price:     it.price,
+          title_snapshot: it.title,
+          image_snapshot: it.image ?? null,
+          is_preorder:    false,
+        }));
+      }
 
-      // Single RPC inserts the orders row + all order_items rows in one
-      // transaction (see docs/wave3a-atomic-submit.sql). If anything fails,
-      // both roll back so no orphan orders row is left behind.
-      const { data: rpcId, error: rpcError } = await supabase.rpc('submit_cart_order', {
-        order_payload: orderPayload,
-        items_payload: orderItemsPayload,
+      // ── Pre-order payload (30% deposit now, 70% + intl shipping on release) ──
+      let preorderPayload = null;
+      let preorderItemsPayload = [];
+      if (hasPreorder) {
+        const placeholderTitle = preorderItems.length === 1
+          ? preorderItems[0].title
+          : `${preorderItems.length} pre-orders — see order_items`;
+        const preorderQty = preorderItems.reduce((s, it) => s + it.qty, 0);
+        // ETA from items — single item carries its own; mixed shows "Multiple".
+        const distinctEtas = Array.from(new Set(preorderItems.map(it => it.etaText).filter(Boolean)));
+        const etaValue = distinctEtas.length === 1 ? distinctEtas[0]
+                       : distinctEtas.length > 1 ? 'Multiple'
+                       : '';
+        preorderPayload = {
+          ...sharedBuyerFields,
+          order_number:    orderNumberPreorder,
+          order_type:      'pre_order',
+          status:          'pending',
+          payment_status:  'awaiting_payment',
+          product_id:      preorderItems.length === 1 ? preorderItems[0].id : 'MULTI',
+          product_title:   placeholderTitle,
+          item_title:      placeholderTitle,
+          quantity:        preorderQty,
+          subtotal:        preorderSubtotal,
+          tax_amount:      0,           // tax billed on release
+          delivery_fee:    null,        // intl shipping computed on release
+          total_price:     preorderDeposit, // "due now" portion
+          full_price:      preorderSubtotal,
+          dp_amount:       preorderDeposit,
+          balance_due:     preorderBalance,
+          eta:             etaValue,
+        };
+        preorderItemsPayload = preorderItems.map(it => ({
+          source_table:   it.source,
+          item_id:        it.id,
+          qty:            it.qty,
+          unit_price:     it.price,
+          title_snapshot: it.title,
+          image_snapshot: it.image ?? null,
+          is_preorder:    true,
+        }));
+      }
+
+      // Single atomic RPC inserts both orders + all order_items rows in one
+      // transaction (see docs/wave3b-split-orders.sql).
+      const { data: rpcResult, error: rpcError } = await supabase.rpc('submit_cart_orders_v2', {
+        in_stock_payload: inStockPayload,
+        in_stock_items:   inStockItemsPayload,
+        preorder_payload: preorderPayload,
+        preorder_items:   preorderItemsPayload,
       });
       if (rpcError) throw rpcError;
-      orderId = rpcId;
-      if (!orderId) throw new Error('Order RPC returned no id.');
+      const inStockOrderId = rpcResult?.in_stock_order_id || null;
+      const preorderOrderId = rpcResult?.preorder_order_id || null;
+      if (hasInStock && !inStockOrderId) throw new Error('In-stock order RPC returned no id.');
+      if (hasPreorder && !preorderOrderId) throw new Error('Pre-order RPC returned no id.');
 
-      // ── 3. Decrement stock for in-stock lines only ─────────────────────
-      // Stock writes intentionally stay OUT of the atomic RPC: if a single
-      // row decrement fails, the order still goes through and admin can
-      // reconcile (status flips to 'stock_check_failed' below). Mirrors the
-      // per-item pattern in AdminPage.confirmOrder (commit ecc5989c).
+      // ── Decrement stock for in-stock lines only ──────────────────────
       let stockCheckFailed = false;
-      for (const it of items) {
-        if (it.isPreorder) continue;
+      for (const it of inStockItems) {
         try {
           const { data: row } = await supabase
             .from(it.source)
@@ -351,89 +405,126 @@ export default function CartPage() {
           stockCheckFailed = true;
         }
       }
-      if (stockCheckFailed) {
-        // Mark the order so admin knows to reconcile by hand.
+      if (stockCheckFailed && inStockOrderId) {
         try {
-          await supabase.from('orders').update({ status: 'stock_check_failed' }).eq('id', orderId);
+          await supabase.from('orders').update({ status: 'stock_check_failed' }).eq('id', inStockOrderId);
         } catch { /* non-blocking */ }
       }
 
-      // ── 4. EmailJS receipt — owner copy + buyer copy ───────────────────
-      const itemsHtml = buildItemsHtml(items);
-      const orderSummaryLines = items.map(it => `${it.title} × ${it.qty} — CAD $${(it.price * it.qty).toFixed(2)}${it.isPreorder ? ' [PRE-ORDER]' : ''}`).join('\n');
-      const baseTemplateVars = {
-        order_number:     orderNumber,
-        buyer_name:       name,
-        buyer_email:      email,
-        buyer_phone:      phone,
-        buyer_address:    [address, postal].filter(Boolean).join(', '),
-        item_title:       placeholderTitle,
-        item_subtitle:    `${items.length} ${items.length === 1 ? 'item' : 'items'}`,
-        quantity:         totals.itemCount,
-        items_html:       itemsHtml,
-        items_text:       orderSummaryLines,
-        has_preorder:     hasPreorder ? 'YES' : 'NO',
-        preorder_note:    hasPreorder
-          ? 'Cart contains pre-order items — those ship when released and may incur separate shipping.'
-          : '',
-        subtotal:         `CAD $${(inStockSubtotal + preorderSubtotal).toFixed(2)}`,
-        instock_subtotal: `CAD $${inStockSubtotal.toFixed(2)}`,
-        preorder_subtotal:`CAD $${preorderSubtotal.toFixed(2)}`,
-        tax_amount:       taxAmount > 0 ? `CAD $${taxAmount.toFixed(2)} (${taxLabel})` : 'N/A',
-        delivery_fee:     freeShipApplied ? 'FREE (Canada $100+)' : `CAD $${shippingFee.toFixed(2)}`,
-        delivery_country: country,
+      // ── EmailJS receipts (one per order, dual templates) ─────────────
+      const baseSharedVars = {
+        buyer_name:        name,
+        buyer_email:       email,
+        buyer_phone:       phone,
+        buyer_address:     [address, postal].filter(Boolean).join(', '),
+        delivery_country:  country,
         delivery_province: province || 'N/A',
-        total_price:      `CAD $${dueNow.toFixed(2)}`,
-        due_on_release:   preorderSubtotal > 0 ? `CAD $${preorderSubtotal.toFixed(2)}` : 'N/A',
-        payment_proof:    'Not provided — buyer will email separately',
-        wise_handle:      WISE_HANDLE,
-        notes:            notes || '(none)',
+        wise_handle:       WISE_HANDLE,
+        notes:             notes || '(none)',
+        payment_proof:     'Not provided — buyer will email separately',
       };
 
-      try {
-        await emailjs.send(
-          EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID,
-          { ...baseTemplateVars, to_email: CONTACT_EMAIL },
-          { publicKey: EMAILJS_PUBLIC_KEY }
-        );
-      } catch (mailErr) {
-        console.warn('Owner email failed (non-blocking):', mailErr);
-      }
-      try {
-        await emailjs.send(
-          EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID,
-          { ...baseTemplateVars, to_email: email.trim() },
-          { publicKey: EMAILJS_PUBLIC_KEY }
-        );
-      } catch (buyerErr) {
-        console.warn('Buyer email failed (non-blocking):', buyerErr);
+      // -- In-stock receipt --
+      if (hasInStock) {
+        const inStockHtml  = buildItemsHtml(inStockItems);
+        const inStockText  = inStockItems.map(it => `${it.title} × ${it.qty} — CAD $${(it.price * it.qty).toFixed(2)}`).join('\n');
+        const inStockVars  = {
+          ...baseSharedVars,
+          order_number:      orderNumberInStock,
+          item_title:        inStockItems.length === 1 ? inStockItems[0].title : `${inStockItems.length} items`,
+          item_subtitle:     `${inStockItems.length} ${inStockItems.length === 1 ? 'item' : 'items'}`,
+          quantity:          inStockItems.reduce((s, it) => s + it.qty, 0),
+          items_html:        inStockHtml,
+          items_text:        inStockText,
+          has_preorder:      'NO',
+          preorder_note:     '',
+          subtotal:          `CAD $${inStockSubtotal.toFixed(2)}`,
+          instock_subtotal:  `CAD $${inStockSubtotal.toFixed(2)}`,
+          preorder_subtotal: 'N/A',
+          tax_amount:        taxAmount > 0 ? `CAD $${taxAmount.toFixed(2)} (${taxLabel})` : 'N/A',
+          delivery_fee:      freeShipApplied ? 'FREE (Canada $100+)' : `CAD $${shippingFee.toFixed(2)}`,
+          total_price:       `CAD $${inStockTotal.toFixed(2)}`,
+          due_on_release:    'N/A',
+        };
+        await sendEmailSafe(EMAILJS_TEMPLATE_ONHAND, { ...inStockVars, to_email: CONTACT_EMAIL });
+        await sendEmailSafe(EMAILJS_TEMPLATE_ONHAND, { ...inStockVars, to_email: email.trim() });
       }
 
-      // ── 5. Hand off to confirmation page ──────────────────────────────
-      const linesForConfirmation = items.map(it => ({
+      // -- Pre-order receipt (use PREORDER template; fall back to ONHAND) --
+      if (hasPreorder) {
+        const preorderHtml = buildItemsHtml(preorderItems);
+        const preorderText = preorderItems.map(it => `${it.title} × ${it.qty} — CAD $${(it.price * it.qty).toFixed(2)} [PRE-ORDER]`).join('\n');
+        const distinctEtas = Array.from(new Set(preorderItems.map(it => it.etaText).filter(Boolean)));
+        const etaValue     = distinctEtas.length === 1 ? distinctEtas[0]
+                           : distinctEtas.length > 1 ? 'Multiple ETAs — see items'
+                           : 'TBA';
+        const preorderVars = {
+          ...baseSharedVars,
+          order_number:      orderNumberPreorder,
+          item_title:        preorderItems.length === 1 ? preorderItems[0].title : `${preorderItems.length} pre-orders`,
+          item_subtitle:     `${preorderItems.length} ${preorderItems.length === 1 ? 'pre-order' : 'pre-orders'}`,
+          quantity:          preorderItems.reduce((s, it) => s + it.qty, 0),
+          items_html:        preorderHtml,
+          items_text:        preorderText,
+          has_preorder:      'YES',
+          preorder_note:     'Pre-order items ship internationally when released. 70% balance + shipping due at that time.',
+          subtotal:          `CAD $${preorderSubtotal.toFixed(2)}`,
+          full_price:        `CAD $${preorderSubtotal.toFixed(2)}`,
+          dp_amount:         `CAD $${preorderDeposit.toFixed(2)}`,
+          balance_due:       `CAD $${preorderBalance.toFixed(2)} + intl shipping`,
+          eta:               etaValue,
+          tax_amount:        'Calculated at release',
+          delivery_fee:      'Intl rates — calculated at release',
+          total_price:       `CAD $${preorderDeposit.toFixed(2)} (30% deposit)`,
+          due_on_release:    `CAD $${preorderBalance.toFixed(2)} + intl shipping`,
+        };
+        const preorderTemplate = EMAILJS_TEMPLATE_PREORDER || EMAILJS_TEMPLATE_ONHAND;
+        if (!EMAILJS_TEMPLATE_PREORDER) {
+          console.warn('VITE_EMAILJS_TEMPLATE_PREORDER not set — falling back to ONHAND template for preorder receipt.');
+        }
+        await sendEmailSafe(preorderTemplate, { ...preorderVars, to_email: CONTACT_EMAIL });
+        await sendEmailSafe(preorderTemplate, { ...preorderVars, to_email: email.trim() });
+      }
+
+      // ── Hand off to confirmation page ────────────────────────────────
+      const buildLines = (arr) => arr.map(it => ({
         title: it.title, qty: it.qty, price: it.price, isPreorder: !!it.isPreorder,
       }));
       clear();
       navigate('/order-confirmation', {
         state: {
-          orderNumber,
+          // Multi-order hand-off
+          orders: [
+            hasInStock && {
+              kind: 'in_stock',
+              orderNumber: orderNumberInStock,
+              lines: buildLines(inStockItems),
+              subtotal: inStockSubtotal,
+              shippingFee,
+              freeShipApplied,
+              taxAmount,
+              taxLabel,
+              total: inStockTotal,
+            },
+            hasPreorder && {
+              kind: 'pre_order',
+              orderNumber: orderNumberPreorder,
+              lines: buildLines(preorderItems),
+              subtotal: preorderSubtotal,
+              dpAmount: preorderDeposit,
+              balanceDue: preorderBalance,
+              eta: (() => {
+                const d = Array.from(new Set(preorderItems.map(it => it.etaText).filter(Boolean)));
+                return d.length === 1 ? d[0] : d.length > 1 ? 'Multiple ETAs' : '';
+              })(),
+              total: preorderDeposit,
+            },
+          ].filter(Boolean),
           email,
-          total: dueNow,
-          inStockTotal: dueNow,
-          preorderTotal: preorderSubtotal,
-          hasPreorder,
-          lines: linesForConfirmation,
-          // Breakdown so the confirmation page can render subtotal / shipping
-          // / tax separately instead of one lump "due now" figure.
-          subtotal:         inStockSubtotal + preorderSubtotal,
-          inStockSubtotal,
-          preorderSubtotal,
-          shippingFee,
-          freeShipApplied,
-          taxAmount,
-          taxLabel,
           country,
-          province,
+          dueNow,
+          // Backward-compat fields for older direct visits / shape:
+          orderNumber: orderNumberInStock || orderNumberPreorder,
         },
       });
     } catch (err) {
@@ -499,7 +590,6 @@ export default function CartPage() {
           {mobileSummaryOpen && (
             <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
               <OrderSummary
-                items={items}
                 country={country}
                 province={province}
                 shippingFee={shippingFee}
@@ -507,7 +597,11 @@ export default function CartPage() {
                 taxLabel={taxLabel}
                 inStockSubtotal={inStockSubtotal}
                 preorderSubtotal={preorderSubtotal}
+                preorderDeposit={preorderDeposit}
+                preorderBalance={preorderBalance}
+                inStockTotal={inStockTotal}
                 dueNow={dueNow}
+                hasInStock={hasInStock}
                 hasPreorder={hasPreorder}
                 freeShipApplied={freeShipApplied}
                 compact
@@ -531,88 +625,29 @@ export default function CartPage() {
         <div className="grid gap-8 md:grid-cols-[1.5fr_1fr]">
           {/* ── Left column: line items + form ─────────────────────────── */}
           <div className="space-y-6">
-            <div className="rounded-[24px] border border-white/10 bg-[#0a061a] overflow-hidden">
-              <div className="px-5 py-4 border-b border-white/10 text-xs font-black uppercase tracking-[0.14em] text-white/60">
-                Line Items
-              </div>
-              <ul className="divide-y divide-white/8">
-                {items.map(it => {
-                  const stock = liveStock[it.key];
-                  const lowStock = !it.isPreorder && typeof stock === 'number' && stock > 0 && stock <= 3;
-                  const overStock = !it.isPreorder && typeof stock === 'number' && it.qty > stock;
-                  const maxQty = it.isPreorder ? 99 : (typeof stock === 'number' ? Math.max(1, stock) : 99);
-                  return (
-                    <li key={it.key} className="flex gap-4 p-4">
-                      <div className="h-20 w-16 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/30">
-                        {it.image ? (
-                          <img src={it.image} alt={it.title} loading="lazy" decoding="async"
-                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                            className="h-full w-full object-cover" />
-                        ) : (
-                          <div className="flex h-full items-center justify-center text-2xl">🃏</div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2 mb-1">
-                          {it.isPreorder ? (
-                            <span className="rounded-full border border-fuchsia-400/40 bg-fuchsia-400/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-fuchsia-300">PRE-ORDER</span>
-                          ) : (
-                            <span className="rounded-full border border-cyan-300/30 bg-cyan-300/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-cyan-200">IN STOCK</span>
-                          )}
-                          <span className="text-[10px] font-black uppercase tracking-[0.12em] text-white/35">
-                            {it.source === 'singles' ? 'Single' : it.source === 'products' ? 'Sealed' : 'Pre-order'}
-                          </span>
-                          {lowStock && (
-                            <span className="rounded-full border border-yellow-400/40 bg-yellow-400/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-yellow-200">
-                              Only {stock} left
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-sm font-black leading-snug">{it.title}</div>
-                        {it.isPreorder && it.etaText && (
-                          <div className="mt-0.5 text-[11px] text-fuchsia-300/80">{it.etaText}</div>
-                        )}
-                        {overStock && (
-                          <div className="mt-1 text-[11px] text-red-300">
-                            Only {stock} in stock — reduce qty before checkout.
-                          </div>
-                        )}
-                        <div className="mt-2 flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              onClick={() => updateQty(it.key, Math.max(1, it.qty - 1))}
-                              className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-sm font-black hover:bg-white/10"
-                              aria-label="Decrease quantity"
-                            >−</button>
-                            <input
-                              type="number" min={1} max={maxQty} value={it.qty}
-                              onChange={(e) => updateQty(it.key, Math.max(1, Math.min(maxQty, Number(e.target.value) || 1)))}
-                              className="w-12 rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-center text-sm font-black text-white outline-none focus:border-cyan-300/40"
-                            />
-                            <button
-                              onClick={() => updateQty(it.key, Math.min(maxQty, it.qty + 1))}
-                              className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-sm font-black hover:bg-white/10"
-                              aria-label="Increase quantity"
-                            >+</button>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-sm font-black text-white tabular-nums">CAD ${(it.price * it.qty).toFixed(2)}</div>
-                            <div className="text-[10px] text-white/35 tabular-nums">CAD ${Number(it.price).toFixed(2)} ea</div>
-                          </div>
-                          <button
-                            onClick={() => removeItem(it.key)}
-                            className="rounded-lg border border-white/10 bg-white/5 p-1.5 text-white/45 hover:bg-red-400/10 hover:text-red-300 transition"
-                            aria-label="Remove item"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
+            {/* ── Panel A: In-Stock ─────────────────────────────────── */}
+            {hasInStock && (
+              <CartItemsPanel
+                title="In-Stock"
+                accent="cyan"
+                items={inStockItems}
+                liveStock={liveStock}
+                updateQty={updateQty}
+                removeItem={removeItem}
+              />
+            )}
+
+            {/* ── Panel B: Pre-Orders ───────────────────────────────── */}
+            {hasPreorder && (
+              <CartItemsPanel
+                title="Pre-Orders"
+                accent="fuchsia"
+                items={preorderItems}
+                liveStock={liveStock}
+                updateQty={updateQty}
+                removeItem={removeItem}
+              />
+            )}
 
             {/* ── Customer info form ─────────────────────────────────── */}
             <form onSubmit={handleSubmit} className="rounded-[24px] border border-white/10 bg-[#0a061a] p-5 space-y-4">
@@ -667,7 +702,7 @@ export default function CartPage() {
               {hasPreorder && (
                 <label className={`flex items-start gap-2 rounded-xl border px-3 py-3 text-xs ${errors.preorderAck ? 'border-red-400/40 bg-red-400/10 text-red-200' : 'border-fuchsia-400/30 bg-fuchsia-400/8 text-fuchsia-100'}`}>
                   <input type="checkbox" checked={preorderAck} onChange={e => setPreorderAck(e.target.checked)} className="mt-0.5" data-form-error={errors.preorderAck ? 'true' : 'false'} />
-                  <span>I understand pre-order items ship when they're released and may incur separate shipping.</span>
+                  <span>I understand pre-order items ship internationally when released. 70% balance + shipping due at that time.</span>
                 </label>
               )}
 
@@ -722,7 +757,6 @@ export default function CartPage() {
           <aside className="hidden md:block">
             <div className="sticky top-6">
               <OrderSummary
-                items={items}
                 country={country}
                 province={province}
                 shippingFee={shippingFee}
@@ -730,7 +764,11 @@ export default function CartPage() {
                 taxLabel={taxLabel}
                 inStockSubtotal={inStockSubtotal}
                 preorderSubtotal={preorderSubtotal}
+                preorderDeposit={preorderDeposit}
+                preorderBalance={preorderBalance}
+                inStockTotal={inStockTotal}
                 dueNow={dueNow}
+                hasInStock={hasInStock}
                 hasPreorder={hasPreorder}
                 freeShipApplied={freeShipApplied}
               />
@@ -742,6 +780,16 @@ export default function CartPage() {
       <Footer />
     </div>
   );
+}
+
+// ── Send an EmailJS receipt without bringing the order down on failure ────
+async function sendEmailSafe(templateId, vars) {
+  if (!templateId) return;
+  try {
+    await emailjs.send(EMAILJS_SERVICE_ID, templateId, vars, { publicKey: EMAILJS_PUBLIC_KEY });
+  } catch (err) {
+    console.warn('EmailJS send failed (non-blocking):', err);
+  }
 }
 
 // ── Form field helper ──────────────────────────────────────────────────────
@@ -757,55 +805,170 @@ function Field({ label, children, required, error }) {
   );
 }
 
+// ── Cart items panel (one per business flow) ───────────────────────────────
+function CartItemsPanel({ title, accent, items, liveStock, updateQty, removeItem }) {
+  const isPreorderPanel = accent === 'fuchsia';
+  const accentBadge = isPreorderPanel
+    ? 'border-fuchsia-400/40 bg-fuchsia-400/10 text-fuchsia-300'
+    : 'border-cyan-300/30 bg-cyan-300/10 text-cyan-200';
+  const panelQty = items.reduce((s, it) => s + it.qty, 0);
+  const panelSubtotal = items.reduce((s, it) => s + Number(it.price) * it.qty, 0);
+  return (
+    <div className={`rounded-[24px] border ${isPreorderPanel ? 'border-fuchsia-400/20' : 'border-white/10'} bg-[#0a061a] overflow-hidden`}>
+      <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between gap-3">
+        <div className="text-xs font-black uppercase tracking-[0.14em] text-white/65">
+          {title} <span className="text-white/30">· {panelQty} {panelQty === 1 ? 'unit' : 'units'}</span>
+        </div>
+        <div className="text-sm font-black text-white tabular-nums">CAD ${panelSubtotal.toFixed(2)}</div>
+      </div>
+      <ul className="divide-y divide-white/8">
+        {items.map(it => {
+          const stock = liveStock[it.key];
+          const lowStock = !it.isPreorder && typeof stock === 'number' && stock > 0 && stock <= 3;
+          const overStock = !it.isPreorder && typeof stock === 'number' && it.qty > stock;
+          const maxQty = it.isPreorder ? 99 : (typeof stock === 'number' ? Math.max(1, stock) : 99);
+          return (
+            <li key={it.key} className="flex gap-4 p-4">
+              <div className="h-20 w-16 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/30">
+                {it.image ? (
+                  <img src={it.image} alt={it.title} loading="lazy" decoding="async"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                    className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-2xl">🃏</div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2 mb-1">
+                  <span className={`rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] ${accentBadge}`}>
+                    {isPreorderPanel ? 'PRE-ORDER' : 'IN STOCK'}
+                  </span>
+                  <span className="text-[10px] font-black uppercase tracking-[0.12em] text-white/35">
+                    {it.source === 'singles' ? 'Single' : it.source === 'products' ? 'Sealed' : 'Pre-order'}
+                  </span>
+                  {lowStock && (
+                    <span className="rounded-full border border-yellow-400/40 bg-yellow-400/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-yellow-200">
+                      Only {stock} left
+                    </span>
+                  )}
+                </div>
+                <div className="text-sm font-black leading-snug">{it.title}</div>
+                {it.isPreorder && it.etaText && (
+                  <div className="mt-0.5 text-[11px] text-fuchsia-300/80">{it.etaText}</div>
+                )}
+                {overStock && (
+                  <div className="mt-1 text-[11px] text-red-300">
+                    Only {stock} in stock — reduce qty before checkout.
+                  </div>
+                )}
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => updateQty(it.key, Math.max(1, it.qty - 1))}
+                      className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-sm font-black hover:bg-white/10"
+                      aria-label="Decrease quantity"
+                    >−</button>
+                    <input
+                      type="number" min={1} max={maxQty} value={it.qty}
+                      onChange={(e) => updateQty(it.key, Math.max(1, Math.min(maxQty, Number(e.target.value) || 1)))}
+                      className="w-12 rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-center text-sm font-black text-white outline-none focus:border-cyan-300/40"
+                    />
+                    <button
+                      onClick={() => updateQty(it.key, Math.min(maxQty, it.qty + 1))}
+                      className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-sm font-black hover:bg-white/10"
+                      aria-label="Increase quantity"
+                    >+</button>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-black text-white tabular-nums">CAD ${(it.price * it.qty).toFixed(2)}</div>
+                    <div className="text-[10px] text-white/35 tabular-nums">CAD ${Number(it.price).toFixed(2)} ea</div>
+                  </div>
+                  <button
+                    onClick={() => removeItem(it.key)}
+                    className="rounded-lg border border-white/10 bg-white/5 p-1.5 text-white/45 hover:bg-red-400/10 hover:text-red-300 transition"
+                    aria-label="Remove item"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 // ── Order summary panel ────────────────────────────────────────────────────
 function OrderSummary({
-  items, country, province, shippingFee, taxAmount, taxLabel,
-  inStockSubtotal, preorderSubtotal, dueNow, hasPreorder, freeShipApplied,
-  compact,
+  country, province, shippingFee, taxAmount, taxLabel,
+  inStockSubtotal, preorderSubtotal, preorderDeposit, preorderBalance, inStockTotal,
+  dueNow, hasInStock, hasPreorder, freeShipApplied, compact,
 }) {
   return (
     <div className={`rounded-[24px] border border-cyan-300/25 bg-[linear-gradient(180deg,#0c0820,#100426)] p-5 ${compact ? 'mt-3' : ''}`}>
       <div className="text-xs font-black uppercase tracking-[0.14em] text-cyan-300/70 mb-3">Order Summary</div>
 
-      <div className="space-y-1.5 text-sm">
-        <Row label={`In-stock (${items.filter(i => !i.isPreorder).reduce((s, i) => s + i.qty, 0)}×)`}
-             value={`CAD $${inStockSubtotal.toFixed(2)}`} />
-        {preorderSubtotal > 0 && (
-          <Row label={`Pre-order (${items.filter(i => i.isPreorder).reduce((s, i) => s + i.qty, 0)}×)`}
-               value={`CAD $${preorderSubtotal.toFixed(2)}`} accent="fuchsia" />
-        )}
-        {country ? (
-          <Row label={`Shipping — ${country}`}
-               value={freeShipApplied ? 'FREE' : `CAD $${shippingFee.toFixed(2)}`}
-               valueClass={freeShipApplied ? 'text-green-400 font-black' : ''} />
-        ) : (
-          <Row label="Shipping" value="Select country" muted />
-        )}
-        {freeShipApplied && (
-          <div className="text-[11px] text-green-400 font-black">Free shipping on Canadian orders $100+</div>
-        )}
-        {country === 'Canada' && province && taxAmount > 0 && (
-          <Row label={`Tax (${taxLabel} — ${province})`} value={`CAD $${taxAmount.toFixed(2)}`} />
-        )}
-
-        <div className="border-t border-white/10 pt-2 mt-2 flex justify-between items-end">
-          <span className="text-xs font-black uppercase tracking-[0.12em] text-white/70">Due Now</span>
-          <span className="text-2xl font-black text-cyan-200 tabular-nums">CAD ${dueNow.toFixed(2)}</span>
-        </div>
-
-        {hasPreorder && (
-          <div className="mt-3 rounded-xl border border-fuchsia-400/25 bg-fuchsia-400/8 p-3 text-[11px] text-fuchsia-100/85 space-y-1">
-            <div className="font-black uppercase tracking-[0.12em] text-fuchsia-300 text-[10px]">Pre-order Notes</div>
-            <div>Pre-order shipping is calculated when items ship — additional charges may apply.</div>
-            {preorderSubtotal > 0 && (
-              <div className="flex justify-between pt-1">
-                <span>Due on release</span>
-                <span className="tabular-nums font-black">CAD ${preorderSubtotal.toFixed(2)}</span>
-              </div>
+      {hasInStock && (
+        <div className="mb-3">
+          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300/60 mb-1.5">In-Stock</div>
+          <div className="space-y-1.5 text-sm">
+            <Row label="Subtotal" value={`CAD $${inStockSubtotal.toFixed(2)}`} />
+            {country ? (
+              <Row label={`Shipping (${country})`}
+                   value={freeShipApplied ? 'FREE' : `CAD $${shippingFee.toFixed(2)}`}
+                   valueClass={freeShipApplied ? 'text-green-400 font-black' : ''} />
+            ) : (
+              <Row label="Shipping" value="Select country" muted />
             )}
+            {freeShipApplied && (
+              <div className="text-[11px] text-green-400 font-black">Free shipping on Canadian orders $100+</div>
+            )}
+            {country === 'Canada' && province && taxAmount > 0 ? (
+              <Row label={`Tax (${taxLabel} — ${province})`} value={`CAD $${taxAmount.toFixed(2)}`} />
+            ) : country === 'Canada' && !province ? (
+              <Row label="Tax" value="Select province" muted />
+            ) : null}
+            <Row label="In-stock total" value={`CAD $${inStockTotal.toFixed(2)}`} valueClass="font-black text-white" />
           </div>
-        )}
+        </div>
+      )}
+
+      {hasPreorder && (
+        <div className={`${hasInStock ? 'mt-4 pt-4 border-t border-white/10' : ''}`}>
+          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-fuchsia-300/70 mb-1.5">Pre-Orders</div>
+          <div className="space-y-1.5 text-sm">
+            <Row label="Pre-order subtotal" value={`CAD $${preorderSubtotal.toFixed(2)}`} accent="fuchsia" />
+            <Row label="Down payment (30%) — Due Now"
+                 value={`CAD $${preorderDeposit.toFixed(2)}`}
+                 valueClass="font-black text-fuchsia-200" accent="fuchsia" />
+            <div className="rounded-lg border border-fuchsia-400/20 bg-fuchsia-400/8 px-2.5 py-2 mt-1 text-[11px] text-fuchsia-100/85 space-y-0.5">
+              <div className="flex justify-between gap-2">
+                <span>70% balance — Due on release</span>
+                <span className="tabular-nums font-black">CAD ${preorderBalance.toFixed(2)}</span>
+              </div>
+              <div className="text-fuchsia-300/60">+ shipping (intl) at time of release</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="border-t border-white/15 pt-3 mt-4 flex justify-between items-end">
+        <span className="text-xs font-black uppercase tracking-[0.12em] text-white/70">Due Now</span>
+        <span className="text-2xl font-black text-cyan-200 tabular-nums">CAD ${dueNow.toFixed(2)}</span>
       </div>
+      {hasInStock && hasPreorder && (
+        <div className="mt-1 text-[10px] text-white/40">
+          (in-stock total + 30% deposit)
+        </div>
+      )}
+      {hasPreorder && (
+        <div className="mt-2 flex justify-between text-[11px] text-fuchsia-300/80">
+          <span>Due on release</span>
+          <span className="tabular-nums">CAD ${preorderBalance.toFixed(2)} + intl shipping</span>
+        </div>
+      )}
     </div>
   );
 }
