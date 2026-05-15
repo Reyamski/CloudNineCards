@@ -61,10 +61,15 @@ SELECT
   END                                                       AS source_table,
   COALESCE(o.product_id, '')                                AS item_id,
   COALESCE(o.quantity, 1)                                   AS qty,
+  -- Price columns on `orders` are TEXT in this project, so cast safely:
+  -- empty string → NULL, non-numeric → NULL (regex-guarded), then ::numeric.
   COALESCE(
-    NULLIF(o.total_price, 0),
-    NULLIF(o.subtotal,    0),
-    NULLIF(o.full_price,  0),
+    CASE WHEN NULLIF(o.total_price::text, '') ~ '^-?[0-9]+(\.[0-9]+)?$'
+         THEN o.total_price::text::numeric END,
+    CASE WHEN NULLIF(o.subtotal::text,    '') ~ '^-?[0-9]+(\.[0-9]+)?$'
+         THEN o.subtotal::text::numeric    END,
+    CASE WHEN NULLIF(o.full_price::text,  '') ~ '^-?[0-9]+(\.[0-9]+)?$'
+         THEN o.full_price::text::numeric  END,
     0
   )                                                         AS unit_price,
   COALESCE(
@@ -79,6 +84,14 @@ WHERE o.product_id IS NOT NULL
   AND NOT EXISTS (
     SELECT 1 FROM order_items oi WHERE oi.order_id = o.id
   );
+
+-- ── Link orders to auth user (Wave 3a Fix 2) ─────────────────────────────────
+-- Adds a nullable FK from `orders` to `auth.users` so logged-in carts can be
+-- joined back to their account. Anon checkouts keep this column NULL — order
+-- lookup by `buyer_email` still works either way.
+ALTER TABLE orders
+  ADD COLUMN IF NOT EXISTS customer_user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS orders_customer_user_id_idx ON orders (customer_user_id);
 
 -- ── Optional: relax legacy single-item columns on `orders` ───────────────────
 -- The cart-driven submit path inserts placeholder values (`product_id = MULTI`,

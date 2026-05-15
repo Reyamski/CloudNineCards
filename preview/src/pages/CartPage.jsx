@@ -243,6 +243,8 @@ export default function CartPage() {
         product_title:    placeholderTitle,
         item_title:       placeholderTitle,
         quantity:         totals.itemCount,
+        // Link order to auth user when logged-in. Anon checkouts stay null.
+        customer_user_id: user?.id ?? null,
         buyer_name:       name,
         buyer_email:      email.trim().toLowerCase(),
         buyer_phone:      phone,
