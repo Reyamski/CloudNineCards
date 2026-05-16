@@ -893,40 +893,21 @@ export default function AdminPage() {
       if (error) throw new Error(error.message);
 
       // ── Restore stock when admin rejects payment ────────────────────────
-      // The cart flow decremented stock at order-submit. If the admin marks
-      // payment as rejected the buyer never paid, so we add those units back
-      // to singles/products via restore_item_stock RPC. Idempotent: the order
-      // row carries `stock_restored_at`; if set, we skip (prevents double
-      // restore when admin toggles statuses back and forth).
-      // Preorder lines weren't decremented at submit, so they're skipped.
+      // Restoration is done server-side by /api/admin/reject-order (service
+      // role): it adds the in-stock units back and stamps stock_restored_at
+      // atomically, idempotent (skips if already restored). The standalone
+      // restore_item_stock RPC is no longer anon-callable
+      // (docs/vuln-rpc-hardening.sql). Preorder lines are skipped server-side.
       let stockRestoredAt = order.stock_restored_at ?? null;
       if (nextStatus === 'payment_rejected' && !order.stock_restored_at) {
         try {
-          const { data: itemRows, error: itemsErr } = await adminFetch(
-            `/api/admin/order-items?order_id=${encodeURIComponent(order.id)}`,
-            'GET'
+          const { data: rj, error: rjErr } = await adminFetch(
+            '/api/admin/reject-order', 'POST', { order_id: order.id }
           );
-          if (itemsErr) {
-            console.warn('order-items fetch failed during restore', itemsErr);
-          } else {
-            for (const line of (itemRows ?? [])) {
-              if (line.is_preorder) continue;
-              const source = line.source_table;
-              const itemId = line.item_id;
-              const qty    = Number(line.qty) || 0;
-              if (!source || !itemId || qty <= 0) continue;
-              try {
-                await supabase.rpc('restore_item_stock', { source, item_id: itemId, qty });
-              } catch (rpcErr) {
-                console.warn('restore_item_stock failed for', line, rpcErr);
-              }
-            }
-            const restoredAt = new Date().toISOString();
-            const { error: stampErr } = await adminFetch('/api/admin/orders', 'PATCH', {
-              id: order.id,
-              patch: { stock_restored_at: restoredAt },
-            });
-            if (!stampErr) stockRestoredAt = restoredAt;
+          if (rjErr) {
+            console.warn('reject-order endpoint failed', rjErr);
+          } else if (rj && !rj.already_restored) {
+            stockRestoredAt = new Date().toISOString();
           }
         } catch (restoreErr) {
           console.warn('Stock restore flow failed:', restoreErr);

@@ -34,6 +34,7 @@ import adminOrderItemsHandler from './api/admin/order-items.js';
 import adminConfigHandler    from './api/admin/config.js';
 import adminStockHandler     from './api/admin/stock.js';
 import adminUploadHandler    from './api/admin/upload.js';
+import adminRejectOrderHandler from './api/admin/reject-order.js';
 
 const PORT = 3001;
 
@@ -82,6 +83,7 @@ const server = http.createServer(async (req, res) => {
     '/api/admin/products':  adminProductsHandler,
     '/api/admin/preorders': adminPreordersHandler,
     '/api/admin/orders':    adminOrdersHandler,
+    '/api/admin/reject-order': adminRejectOrderHandler,
     '/api/admin/config':    adminConfigHandler,
     '/api/admin/stock':     adminStockHandler,
   };

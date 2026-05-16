@@ -405,37 +405,11 @@ export default function CartPage() {
       if (hasInStock && !inStockOrderId) throw new Error('In-stock order RPC returned no id.');
       if (hasPreorder && !preorderOrderId) throw new Error('Pre-order RPC returned no id.');
 
-      // ── Decrement stock for in-stock lines only ──────────────────────
-      // Uses the decrement_item_stock RPC (docs/wave3c-stock-decrement.sql)
-      // so the call works whether RLS is on or off. The RPC is SECURITY
-      // DEFINER and atomic per row. Per-row failure does NOT block the order;
-      // admin reconciles by-hand if a decrement was missed.
-      let stockCheckFailed = false;
-      for (const it of inStockItems) {
-        try {
-          const { error: decErr } = await supabase.rpc('decrement_item_stock', {
-            source:  it.source,
-            item_id: it.id,
-            qty:     it.qty,
-          });
-          if (decErr) {
-            console.warn('Stock decrement RPC failed for', it.key, decErr);
-            stockCheckFailed = true;
-          }
-        } catch (decErr) {
-          console.warn('Stock decrement threw for', it.key, decErr);
-          stockCheckFailed = true;
-        }
-      }
-      if (stockCheckFailed && inStockOrderId) {
-        // Flag for admin reconciliation. Wave 3c-2 Phase B blocks direct
-        // anon UPDATE on `orders`, so the status flip goes through a
-        // SECURITY DEFINER RPC that only allows the flip from a known
-        // pre-payment status. See docs/wave3c2-mark-order-status-rpc.sql.
-        try {
-          await supabase.rpc('mark_order_stock_check_failed', { order_id: inStockOrderId });
-        } catch { /* non-blocking */ }
-      }
+      // Stock decrement now happens INSIDE submit_cart_orders_v2 (same
+      // transaction as the order insert) and the order is auto-flagged
+      // 'stock_check_failed' there if a line can't be decremented. The
+      // standalone decrement / mark-failed RPCs are no longer anon-callable
+      // (see docs/vuln-rpc-hardening.sql) — nothing to do here.
 
       // ── EmailJS receipts (one per order, dual templates) ─────────────
       const baseSharedVars = {
