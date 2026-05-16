@@ -138,11 +138,17 @@ GRANT EXECUTE ON FUNCTION submit_cart_orders_v2(jsonb, jsonb, jsonb, jsonb) TO a
 GRANT EXECUTE ON FUNCTION submit_cart_orders_v2(jsonb, jsonb, jsonb, jsonb) TO authenticated;
 
 -- ── Revoke anon access to the standalone mutation RPCs ──────────────────
--- They stay callable by service_role (admin reconciliation / the new
--- /api/admin/reject-order endpoint uses service-role).
-REVOKE EXECUTE ON FUNCTION decrement_item_stock(text, text, integer)        FROM anon, authenticated;
-REVOKE EXECUTE ON FUNCTION restore_item_stock(text, text, integer)          FROM anon, authenticated;
-REVOKE EXECUTE ON FUNCTION mark_order_stock_check_failed(uuid)              FROM anon, authenticated;
+-- IMPORTANT: Postgres auto-grants EXECUTE TO PUBLIC on CREATE FUNCTION.
+-- Revoking only from anon/authenticated leaves the implicit PUBLIC grant,
+-- so anon still inherits EXECUTE. Must REVOKE ... FROM PUBLIC too, then
+-- explicitly GRANT back to service_role (the admin reject endpoint path).
+REVOKE EXECUTE ON FUNCTION decrement_item_stock(text, text, integer)         FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION restore_item_stock(text, text, integer)           FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION mark_order_stock_check_failed(uuid)               FROM PUBLIC, anon, authenticated;
+
+GRANT EXECUTE ON FUNCTION decrement_item_stock(text, text, integer)          TO service_role;
+GRANT EXECUTE ON FUNCTION restore_item_stock(text, text, integer)            TO service_role;
+GRANT EXECUTE ON FUNCTION mark_order_stock_check_failed(uuid)                TO service_role;
 
 -- ── Verification ────────────────────────────────────────────────────────
 -- 1. Anon direct RPC calls now blocked:
