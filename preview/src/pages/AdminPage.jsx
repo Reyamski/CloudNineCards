@@ -553,10 +553,9 @@ export default function AdminPage() {
         setProducts(mergeProducts(data));
       }
 
-      const {data: orderRows, error: orderError} = await supabase
-        .from('orders')
-        .select('*')
-        .order('created_at', {ascending: false});
+      // Wave 3c-2 Phase B: orders SELECT is restricted to own-rows for anon.
+      // Admin reads now go through the service-role endpoint instead.
+      const {data: orderRows, error: orderError} = await adminFetch('/api/admin/orders', 'GET');
 
       if (orderError) {
         setDbError((prev) => prev || `Orders load failed: ${orderError.message}`);
@@ -624,11 +623,10 @@ export default function AdminPage() {
     }
     let cancelled = false;
     setSelectedOrderItemsLoading(true);
-    supabase
-      .from('order_items')
-      .select('*')
-      .eq('order_id', selectedOrderId)
-      .order('created_at', { ascending: true })
+    // Wave 3c-2 Phase B: order_items SELECT is restricted to own-rows.
+    // Admin reads go through the service-role endpoint instead of the
+    // anon-key Supabase client.
+    adminFetch(`/api/admin/order-items?order_id=${encodeURIComponent(selectedOrderId)}`, 'GET')
       .then(({ data, error }) => {
         if (cancelled) return;
         setSelectedOrderItemsLoading(false);
