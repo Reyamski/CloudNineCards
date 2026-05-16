@@ -52,10 +52,16 @@ export default function AccountOrdersPage() {
   const loadOrders = useCallback(async (showSpinner = false) => {
     if (!user || !supabase) return;
     if (showSpinner) setRefreshing(true);
+    // Match orders by either the linked auth user_id (set on signed-in checkout)
+    // OR the buyer email (covers guest-then-signed-up customers).
+    const escapedEmail = String(user.email || '').replace(/[(),]/g, '');
+    const filterClause = user.id
+      ? `customer_user_id.eq.${user.id},buyer_email.ilike.${escapedEmail}`
+      : `buyer_email.ilike.${escapedEmail}`;
     const { data } = await supabase
       .from('orders')
-      .select('order_number, item_title, product_title, quantity, full_price, total_price, dp_amount, balance_due, payment_status, status, order_type, eta, delivery_country, delivery_fee, tax_amount, buyer_address, buyer_name, created_at')
-      .ilike('buyer_email', user.email)
+      .select('order_number, item_title, product_title, quantity, full_price, total_price, dp_amount, balance_due, payment_status, status, order_type, eta, delivery_country, delivery_fee, tax_amount, buyer_address, buyer_name, created_at, customer_user_id, buyer_email')
+      .or(filterClause)
       .order('created_at', { ascending: false });
     setOrders(data ?? []);
     setFetching(false);
@@ -308,15 +314,76 @@ export default function AccountOrdersPage() {
                           </>}
                         </div>
 
-                        {(sel.payment_status === 'awaiting_payment' || sel.status === 'awaiting_payment') && (
-                          <div className="mt-4 rounded-2xl border border-yellow-400/25 bg-yellow-400/8 px-4 py-3">
-                            <div className="text-xs font-black uppercase tracking-[0.14em] text-yellow-300">Action required — send payment via Wise</div>
-                            <div className="mt-1 text-sm text-white/60">
-                              Send <span className="font-black text-white">CAD ${safeNum(sel.balance_due ?? sel.full_price ?? sel.total_price).toFixed(2)}</span> to{' '}
-                              <span className="font-black text-yellow-300">@cloudninecards</span> on Wise, then submit your payment screenshot in the shop.
-                            </div>
-                          </div>
-                        )}
+                        {(() => {
+                          const isPreorder = sel.order_type === 'pre_order' || sel.order_type === 'preorder_cart';
+                          const awaitingPayment =
+                            sel.payment_status === 'awaiting_payment' ||
+                            sel.status === 'awaiting_payment';
+
+                          // 1) Preorder, deposit not yet paid → ask for the 30% DP.
+                          if (isPreorder && awaitingPayment) {
+                            const dp = safeNum(sel.dp_amount ?? sel.total_price);
+                            return (
+                              <div className="mt-4 rounded-2xl border border-yellow-400/25 bg-yellow-400/8 px-4 py-3">
+                                <div className="text-xs font-black uppercase tracking-[0.14em] text-yellow-300">Action required — send 30% deposit via Wise</div>
+                                <div className="mt-1 text-sm text-white/60">
+                                  Send <span className="font-black text-white">CAD ${dp.toFixed(2)}</span>{' '}
+                                  <span className="text-white/40">(30% deposit)</span> to{' '}
+                                  <span className="font-black text-yellow-300">@cloudninecards</span> on Wise, then submit your payment screenshot in the shop.
+                                </div>
+                                {safeNum(sel.balance_due) > 0 && (
+                                  <div className="mt-1.5 text-xs text-white/45">
+                                    Remaining balance <span className="font-black text-white/70">CAD ${safeNum(sel.balance_due).toFixed(2)}</span> + intl shipping due on release{sel.eta ? ` (${sel.eta})` : ''}.
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
+
+                          // 2) Preorder, deposit verified but order not yet "confirmed/released" → balance reminder.
+                          if (isPreorder && sel.payment_status === 'payment_verified' && sel.status !== 'confirmed') {
+                            return (
+                              <div className="mt-4 rounded-2xl border border-fuchsia-400/25 bg-fuchsia-400/8 px-4 py-3">
+                                <div className="text-xs font-black uppercase tracking-[0.14em] text-fuchsia-300">Deposit received — balance due on release</div>
+                                <div className="mt-1 text-sm text-white/60">
+                                  Balance <span className="font-black text-white">CAD ${safeNum(sel.balance_due).toFixed(2)}</span>{' '}
+                                  <span className="text-white/40">(70%)</span> + intl shipping due on release{sel.eta ? ` (${sel.eta})` : ''}.
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          // 3) Preorder confirmed/released → ask for the balance.
+                          if (isPreorder && sel.status === 'confirmed' && sel.payment_status !== 'payment_verified') {
+                            const bal = safeNum(sel.balance_due);
+                            return (
+                              <div className="mt-4 rounded-2xl border border-yellow-400/25 bg-yellow-400/8 px-4 py-3">
+                                <div className="text-xs font-black uppercase tracking-[0.14em] text-yellow-300">Action required — send balance via Wise</div>
+                                <div className="mt-1 text-sm text-white/60">
+                                  Send <span className="font-black text-white">CAD ${bal.toFixed(2)}</span>{' '}
+                                  <span className="text-white/40">(70% balance + intl shipping)</span> to{' '}
+                                  <span className="font-black text-yellow-300">@cloudninecards</span> on Wise to finalize your order.
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          // 4) In-stock / cart order awaiting payment → full total.
+                          if (awaitingPayment) {
+                            const amt = safeNum(sel.total_price ?? sel.full_price);
+                            return (
+                              <div className="mt-4 rounded-2xl border border-yellow-400/25 bg-yellow-400/8 px-4 py-3">
+                                <div className="text-xs font-black uppercase tracking-[0.14em] text-yellow-300">Action required — send payment via Wise</div>
+                                <div className="mt-1 text-sm text-white/60">
+                                  Send <span className="font-black text-white">CAD ${amt.toFixed(2)}</span> to{' '}
+                                  <span className="font-black text-yellow-300">@cloudninecards</span> on Wise, then submit your payment screenshot in the shop.
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          return null;
+                        })()}
 
                         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-3">
                           <span className="text-xs text-white/30">
