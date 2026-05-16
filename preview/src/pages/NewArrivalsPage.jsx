@@ -121,7 +121,7 @@ export default function NewArrivalsPage() {
               initial={{opacity: 0, y: 20}}
               animate={{opacity: 1, y: 0}}
               transition={{duration: 0.45, delay: idx * 0.08}}
-              className="group relative overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,#0b1022,#14081d)]"
+              className="group relative overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,#0b1022,#14081d)] flex flex-col h-full"
             >
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-yellow-300 via-cyan-300 to-fuchsia-400" />
               <div className="relative overflow-hidden">
@@ -146,12 +146,12 @@ export default function NewArrivalsPage() {
                   </div>
                 )}
               </div>
-              <div className="p-5">
+              <div className="p-5 flex flex-1 flex-col">
                 <div className="text-sm font-black uppercase tracking-[0.18em] text-yellow-300/75">{item.subtitle}</div>
                 <div className="mt-2 text-lg font-black leading-snug">{item.title}</div>
                 <div className="mt-4 text-3xl font-black">CAD ${item.price.toFixed(2)}</div>
                 <div className="mt-1 text-xs text-white/35">{item.daysAgo}</div>
-                <div className="mt-5 flex flex-col gap-2">
+                <div className="mt-auto pt-5 flex flex-col gap-2">
                   <button
                     onClick={() => {
                       const result = addItem({

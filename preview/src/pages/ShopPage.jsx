@@ -339,7 +339,7 @@ export default function ShopPage() {
         )}
         <div className="grid gap-6 md:grid-cols-3">
           {filtered.map((item) => (
-            <div key={item.id} className={`group relative overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,#0b1022,#14081d)] hover:scale-[1.02] transition-transform duration-300${!item.inStock ? ' grayscale-[0.4]' : ''}`}>
+            <div key={item.id} className={`group relative overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,#0b1022,#14081d)] hover:scale-[1.02] transition-transform duration-300 flex flex-col h-full${!item.inStock ? ' grayscale-[0.4]' : ''}`}>
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-yellow-300" />
               {/* diagonal shine sweep on hover */}
               <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden rounded-[32px]">
@@ -352,12 +352,12 @@ export default function ShopPage() {
                   {item.badge}
                 </div>
               </Link>
-              <div className="p-5">
+              <div className="p-5 flex flex-1 flex-col">
                 <div className="text-sm font-black uppercase tracking-[0.18em] text-cyan-300/75">{item.subtitle}</div>
                 <Link to={`/shop/${item.id}`} className="mt-2 block text-lg font-black leading-snug hover:text-cyan-200 transition">{item.title}</Link>
                 <div className="mt-4 text-3xl font-black">{item.priceTba ? 'Price TBA' : `CAD $${item.price.toFixed(2)}`}</div>
                 <div className="mt-1 text-xs text-white/30">+ shipping & tax calculated at checkout</div>
-                <div className="mt-4">
+                <div className="mt-auto pt-4">
                   {item.isPreorder ? (
                     <button onClick={() => {
                       addItem({

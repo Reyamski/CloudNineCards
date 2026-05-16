@@ -71,9 +71,9 @@ function SingleCard({ card, onBuy }) {
             <span className="rounded-full border border-fuchsia-400/25 bg-fuchsia-400/8 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.1em] text-fuchsia-300/80">{card.rarity}</span>
           )}
         </div>
-        <div className="text-sm font-black leading-snug text-white flex-1">{card.card_name}</div>
+        <div className="text-sm font-black leading-snug text-white">{card.card_name}</div>
         <div className="mt-1 text-xs text-white/40">{card.set_name}{card.card_number ? ` · ${card.card_number}` : ''}</div>
-        <div className="mt-3 flex items-end justify-between">
+        <div className="mt-auto pt-3 flex items-end justify-between">
           <div>
             <div className="text-2xl font-black text-white">
               {Number(card.price) > 0 ? `CAD $${Number(card.price).toFixed(2)}` : <span className="text-white/40 text-lg">TBD</span>}

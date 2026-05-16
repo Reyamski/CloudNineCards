@@ -332,7 +332,7 @@ export default function PreOrdersPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.45, delay: idx * 0.1 }}
-              className="group relative overflow-hidden rounded-[32px] border border-fuchsia-400/20 bg-[linear-gradient(180deg,#0d0520,#14081d)] transition-all duration-300 hover:border-fuchsia-400/60 hover:shadow-[0_0_30px_rgba(168,85,247,0.3)]"
+              className="group relative overflow-hidden rounded-[32px] border border-fuchsia-400/20 bg-[linear-gradient(180deg,#0d0520,#14081d)] transition-all duration-300 hover:border-fuchsia-400/60 hover:shadow-[0_0_30px_rgba(168,85,247,0.3)] flex flex-col h-full"
             >
               {/* Energy slash decorative element */}
               <div
@@ -354,11 +354,11 @@ export default function PreOrdersPage() {
                   <Zap className="h-3 w-3" /> {item.hype}
                 </div>
               </div>
-              <div className="p-5">
+              <div className="p-5 flex flex-1 flex-col">
                 <div className="text-sm font-black uppercase tracking-[0.18em] text-fuchsia-300/75">{item.subtitle}</div>
                 <div className="mt-2 text-lg font-black leading-snug">{item.title}</div>
 
-                <div className="mt-4 flex items-end justify-between">
+                <div className="mt-auto pt-4 flex items-end justify-between">
                   <div>
                     <div className="text-xs text-white/40 uppercase tracking-[0.12em]">Full price</div>
                     {item.soldOut ? (
