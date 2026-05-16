@@ -21,12 +21,15 @@ export default function Nav() {
   return (
     <div className="mb-8">
       <div className="flex items-center justify-between">
-        <Link to="/">
+        <Link to="/" className="min-w-0">
           <div>
-            <div className="bg-gradient-to-r from-cyan-300 via-fuchsia-300 to-yellow-300 bg-clip-text text-2xl font-black tracking-[0.28em] text-transparent md:text-3xl">
+            {/* F7 mobile fix: scale down the logo wordmark + shorten the
+                tagline tracking under 480px so the header row doesn't push
+                the cart icon off-screen on 390px viewports. */}
+            <div className="bg-gradient-to-r from-cyan-300 via-fuchsia-300 to-yellow-300 bg-clip-text text-lg font-black tracking-[0.18em] text-transparent sm:text-2xl sm:tracking-[0.28em] md:text-3xl">
               CLOUDNINECARDS
             </div>
-            <div className="mt-1 text-xs uppercase tracking-[0.34em] text-white/45">
+            <div className="mt-1 hidden text-[10px] uppercase tracking-[0.22em] text-white/45 sm:block sm:text-xs sm:tracking-[0.34em]">
               one piece · pokémon · dragon ball · shipped from canada
             </div>
           </div>

@@ -113,29 +113,32 @@ export default function AccountOrdersPage() {
         />
         <div className="relative mx-auto max-w-7xl">
           <Nav />
-          <div className="mt-6 flex items-end justify-between gap-4">
-            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-              <div className="inline-flex items-center gap-2 rounded-full border border-fuchsia-400/35 bg-fuchsia-400/12 px-4 py-2 text-xs font-black uppercase tracking-[0.24em] text-fuchsia-100">
-                <Package className="h-4 w-4" /> {user?.email}
+          {/* F7 mobile fix: stack header pieces under 480px so the email pill +
+              action buttons don't push the row past viewport width. */}
+          <div className="mt-6 flex flex-col items-start gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="min-w-0 max-w-full">
+              <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-fuchsia-400/35 bg-fuchsia-400/12 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-fuchsia-100 sm:px-4 sm:py-2 sm:text-xs sm:tracking-[0.24em]">
+                <Package className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+                <span className="truncate">{user?.email}</span>
               </div>
-              <h1 className="mt-4 text-5xl font-black uppercase leading-[0.88] tracking-[-0.04em] md:text-7xl">
+              <h1 className="mt-4 text-4xl font-black uppercase leading-[0.88] tracking-[-0.04em] sm:text-5xl md:text-7xl">
                 My
                 <span className="block bg-gradient-to-r from-fuchsia-300 to-cyan-300 bg-clip-text text-transparent">
                   Orders
                 </span>
               </h1>
             </motion.div>
-            <div className="mb-1 flex items-center gap-2">
+            <div className="mb-1 flex w-full items-center gap-2 sm:w-auto">
               <button
                 onClick={() => loadOrders(true)}
                 disabled={refreshing}
-                className="flex items-center gap-2 rounded-2xl border border-cyan-300/20 bg-cyan-300/8 px-4 py-2.5 text-xs font-black uppercase tracking-[0.12em] text-cyan-300/70 transition hover:bg-cyan-300/15 hover:text-cyan-300 disabled:opacity-40"
+                className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-cyan-300/20 bg-cyan-300/8 px-3 py-2.5 text-[11px] font-black uppercase tracking-[0.12em] text-cyan-300/70 transition hover:bg-cyan-300/15 hover:text-cyan-300 disabled:opacity-40 sm:flex-none sm:px-4 sm:text-xs"
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} /> Refresh
               </button>
               <button
                 onClick={handleSignOut}
-                className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-black uppercase tracking-[0.12em] text-white/60 transition hover:bg-white/10 hover:text-white/80"
+                className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-[11px] font-black uppercase tracking-[0.12em] text-white/60 transition hover:bg-white/10 hover:text-white/80 sm:flex-none sm:px-4 sm:text-xs"
               >
                 <LogOut className="h-3.5 w-3.5" /> Sign Out
               </button>
