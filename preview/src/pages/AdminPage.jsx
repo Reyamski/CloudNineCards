@@ -1365,6 +1365,13 @@ export default function AdminPage() {
                 <div className="rounded-[28px] border border-white/10 bg-white/5 p-5 sticky top-6 max-h-[calc(100vh-100px)] overflow-y-auto">
                   {selectedOrder ? (
                     <>
+                      {(() => {
+                        const isPreorder = selectedOrder.order_type === 'pre_order' || selectedOrder.order_type === 'preorder_cart';
+                        const headerAmountLabel = isPreorder ? 'Deposit due' : 'Total';
+                        const headerAmount = isPreorder
+                          ? (selectedOrder.dp_amount ?? selectedOrder.total_price)
+                          : selectedOrder.total_price;
+                        return (
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <div className="text-xs font-black uppercase tracking-[0.18em] text-cyan-300/75">
@@ -1372,7 +1379,7 @@ export default function AdminPage() {
                           </div>
                           <div className="mt-2 text-2xl font-black leading-tight">{selectedOrder.product_title}</div>
                           <div className="mt-2 text-sm text-white/55">
-                            {selectedOrder.product_variant} | Qty {selectedOrder.quantity} | {formatMoney(selectedOrder.total_price)}
+                            {selectedOrder.product_variant} | Qty {selectedOrder.quantity} | {headerAmountLabel} {formatMoney(headerAmount)}
                           </div>
                         </div>
                         {selectedOrder.status === 'pending' ? (
@@ -1391,6 +1398,35 @@ export default function AdminPage() {
                           </button>
                         ) : null}
                       </div>
+                        );
+                      })()}
+
+                      {(selectedOrder.order_type === 'pre_order' || selectedOrder.order_type === 'preorder_cart') && (
+                        <div className="mt-4 rounded-2xl border border-fuchsia-400/25 bg-fuchsia-400/8 p-4">
+                          <div className="mb-2 flex items-center gap-2">
+                            <span className="text-[10px] font-black uppercase tracking-[0.18em] text-fuchsia-300/80">Pre-Order Breakdown</span>
+                            {selectedOrder.eta && (
+                              <span className="rounded-full border border-fuchsia-400/25 bg-fuchsia-400/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-fuchsia-200/85">
+                                ETA {selectedOrder.eta}
+                              </span>
+                            )}
+                          </div>
+                          <div className="grid gap-x-6 gap-y-1 text-xs sm:grid-cols-3">
+                            <div className="text-white/50">Full price</div>
+                            <div className="text-right font-black text-white/90 tabular-nums sm:col-span-2">
+                              {formatMoney(selectedOrder.full_price ?? 0)}
+                            </div>
+                            <div className="text-white/50">Deposit (30%)</div>
+                            <div className="text-right font-black text-emerald-300 tabular-nums sm:col-span-2">
+                              {formatMoney(selectedOrder.dp_amount ?? 0)}
+                            </div>
+                            <div className="text-white/50">Balance on release (70%)</div>
+                            <div className="text-right font-black text-yellow-300 tabular-nums sm:col-span-2">
+                              {formatMoney(selectedOrder.balance_due ?? 0)} <span className="text-white/40 font-normal">+ intl ship</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       <div className="mt-5 grid gap-3 md:grid-cols-2">
                         <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
