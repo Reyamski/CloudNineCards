@@ -53,6 +53,34 @@ export default function ProductPage() {
   const { addItem } = useCart();
   const { showToast } = useToast();
 
+  // Shared add-to-cart so the main button and the sticky mobile bar behave
+  // identically.
+  function handleAddToCart() {
+    if (!product) return;
+    const result = addItem({
+      key:        `${product.isPreorder ? 'preorders' : 'products'}:${product.id}`,
+      source:     product.isPreorder ? 'preorders' : 'products',
+      id:         product.id,
+      title:      product.title,
+      image:      product.image,
+      price:      Number(product.price) || 0,
+      qty,
+      isPreorder: !!product.isPreorder,
+      etaText:    product.eta ?? '',
+      maxStock:   product.isPreorder ? undefined : (Number(product.stock) || 0),
+      currency:   'CAD',
+    });
+    if (!result.ok && result.reason === 'stock') {
+      showToast(
+        result.available > 0
+          ? `Only ${result.available} more available`
+          : `Already at stock limit`
+      );
+      return;
+    }
+    showToast(`Added × ${qty} to cart`, { actionTo: '/cart', actionLabel: 'View Cart' });
+  }
+
   useEffect(() => {
     let ignore = false;
 
@@ -227,30 +255,7 @@ export default function ProductPage() {
                     )}
                   </div>
                   <button
-                    onClick={() => {
-                      const result = addItem({
-                        key:        `${product.isPreorder ? 'preorders' : 'products'}:${product.id}`,
-                        source:     product.isPreorder ? 'preorders' : 'products',
-                        id:         product.id,
-                        title:      product.title,
-                        image:      product.image,
-                        price:      Number(product.price) || 0,
-                        qty,
-                        isPreorder: !!product.isPreorder,
-                        etaText:    product.eta ?? '',
-                        maxStock:   product.isPreorder ? undefined : (Number(product.stock) || 0),
-                        currency:   'CAD',
-                      });
-                      if (!result.ok && result.reason === 'stock') {
-                        showToast(
-                          result.available > 0
-                            ? `Only ${result.available} more available`
-                            : `Already at stock limit`
-                        );
-                        return;
-                      }
-                      showToast(`Added × ${qty} to cart`, { actionTo: '/cart', actionLabel: 'View Cart' });
-                    }}
+                    onClick={handleAddToCart}
                     className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 py-4 text-sm font-black uppercase tracking-[0.12em] text-black shadow-[0_10px_30px_rgba(34,211,238,0.25)] transition hover:opacity-95"
                   >
                     {product.isPreorder ? 'Pre-order — Add to Cart' : 'Add to Cart'}
@@ -267,6 +272,30 @@ export default function ProductPage() {
       </section>
 
       <Footer />
+
+      {/* Sticky mobile buy bar (<=640px). Desktop unchanged. The tab bar is
+          hidden on this route so this is the only fixed bottom element. */}
+      {product.inStock && !product.priceTba && (
+        <div
+          className="sm:hidden fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#07030f]/97 backdrop-blur px-4 py-3 flex items-center gap-3"
+          style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
+        >
+          <div className="min-w-0">
+            <div className="text-[10px] font-black uppercase tracking-[0.14em] text-white/40">
+              {product.isPreorder ? 'Pre-order' : 'Price'}
+            </div>
+            <div className="text-lg font-black text-white tabular-nums truncate">
+              CAD ${Number(product.price).toFixed(2)}
+            </div>
+          </div>
+          <button
+            onClick={handleAddToCart}
+            className="ml-auto shrink-0 rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 px-6 py-3 text-sm font-black uppercase tracking-[0.1em] text-black transition hover:opacity-95"
+          >
+            {product.isPreorder ? 'Pre-order' : 'Add to Cart'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

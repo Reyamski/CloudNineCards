@@ -1,1 +1,12 @@
 @import "tailwindcss";
+
+/* Reserve space for the fixed mobile bottom tab bar (<=640px) so page content
+   and footers aren't hidden behind it. Desktop is unaffected. Includes the
+   iOS safe-area inset so it also clears the home indicator.
+   The product detail page hides the tab bar and shows its own sticky buy bar
+   instead; it manages its own bottom padding locally. */
+@media (max-width: 640px) {
+  body {
+    padding-bottom: calc(3.75rem + env(safe-area-inset-bottom));
+  }
+}

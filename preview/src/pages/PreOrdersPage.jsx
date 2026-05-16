@@ -1,6 +1,7 @@
-import { BellRing, ChevronRight, Zap, AlertTriangle, Truck, Globe, CreditCard, Camera, Loader2, Calculator } from 'lucide-react';
+import { BellRing, ChevronRight, Zap, AlertTriangle, Truck, Globe, CreditCard, Camera, Loader2, Calculator, HelpCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import Nav from '../components/Nav';
 import Footer from '../components/Footer';
 import { supabase } from '../lib/supabase';
@@ -251,6 +252,12 @@ export default function PreOrdersPage() {
               >
                 <Calculator className="h-3.5 w-3.5" /> DP Calculator
               </button>
+              <Link
+                to="/how-preorders-work"
+                className="inline-flex items-center gap-2 rounded-full border border-cyan-300/40 bg-cyan-300/8 px-5 py-2 text-xs font-black uppercase tracking-[0.16em] text-cyan-200 transition hover:border-cyan-300/60 hover:bg-cyan-300/15"
+              >
+                <HelpCircle className="h-3.5 w-3.5" /> How Pre-Orders Work
+              </Link>
             </div>
           </motion.div>
         </div>
