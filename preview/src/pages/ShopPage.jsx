@@ -30,14 +30,18 @@ function NotifyMeModal({ item, onClose }) {
     setSending(true);
     setSendError('');
     try {
-      if (supabaseEnabled && supabase) {
-        const { error } = await supabase.from('waitlist').insert({
+      const res = await fetch('/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           email: email.trim().toLowerCase(),
           product_id: item.id,
           product_title: item.title,
-          created_at: new Date().toISOString(),
-        });
-        if (error) throw error;
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.error) {
+        throw new Error(json?.error?.message || 'Submission failed.');
       }
       setSubmitted(true);
     } catch (err) {
