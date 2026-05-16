@@ -2234,25 +2234,12 @@ export default function AdminPage() {
                   <div>
                     <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/30">Price (CAD) *</label>
                     <input type="number" step="0.01" min="0" required value={addProdForm.price}
-                      onChange={e => handleProdCadChange(e.target.value)}
+                      onChange={e => setAddProdForm(f => ({ ...f, price: e.target.value }))}
                       placeholder="129.00"
                       className="w-full rounded-xl border border-yellow-400/30 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-yellow-400/50" />
                   </div>
-                  <div>
-                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">USD Price <span className="text-white/25 normal-case font-normal">(auto +20%)</span></label>
-                    <input type="number" step="0.01" min="0" value={addProdForm.usd_price} onChange={e => setAddProdForm(f => ({ ...f, usd_price: e.target.value }))}
-                      placeholder="auto" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-cyan-400/40" />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">AUD Price <span className="text-white/25 normal-case font-normal">(auto +20%)</span></label>
-                    <input type="number" step="0.01" min="0" value={addProdForm.aud_price} onChange={e => setAddProdForm(f => ({ ...f, aud_price: e.target.value }))}
-                      placeholder="auto" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-cyan-400/40" />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">EUR Price <span className="text-white/25 normal-case font-normal">(auto +20%)</span></label>
-                    <input type="number" step="0.01" min="0" value={addProdForm.eur_price} onChange={e => setAddProdForm(f => ({ ...f, eur_price: e.target.value }))}
-                      placeholder="auto" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-cyan-400/40" />
-                  </div>
+                  {/* Multi-currency price fields removed — the products table doesn't
+                      expose usd_price / aud_price / eur_price (only preorders do). */}
                   <div>
                     <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Image URL</label>
                     <input value={addProdForm.image_url} onChange={e => setAddProdForm(f => ({ ...f, image_url: e.target.value }))}
