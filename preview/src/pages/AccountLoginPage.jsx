@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Loader2 } from 'lucide-react';
 import Nav from '../components/Nav';
@@ -10,6 +10,11 @@ import { useAuth } from '../lib/useAuth';
 export default function AccountLoginPage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  // Redirect hint set by callers that gated a page behind login (e.g. /cart).
+  // Falls back to /account/orders so direct visitors land on their history.
+  const redirectTo = location.state?.redirect || '/account/orders';
+  const flashMsg = location.state?.flash || '';
 
   const [tab, setTab] = useState('signin'); // 'signin' | 'signup'
   const [email, setEmail] = useState('');
@@ -20,8 +25,8 @@ export default function AccountLoginPage() {
 
   useEffect(() => { document.title = 'My Account | CloudNineCards'; }, []);
   useEffect(() => {
-    if (user) navigate('/account/orders', { replace: true });
-  }, [user, navigate]);
+    if (user) navigate(redirectTo, { replace: true });
+  }, [user, navigate, redirectTo]);
 
   function reset() {
     setStatus('idle');
@@ -43,7 +48,7 @@ export default function AccountLoginPage() {
       setErrorMsg(error.message || 'Invalid email or password.');
       setStatus('error');
     } else {
-      navigate('/account/orders');
+      navigate(redirectTo);
     }
   }
 
@@ -154,6 +159,12 @@ export default function AccountLoginPage() {
             transition={{ duration: 0.4 }}
             className="flex flex-col gap-5 rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,#0b1022,#14081d)] p-8"
           >
+            {flashMsg && (
+              <div className="rounded-xl border border-cyan-300/30 bg-cyan-300/10 px-4 py-3 text-xs text-cyan-100">
+                {flashMsg}
+              </div>
+            )}
+
             {/* Tab toggle */}
             <div className="mb-2 flex rounded-2xl border border-white/10 bg-white/5 p-1">
               <button
