@@ -30,18 +30,21 @@ BEGIN
   END IF;
 
   IF source = 'singles' THEN
+    -- singles.id is UUID; cast to text on both sides so the RPC accepts a
+    -- text item_id from the cart payload without 42883 type errors.
     UPDATE singles
     SET    stock     = GREATEST(0, stock - qty),
            in_stock  = (GREATEST(0, stock - qty) > 0),
            updated_at = now()
-    WHERE  id = item_id
+    WHERE  id::text = item_id
     RETURNING stock INTO result_stock;
   ELSIF source = 'products' THEN
+    -- products.id is TEXT; comparison works as-is.
     UPDATE products
     SET    stock     = GREATEST(0, stock - qty),
            in_stock  = (GREATEST(0, stock - qty) > 0),
            badge     = CASE WHEN (GREATEST(0, stock - qty) > 0) THEN 'In Stock' ELSE 'Sold Out' END
-    WHERE  id = item_id
+    WHERE  id::text = item_id
     RETURNING stock INTO result_stock;
   ELSE
     RAISE EXCEPTION 'invalid source: %', source;
