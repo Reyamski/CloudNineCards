@@ -21,12 +21,16 @@ const STATUS_META = {
   payment_rejected:   { label: 'Payment Rejected',  color: 'border-red-400/30 bg-red-400/10 text-red-300',       icon: XCircle },
 };
 
-function StatusBadge({ status }) {
+function StatusBadge({ status, compact = false }) {
   const meta = STATUS_META[status] ?? STATUS_META.awaiting_payment;
   const Icon = meta.icon;
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] ${meta.color}`}>
-      <Icon className="h-3 w-3" /> {meta.label}
+    <span className={`inline-flex items-center gap-1 rounded-full border font-black uppercase ${meta.color} ${
+      compact
+        ? 'px-2 py-0.5 text-[9px] tracking-[0.1em]'
+        : 'gap-1.5 px-3 py-1 text-[11px] tracking-[0.14em]'
+    }`}>
+      <Icon className={compact ? 'h-2.5 w-2.5' : 'h-3 w-3'} /> {meta.label}
     </span>
   );
 }
@@ -250,19 +254,20 @@ export default function AccountOrdersPage() {
                         return (
                           <button key={order.order_number ?? idx} onClick={() => setSelectedIdx(idx)}
                             className={`w-full rounded-[18px] border p-4 text-left transition ${active ? 'border-cyan-300/40 bg-cyan-300/8' : 'border-white/8 bg-white/3 hover:bg-white/6'}`}>
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="text-[10px] font-black uppercase tracking-[0.16em] text-white/35">#{order.order_number ?? '—'}</span>
-                                  <OrderTypeBadge type={order.order_type} />
-                                </div>
-                                <div className="truncate text-sm font-black text-white">{order.item_title ?? order.product_title}</div>
-                                <div className="mt-0.5 text-xs text-white/40">Qty {order.quantity} · {order.delivery_country ?? 'Canada'}</div>
+                            {/* Row 1: order_number + type badge (left) + price (right) */}
+                            <div className="flex items-center justify-between gap-2 mb-1.5">
+                              <div className="flex min-w-0 items-center gap-2">
+                                <span className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-white/35">#{order.order_number ?? '—'}</span>
+                                <OrderTypeBadge type={order.order_type} />
                               </div>
-                              <div className="shrink-0 text-right">
-                                <StatusBadge status={order.payment_status ?? order.status} />
-                                <div className="mt-1 text-sm font-black text-white">CAD ${safeNum(order.full_price ?? order.total_price).toFixed(2)}</div>
-                              </div>
+                              <div className="shrink-0 text-sm font-black text-white">CAD ${safeNum(order.full_price ?? order.total_price).toFixed(2)}</div>
+                            </div>
+                            {/* Row 2: item title */}
+                            <div className="truncate text-sm font-black text-white">{order.item_title ?? order.product_title}</div>
+                            {/* Row 3: qty/country (left) + status pill (right) */}
+                            <div className="mt-1.5 flex items-center justify-between gap-2">
+                              <div className="min-w-0 truncate text-xs text-white/40">Qty {order.quantity} · {order.delivery_country ?? 'Canada'}</div>
+                              <div className="shrink-0"><StatusBadge status={order.payment_status ?? order.status} compact /></div>
                             </div>
                           </button>
                         );
