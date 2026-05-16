@@ -5,6 +5,7 @@ import AnnouncementBar from './components/AnnouncementBar';
 import HomePage from './HomePage';
 import ShopPage from './pages/ShopPage';
 import PreOrdersPage from './pages/PreOrdersPage';
+import HowPreordersPage from './pages/HowPreordersPage';
 import NewArrivalsPage from './pages/NewArrivalsPage';
 import ContactPage from './pages/ContactPage';
 // F6: AdminPage is the heaviest single page (~2.5k lines); lazy-load so the
@@ -19,6 +20,7 @@ import SinglesPage from './pages/SinglesPage';
 import CartPage from './pages/CartPage';
 import OrderConfirmationPage from './pages/OrderConfirmationPage';
 import { ToastProvider } from './components/Toast';
+import MobileTabBar from './components/MobileTabBar';
 
 export default function App() {
   return (
@@ -29,6 +31,7 @@ export default function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/shop" element={<ShopPage />} />
           <Route path="/pre-orders" element={<PreOrdersPage />} />
+          <Route path="/how-preorders-work" element={<HowPreordersPage />} />
           <Route path="/new-arrivals" element={<NewArrivalsPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/admin" element={<Suspense fallback={null}><AdminPage /></Suspense>} />
@@ -41,6 +44,7 @@ export default function App() {
           <Route path="/order-confirmation" element={<OrderConfirmationPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
+        <MobileTabBar />
       </ToastProvider>
     </BrowserRouter>
   );

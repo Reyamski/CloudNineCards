@@ -5,6 +5,7 @@ import { X, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Nav from '../components/Nav';
 import Footer from '../components/Footer';
+import CardRequestModal from '../components/CardRequestModal';
 import { allProducts } from '../data/products';
 import { useCart } from '../contexts/CartContext';
 import { useToast } from '../components/Toast';
@@ -138,6 +139,7 @@ export default function ShopPage() {
   const [langFilter, setLangFilter] = useState('All');
   const [sort, setSort] = useState('newest');
   const [notifyItem, setNotifyItem] = useState(null);
+  const [showRequest, setShowRequest] = useState(false);
   const [products, setProducts]   = useState([]);
   const [stockSyncError, setStockSyncError] = useState('');
   const { addItem } = useCart();
@@ -247,6 +249,15 @@ export default function ShopPage() {
         {notifyItem && <NotifyMeModal item={notifyItem} onClose={() => setNotifyItem(null)} />}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {showRequest && (
+          <CardRequestModal
+            onClose={() => setShowRequest(false)}
+            onSuccess={() => showToast("Request received — we'll email you")}
+          />
+        )}
+      </AnimatePresence>
+
       <style>{`
         @keyframes floatDeco {
           0%, 100% { transform: translateY(0px) rotate(-6deg); }
@@ -298,8 +309,14 @@ export default function ShopPage() {
               </button>
             ))}
           </div>
+          <button
+            onClick={() => setShowRequest(true)}
+            className="ml-auto inline-flex items-center gap-2 rounded-full border border-cyan-300/35 bg-cyan-300/8 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-cyan-200 transition hover:border-cyan-300/55 hover:bg-cyan-300/15"
+          >
+            Request a Card
+          </button>
           <select value={sort} onChange={(e) => setSort(e.target.value)}
-            className="ml-auto rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-white/70 outline-none focus:border-cyan-300/40">
+            className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-white/70 outline-none focus:border-cyan-300/40">
             {SORTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
         </div>

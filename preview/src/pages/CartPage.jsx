@@ -702,7 +702,13 @@ export default function CartPage() {
               {hasPreorder && (
                 <label className={`flex items-start gap-2 rounded-xl border px-3 py-3 text-xs ${errors.preorderAck ? 'border-red-400/40 bg-red-400/10 text-red-200' : 'border-fuchsia-400/30 bg-fuchsia-400/8 text-fuchsia-100'}`}>
                   <input type="checkbox" checked={preorderAck} onChange={e => setPreorderAck(e.target.checked)} className="mt-0.5" data-form-error={errors.preorderAck ? 'true' : 'false'} />
-                  <span>I understand pre-order items ship internationally when released. 70% balance + shipping due at that time.</span>
+                  <span>
+                    I understand pre-order items ship internationally when released. 70% balance + shipping due at that time.{' '}
+                    <Link to="/how-preorders-work" className="font-black text-cyan-300 underline hover:text-cyan-200">
+                      How pre-orders work
+                    </Link>
+                    .
+                  </span>
                 </label>
               )}
 

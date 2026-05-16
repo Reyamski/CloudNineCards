@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, SlidersHorizontal, Package, Globe, ShieldCheck } from 'lucide-react';
+import { Search, SlidersHorizontal, Package, Globe, ShieldCheck, X, Plus } from 'lucide-react';
 import Nav from '../components/Nav';
 import Footer from '../components/Footer';
 import { supabase, supabaseEnabled } from '../lib/supabase';
 import { useCart } from '../contexts/CartContext';
 import { useToast } from '../components/Toast';
+import CardRequestModal from '../components/CardRequestModal';
 
 const GAMES      = ['All', 'One Piece', 'Pokemon', 'Dragon Ball', 'Yu-Gi-Oh!', 'Union Arena'];
 const LANGS      = ['All', 'English', 'Japanese'];
@@ -96,6 +97,158 @@ function SingleCard({ card, onBuy }) {
   );
 }
 
+// Shared filter+sort pipeline so the page grid and the modal's live "Show N"
+// count stay in sync. Pure function — no React state.
+function applyFilters(list, { game, lang, cond, status, search, sort }) {
+  let out = list;
+  if (game !== 'All')   out = out.filter(c => c.game === game);
+  if (lang !== 'All')   out = out.filter(c => c.language === lang);
+  if (cond !== 'All')   out = out.filter(c => c.condition === cond);
+  if (status === 'in')  out = out.filter(c => c.in_stock);
+  if (status === 'out') out = out.filter(c => !c.in_stock);
+  if (search && search.trim()) {
+    const q = search.trim().toLowerCase();
+    out = out.filter(c =>
+      c.card_name.toLowerCase().includes(q) ||
+      c.set_name.toLowerCase().includes(q) ||
+      (c.card_number ?? '').toLowerCase().includes(q)
+    );
+  }
+  return [...out].sort((a, b) => {
+    if (sort === 'price_asc')  return Number(a.price) - Number(b.price);
+    if (sort === 'price_desc') return Number(b.price) - Number(a.price);
+    if (sort === 'name_asc')   return a.card_name.localeCompare(b.card_name);
+    return new Date(b.created_at ?? 0) - new Date(a.created_at ?? 0);
+  });
+}
+
+// ── Unified Filter / Sort modal (F5) ──────────────────────────────────────────
+// Consolidates the previously scattered game / language / condition / in-stock
+// / sort controls into a single drawer. Uses a draft state so changes only
+// apply when "Apply" is pressed (the count preview updates live).
+function FilterModal({
+  open, onClose,
+  game, lang, cond, status, sort,
+  onApply, sourceList, search,
+}) {
+  const [dGame, setDGame]     = useState(game);
+  const [dLang, setDLang]     = useState(lang);
+  const [dCond, setDCond]     = useState(cond);
+  const [dStatus, setDStatus] = useState(status); // 'all' | 'in' | 'out'
+  const [dSort, setDSort]     = useState(sort);
+
+  // Re-sync drafts whenever the modal re-opens with the live values.
+  useEffect(() => {
+    if (open) { setDGame(game); setDLang(lang); setDCond(cond); setDStatus(status); setDSort(sort); }
+  }, [open, game, lang, cond, status, sort]);
+
+  // Live preview of how many cards the *draft* selection yields.
+  const resultCount = useMemo(
+    () => applyFilters(sourceList, { game: dGame, lang: dLang, cond: dCond, status: dStatus, search, sort: dSort }).length,
+    [sourceList, dGame, dLang, dCond, dStatus, search, dSort]
+  );
+
+  if (!open) return null;
+
+  const Pill = ({ active, onClick, children }) => (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full border px-4 py-1.5 text-[11px] font-black uppercase tracking-[0.12em] transition ${
+        active
+          ? 'border-fuchsia-400/60 bg-fuchsia-400/15 text-fuchsia-200'
+          : 'border-white/10 bg-white/5 text-white/55 hover:border-white/20 hover:text-white/80'
+      }`}
+    >
+      {children}
+    </button>
+  );
+
+  const Section = ({ label, children }) => (
+    <div>
+      <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/35 mb-2">{label}</div>
+      <div className="flex flex-wrap gap-1.5">{children}</div>
+    </div>
+  );
+
+  function reset() {
+    setDGame('All'); setDLang('All'); setDCond('All'); setDStatus('all'); setDSort('price_asc');
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center px-0 sm:px-4">
+      <motion.div
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose}
+      />
+      <motion.div
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 40 }}
+        transition={{ duration: 0.25 }}
+        className="relative w-full max-w-lg rounded-t-[28px] sm:rounded-[28px] border border-white/10 bg-[#07030f] overflow-hidden max-h-[88vh] flex flex-col"
+      >
+        <div className="h-1 w-full bg-gradient-to-r from-fuchsia-500 to-cyan-400" />
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+          <div className="text-sm font-black uppercase tracking-[0.16em] text-white">Filter & Sort</div>
+          <button onClick={onClose} className="rounded-xl border border-white/10 bg-white/5 p-1.5 hover:bg-white/10">
+            <X className="h-4 w-4 text-white/60" />
+          </button>
+        </div>
+
+        <div className="px-6 py-5 space-y-5 overflow-y-auto">
+          <Section label="Status">
+            <Pill active={dStatus === 'all'} onClick={() => setDStatus('all')}>All</Pill>
+            <Pill active={dStatus === 'in'}  onClick={() => setDStatus('in')}>In Stock</Pill>
+            <Pill active={dStatus === 'out'} onClick={() => setDStatus('out')}>Sold Out</Pill>
+          </Section>
+
+          <Section label="Game">
+            {GAMES.map(g => (
+              <Pill key={g} active={dGame === g} onClick={() => setDGame(g)}>{g}</Pill>
+            ))}
+          </Section>
+
+          <Section label="Language">
+            {LANGS.map(l => (
+              <Pill key={l} active={dLang === l} onClick={() => setDLang(l)}>
+                {l === 'Japanese' ? '🇯🇵 JP' : l === 'English' ? '🇺🇸 EN' : 'All'}
+              </Pill>
+            ))}
+          </Section>
+
+          <Section label="Condition">
+            {CONDITIONS.map(c => (
+              <Pill key={c} active={dCond === c} onClick={() => setDCond(c)}>{c}</Pill>
+            ))}
+          </Section>
+
+          <Section label="Sort by">
+            {SORTS.map(s => (
+              <Pill key={s.value} active={dSort === s.value} onClick={() => setDSort(s.value)}>{s.label}</Pill>
+            ))}
+          </Section>
+        </div>
+
+        <div className="px-6 py-4 border-t border-white/10 flex items-center gap-3">
+          <button
+            onClick={reset}
+            className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-xs font-black uppercase tracking-[0.12em] text-white/60 hover:bg-white/10"
+          >
+            Reset
+          </button>
+          <button
+            onClick={() => onApply({ game: dGame, lang: dLang, cond: dCond, status: dStatus, sort: dSort })}
+            className="flex-1 rounded-2xl bg-gradient-to-r from-fuchsia-500 to-cyan-400 px-5 py-3 text-xs font-black uppercase tracking-[0.12em] text-black transition hover:opacity-90"
+          >
+            Show {resultCount} {resultCount === 1 ? 'card' : 'cards'}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function SinglesPage() {
   const [singles, setSingles]         = useState(STATIC_SINGLES);
@@ -105,9 +258,12 @@ export default function SinglesPage() {
   const [gameFilter, setGameFilter]   = useState('All');
   const [langFilter, setLangFilter]   = useState('All');
   const [condFilter, setCondFilter]   = useState('All');
-  const [inStockOnly, setInStockOnly] = useState(false);
+  // status: 'all' | 'in' | 'out' — replaces the old inStockOnly toggle so the
+  // unified modal can also surface sold-out-only.
+  const [statusFilter, setStatusFilter] = useState('all');
   const [sort, setSort]               = useState('price_asc');
   const [showFilters, setShowFilters] = useState(false);
+  const [showRequest, setShowRequest] = useState(false);
 
   useEffect(() => { document.title = 'Singles | CloudNineCards'; }, []);
 
@@ -126,27 +282,19 @@ export default function SinglesPage() {
     });
   }, []);
 
-  const filtered = useMemo(() => {
-    let list = singles;
-    if (gameFilter !== 'All')   list = list.filter(c => c.game === gameFilter);
-    if (langFilter !== 'All')   list = list.filter(c => c.language === langFilter);
-    if (condFilter !== 'All')   list = list.filter(c => c.condition === condFilter);
-    if (inStockOnly)            list = list.filter(c => c.in_stock);
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      list = list.filter(c =>
-        c.card_name.toLowerCase().includes(q) ||
-        c.set_name.toLowerCase().includes(q) ||
-        (c.card_number ?? '').toLowerCase().includes(q)
-      );
-    }
-    return [...list].sort((a, b) => {
-      if (sort === 'price_asc')  return Number(a.price) - Number(b.price);
-      if (sort === 'price_desc') return Number(b.price) - Number(a.price);
-      if (sort === 'name_asc')   return a.card_name.localeCompare(b.card_name);
-      return new Date(b.created_at ?? 0) - new Date(a.created_at ?? 0);
-    });
-  }, [singles, gameFilter, langFilter, condFilter, inStockOnly, search, sort]);
+  const filtered = useMemo(
+    () => applyFilters(singles, {
+      game: gameFilter, lang: langFilter, cond: condFilter,
+      status: statusFilter, search, sort,
+    }),
+    [singles, gameFilter, langFilter, condFilter, statusFilter, search, sort]
+  );
+
+  const activeFilterCount =
+    (gameFilter !== 'All' ? 1 : 0) +
+    (langFilter !== 'All' ? 1 : 0) +
+    (condFilter !== 'All' ? 1 : 0) +
+    (statusFilter !== 'all' ? 1 : 0);
 
   const { addItem } = useCart();
   const { showToast } = useToast();
@@ -199,25 +347,40 @@ export default function SinglesPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-8">
-        {/* Game filter — always visible */}
-        <div className="mb-4 flex flex-wrap gap-2">
-          {GAMES.map(g => (
-            <button key={g} onClick={() => setGameFilter(g)}
-              className={`rounded-full border px-5 py-2 text-xs font-black uppercase tracking-[0.18em] transition ${
-                gameFilter === g
-                  ? 'border-purple-400/60 bg-purple-500/15 text-purple-100 shadow-[0_0_20px_rgba(168,85,247,0.4)]'
-                  : 'border-white/10 bg-white/5 text-white/65 hover:border-white/20 hover:text-white/85'
-              }`}>
-              {g}
-            </button>
-          ))}
-        </div>
+      <AnimatePresence>
+        {showRequest && (
+          <CardRequestModal
+            onClose={() => setShowRequest(false)}
+            onSuccess={() => showToast('Request received — we\'ll email you')}
+          />
+        )}
+      </AnimatePresence>
 
-        {/* Search + filter bar */}
-        <div className="mb-6 flex flex-col gap-3">
-          {/* F7 mobile fix: search occupies full row, then sort + filters wrap
-              underneath on narrow viewports so the row doesn't overflow 390px. */}
+      <AnimatePresence>
+        <FilterModal
+          open={showFilters}
+          onClose={() => setShowFilters(false)}
+          game={gameFilter}
+          lang={langFilter}
+          cond={condFilter}
+          status={statusFilter}
+          sort={sort}
+          sourceList={singles}
+          search={search}
+          onApply={({ game, lang, cond, status, sort: s }) => {
+            setGameFilter(game);
+            setLangFilter(lang);
+            setCondFilter(cond);
+            setStatusFilter(status);
+            setSort(s);
+            setShowFilters(false);
+          }}
+        />
+      </AnimatePresence>
+
+      <section className="mx-auto max-w-7xl px-6 py-8">
+        {/* Unified controls: search + single Filter & Sort button + request CTA */}
+        <div className="mb-5 flex flex-col gap-3">
           <div className="flex flex-wrap gap-2 sm:gap-3">
             <div className="relative w-full sm:flex-1">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30" />
@@ -225,63 +388,37 @@ export default function SinglesPage() {
                 placeholder="Search by card name, set, or number…"
                 className="w-full rounded-2xl border border-white/10 bg-white/5 py-3 pl-11 pr-4 text-sm text-white placeholder-white/30 outline-none focus:border-cyan-300/40" />
             </div>
-            {/* Top-level sort dropdown — matches the /shop affordance so buyers
-                don't have to open the Filters accordion to re-sort. */}
-            <select value={sort} onChange={e => setSort(e.target.value)}
-              className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-[11px] font-black uppercase tracking-[0.12em] text-white/70 outline-none focus:border-cyan-300/40 sm:flex-none sm:px-4 sm:text-xs sm:tracking-[0.14em]">
-              {SORTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-            </select>
-            <button onClick={() => setShowFilters(f => !f)}
-              className={`flex items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-[11px] font-black uppercase tracking-[0.12em] transition sm:px-4 sm:text-xs sm:tracking-[0.14em] ${showFilters ? 'border-fuchsia-400/50 bg-fuchsia-400/15 text-fuchsia-200' : 'border-white/10 bg-white/5 text-white/60 hover:bg-white/10'}`}>
-              <SlidersHorizontal className="h-4 w-4" /> Filters
+            <button onClick={() => setShowFilters(true)}
+              className={`flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-[11px] font-black uppercase tracking-[0.12em] transition sm:text-xs sm:tracking-[0.14em] ${activeFilterCount > 0 ? 'border-fuchsia-400/50 bg-fuchsia-400/15 text-fuchsia-200' : 'border-white/10 bg-white/5 text-white/65 hover:bg-white/10'}`}>
+              <SlidersHorizontal className="h-4 w-4" /> Filter &amp; Sort
+              {activeFilterCount > 0 && (
+                <span className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-fuchsia-400 px-1 text-[10px] font-black text-black">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+            <button onClick={() => setShowRequest(true)}
+              className="flex items-center justify-center gap-2 rounded-2xl border border-cyan-300/35 bg-cyan-300/8 px-4 py-3 text-[11px] font-black uppercase tracking-[0.12em] text-cyan-200 transition hover:border-cyan-300/55 hover:bg-cyan-300/15 sm:text-xs sm:tracking-[0.14em]">
+              <Plus className="h-4 w-4" /> Request a Card
             </button>
           </div>
 
-          <AnimatePresence>
-            {showFilters && (
-              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                <div className="rounded-[20px] border border-white/8 bg-white/3 p-4 flex flex-wrap gap-5">
-                  <div>
-                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-2">Language</div>
-                    <div className="flex gap-1.5">
-                      {LANGS.map(l => (
-                        <button key={l} onClick={() => setLangFilter(l)}
-                          className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] transition ${langFilter === l ? 'border-cyan-400/60 bg-cyan-500/15 text-cyan-200' : 'border-white/10 bg-white/5 text-white/50 hover:text-white/70'}`}>
-                          {l === 'Japanese' ? '🇯🇵 JP' : l === 'English' ? '🇺🇸 EN' : l}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-2">Condition</div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {CONDITIONS.map(c => (
-                        <button key={c} onClick={() => setCondFilter(c)}
-                          className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] transition ${condFilter === c ? (CONDITION_COLOR[c] ?? 'border-white/40 bg-white/10 text-white') : 'border-white/10 bg-white/5 text-white/50 hover:text-white/70'}`}>
-                          {c}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap items-end gap-4 ml-auto">
-                    <label className="flex items-center gap-2 cursor-pointer" onClick={() => setInStockOnly(v => !v)}>
-                      <div className={`h-5 w-9 rounded-full transition-colors duration-200 flex items-center px-0.5 ${inStockOnly ? 'bg-cyan-400' : 'bg-white/15'}`}>
-                        <div className={`h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${inStockOnly ? 'translate-x-4' : 'translate-x-0'}`} />
-                      </div>
-                      <span className="text-xs font-black uppercase tracking-[0.14em] text-white/55">In Stock Only</span>
-                    </label>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
+          {/* Result count + active filter chips */}
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="text-white/35 font-black uppercase tracking-[0.14em]">{filtered.length} card{filtered.length !== 1 ? 's' : ''}</span>
             {gameFilter !== 'All' && <span className="rounded-full border border-purple-400/30 bg-purple-400/10 px-2.5 py-0.5 text-[10px] font-black text-purple-300">{gameFilter}</span>}
             {langFilter !== 'All' && <span className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2.5 py-0.5 text-[10px] font-black text-cyan-300">{langFilter}</span>}
             {condFilter !== 'All' && <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-black ${CONDITION_COLOR[condFilter] ?? ''}`}>{condFilter}</span>}
-            {inStockOnly && <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-0.5 text-[10px] font-black text-emerald-300">In Stock</span>}
+            {statusFilter === 'in'  && <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-0.5 text-[10px] font-black text-emerald-300">In Stock</span>}
+            {statusFilter === 'out' && <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-[10px] font-black text-white/50">Sold Out</span>}
+            {activeFilterCount > 0 && (
+              <button
+                onClick={() => { setGameFilter('All'); setLangFilter('All'); setCondFilter('All'); setStatusFilter('all'); }}
+                className="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-white/45 hover:text-white/70"
+              >
+                Clear
+              </button>
+            )}
           </div>
         </div>
 
@@ -295,7 +432,13 @@ export default function SinglesPage() {
           <div className="py-20 text-center">
             <div className="text-5xl mb-4">🃏</div>
             <div className="text-xl font-black uppercase">No cards found</div>
-            <p className="mt-2 text-sm text-white/50">Try adjusting your filters or check back soon.</p>
+            <p className="mt-2 text-sm text-white/50">Try adjusting your filters — or ask us to source it for you.</p>
+            <button
+              onClick={() => setShowRequest(true)}
+              className="mt-6 inline-flex items-center gap-2 rounded-2xl border border-cyan-300/35 bg-cyan-300/8 px-6 py-2.5 text-sm font-black uppercase tracking-[0.1em] text-cyan-200 hover:bg-cyan-300/15"
+            >
+              <Plus className="h-4 w-4" /> Request a Card
+            </button>
           </div>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
