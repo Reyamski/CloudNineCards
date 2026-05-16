@@ -5,3 +5,16 @@ dist/
 hydrogen-quickstart/node_modules/
 
 .vercel
+
+# F10: Playwright / E2E screenshots dumped into the repo root during testing.
+# Keep them locally for debugging but don't track them in git.
+e2e-*.png
+full-test-*.png
+test-*.png
+*-test-*.png
+e4-*.png
+e5-*.png
+check-*.png
+preorders-*.png
+singles-*.png
+stock-test-*.png
