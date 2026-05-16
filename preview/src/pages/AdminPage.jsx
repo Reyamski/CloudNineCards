@@ -35,6 +35,13 @@ function hasValidAdminToken() {
 // drop-in replacements.
 async function adminFetch(path, method, body) {
   const token = sessionStorage.getItem(ADMIN_TOKEN_KEY);
+  // No token = anon visitor hasn't passed the password gate yet. Short-circuit
+  // before hitting /api/admin/* so we don't get a 401 → reload → 401 loop.
+  // The password gate is rendered by the !authed branch below; once the user
+  // logs in, setAuthed(true) re-runs the load effect with a valid token.
+  if (!token) {
+    return { data: null, error: { message: 'Not authenticated' } };
+  }
   const opts = { method, headers: { Authorization: `Bearer ${token}` } };
   if (body instanceof FormData) {
     opts.body = body;
@@ -539,6 +546,10 @@ export default function AdminPage() {
   }
 
   useEffect(() => {
+    // Don't run any admin loads until the password gate has confirmed.
+    // adminFetch also short-circuits without a token, but gating here keeps
+    // the anon-key supabase reads (stock, config) from firing too.
+    if (!authed) return;
     async function load() {
       if (!supabaseEnabled || !supabase) {
         setDbError('Supabase is not configured for this deployment yet.');
@@ -586,7 +597,7 @@ export default function AdminPage() {
     }
 
     load();
-  }, []);
+  }, [authed]);
 
   useEffect(() => {
     if (!orders.length) {
