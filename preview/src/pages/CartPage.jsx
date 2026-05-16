@@ -391,27 +391,31 @@ export default function CartPage() {
       if (hasPreorder && !preorderOrderId) throw new Error('Pre-order RPC returned no id.');
 
       // ── Decrement stock for in-stock lines only ──────────────────────
+      // Uses the decrement_item_stock RPC (docs/wave3c-stock-decrement.sql)
+      // so the call works whether RLS is on or off. The RPC is SECURITY
+      // DEFINER and atomic per row. Per-row failure does NOT block the order;
+      // admin reconciles by-hand if a decrement was missed.
       let stockCheckFailed = false;
       for (const it of inStockItems) {
         try {
-          const { data: row } = await supabase
-            .from(it.source)
-            .select('stock,in_stock')
-            .eq('id', it.id)
-            .maybeSingle();
-          if (!row) { stockCheckFailed = true; continue; }
-          const nextQty = Math.max(0, (row.stock ?? 0) - it.qty);
-          const nextInStock = nextQty > 0;
-          const update = { stock: nextQty, in_stock: nextInStock };
-          if (it.source === 'singles') update.updated_at = new Date().toISOString();
-          if (it.source === 'products') update.badge = nextInStock ? 'In Stock' : 'Sold Out';
-          await supabase.from(it.source).update(update).eq('id', it.id);
+          const { error: decErr } = await supabase.rpc('decrement_item_stock', {
+            source:  it.source,
+            item_id: it.id,
+            qty:     it.qty,
+          });
+          if (decErr) {
+            console.warn('Stock decrement RPC failed for', it.key, decErr);
+            stockCheckFailed = true;
+          }
         } catch (decErr) {
-          console.warn('Stock decrement failed for', it.key, decErr);
+          console.warn('Stock decrement threw for', it.key, decErr);
           stockCheckFailed = true;
         }
       }
       if (stockCheckFailed && inStockOrderId) {
+        // Flag for admin reconciliation. This update will need RLS to allow
+        // updating just the `status` field by order id from anon, OR be moved
+        // to a dedicated RPC, in Wave 3c-2. For now (RLS off) it still works.
         try {
           await supabase.from('orders').update({ status: 'stock_check_failed' }).eq('id', inStockOrderId);
         } catch { /* non-blocking */ }
