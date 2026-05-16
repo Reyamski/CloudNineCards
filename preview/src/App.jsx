@@ -13,25 +13,32 @@ import AccountLoginPage from './pages/AccountLoginPage';
 import AccountOrdersPage from './pages/AccountOrdersPage';
 import BuylistPage from './pages/BuylistPage';
 import SinglesPage from './pages/SinglesPage';
+import CartPage from './pages/CartPage';
+import OrderConfirmationPage from './pages/OrderConfirmationPage';
+import { ToastProvider } from './components/Toast';
 
 export default function App() {
   return (
     <BrowserRouter>
-      <AnnouncementBar />
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/shop" element={<ShopPage />} />
-        <Route path="/pre-orders" element={<PreOrdersPage />} />
-        <Route path="/new-arrivals" element={<NewArrivalsPage />} />
-        <Route path="/contact" element={<ContactPage />} />
-        <Route path="/admin" element={<AdminPage />} />
-        <Route path="/account" element={<AccountLoginPage />} />
-        <Route path="/account/orders" element={<AccountOrdersPage />} />
-        <Route path="/shop/:id" element={<ProductPage />} />
-        <Route path="/buylist" element={<BuylistPage />} />
-        <Route path="/singles" element={<SinglesPage />} />
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
+      <ToastProvider>
+        <AnnouncementBar />
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/shop" element={<ShopPage />} />
+          <Route path="/pre-orders" element={<PreOrdersPage />} />
+          <Route path="/new-arrivals" element={<NewArrivalsPage />} />
+          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/account" element={<AccountLoginPage />} />
+          <Route path="/account/orders" element={<AccountOrdersPage />} />
+          <Route path="/shop/:id" element={<ProductPage />} />
+          <Route path="/buylist" element={<BuylistPage />} />
+          <Route path="/singles" element={<SinglesPage />} />
+          <Route path="/cart" element={<CartPage />} />
+          <Route path="/order-confirmation" element={<OrderConfirmationPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </ToastProvider>
     </BrowserRouter>
   );
 }

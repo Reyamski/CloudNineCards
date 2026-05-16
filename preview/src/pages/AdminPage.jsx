@@ -2,8 +2,65 @@ import {useEffect, useRef, useState} from 'react';
 import {ShieldCheck, Save, RotateCcw, Eye, EyeOff, Youtube, Loader2, Sparkles, Upload, X, Check, Package, BellRing} from 'lucide-react';
 import {supabase, supabaseEnabled} from '../lib/supabase';
 
-const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD;
 const DEFAULT_VIDEO_ID = 'OcLL44cDh7k';
+const ADMIN_TOKEN_KEY = 'cnc_admin_token';
+
+// Decode a base64url-payload from our /api/admin-auth token and return its exp.
+// Returns null if token is malformed or expired.
+function readAdminTokenExp(token) {
+  if (!token || typeof token !== 'string' || !token.includes('.')) return null;
+  try {
+    const [payloadB64] = token.split('.');
+    const b64 = payloadB64.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = b64 + '='.repeat((4 - b64.length % 4) % 4);
+    const json = atob(padded);
+    const { exp } = JSON.parse(json);
+    if (typeof exp !== 'number' || exp < Date.now()) return null;
+    return exp;
+  } catch {
+    return null;
+  }
+}
+
+function hasValidAdminToken() {
+  const token = sessionStorage.getItem(ADMIN_TOKEN_KEY);
+  return readAdminTokenExp(token) !== null;
+}
+
+// ── Admin write fetch helper ───────────────────────────────────────────────
+// Wave 3c-1: admin writes go through service-role-backed endpoints at
+// /api/admin/*. Bearer token comes from sessionStorage (set by /api/admin-auth).
+// On 401, the session is dead — clear and force re-login. Returns the same
+// `{ data, error }` shape the Supabase JS client used to so the call sites are
+// drop-in replacements.
+async function adminFetch(path, method, body) {
+  const token = sessionStorage.getItem(ADMIN_TOKEN_KEY);
+  const opts = { method, headers: { Authorization: `Bearer ${token}` } };
+  if (body instanceof FormData) {
+    opts.body = body;
+  } else if (body !== undefined) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
+  let res;
+  try {
+    res = await fetch(path, opts);
+  } catch (err) {
+    return { data: null, error: { message: `Network error: ${err.message}` } };
+  }
+  if (res.status === 401) {
+    sessionStorage.removeItem(ADMIN_TOKEN_KEY);
+    // Force the auth gate to re-render. Reload keeps it simple and matches the
+    // existing login flow (no router push needed).
+    if (typeof window !== 'undefined') window.location.reload();
+    return { data: null, error: { message: 'Session expired' } };
+  }
+  try {
+    return await res.json();
+  } catch {
+    return { data: null, error: { message: `Bad response (status ${res.status})` } };
+  }
+}
 
 const PAYMENT_STATUS_META = {
   awaiting_payment: {
@@ -34,6 +91,12 @@ const PAYMENT_STATUS_OPTIONS = [
   'payment_verified',
   'payment_rejected',
 ];
+
+// In-stock orders come through two flows that write different order_type
+// values: the legacy buy-modal writes `on_hand` (sealed) / `single` (singles),
+// and the new cart flow writes `cart`. The "On Hand" filter should match all
+// non-preorder shapes.
+const ON_HAND_TYPES = new Set(['on_hand', 'single', 'cart']);
 
 const BASE_PRODUCTS = [
   {id: 'op15jp', title: "OP-15 Adventure on Kami's Island", subtitle: 'Japanese', price: 129.00, inStock: true, stock: 12},
@@ -95,10 +158,12 @@ function normalizeOrder(order) {
 export default function AdminPage() {
   useEffect(() => { document.title = 'Admin | CloudNineCards'; }, []);
 
-  const [authed, setAuthed] = useState(() => sessionStorage.getItem('cnc_admin') === '1');
+  const [authed, setAuthed] = useState(() => hasValidAdminToken());
   const [pw, setPw] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [pwError, setPwError] = useState(false);
+  const [pwErrorMsg, setPwErrorMsg] = useState('');
+  const [loggingIn, setLoggingIn] = useState(false);
   const [activeTab, setActiveTab] = useState('orders');
   const [orderFilter, setOrderFilter] = useState('all');
   const [orderTypeFilter, setOrderTypeFilter] = useState('all');
@@ -108,6 +173,11 @@ export default function AdminPage() {
   const [appliedDateFrom, setAppliedFrom] = useState('');
   const [appliedDateTo, setAppliedTo]     = useState('');
   const [selectedOrderId, setSelectedOrderId] = useState('');
+  // order_items rows for the currently selected order (multi-item carts).
+  // Single-item legacy orders also have rows after backfill — see
+  // docs/cart-migration.sql.
+  const [selectedOrderItems, setSelectedOrderItems] = useState([]);
+  const [selectedOrderItemsLoading, setSelectedOrderItemsLoading] = useState(false);
   const [products, setProducts] = useState(() => mergeProducts([]));
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
@@ -325,6 +395,8 @@ export default function AdminPage() {
     const notesArr = addPoForm.notes
       ? addPoForm.notes.split('\n').map(n => n.trim()).filter(Boolean)
       : [];
+    // Preorders schema (docs/preorders-migration.sql) exposes usd_price and
+    // aud_price for FX reference but NOT eur_price — strip it from the insert.
     const payload = {
       id:            addPoForm.id.trim() || `po-${Date.now()}`,
       title:         addPoForm.title.trim(),
@@ -334,7 +406,6 @@ export default function AdminPage() {
       price:         parseFloat(addPoForm.price) || null,
       usd_price:     parseFloat(addPoForm.usd_price) || null,
       aud_price:     parseFloat(addPoForm.aud_price) || null,
-      eur_price:     parseFloat(addPoForm.eur_price) || null,
       currency:      addPoForm.currency || 'CAD',
       eta:           addPoForm.eta.trim() || null,
       deadline:      addPoForm.deadline || null,
@@ -343,7 +414,7 @@ export default function AdminPage() {
       notes:         notesArr.length ? notesArr : null,
       display_order: parseInt(addPoForm.display_order, 10) || 0,
     };
-    const { data, error } = await supabase.from('preorders').insert(payload).select().single();
+    const { data, error } = await adminFetch('/api/admin/preorders', 'POST', payload);
     if (error) { setPreordersError(`Add failed: ${error.message}`); }
     else {
       setPreorders(prev => [...prev, data].sort((a, b) => a.display_order - b.display_order));
@@ -360,7 +431,7 @@ export default function AdminPage() {
     let parsed = value;
     if (field === 'price' || field === 'usd_price' || field === 'aud_price') parsed = parseFloat(value) || null;
     if (field === 'display_order') parsed = parseInt(value, 10) || 0;
-    const { error } = await supabase.from('preorders').update({ [field]: parsed }).eq('id', id);
+    const { error } = await adminFetch('/api/admin/preorders', 'PATCH', { id, patch: { [field]: parsed } });
     if (error) setPreordersError(`Update failed: ${error.message}`);
     else {
       setPreorders(prev => prev.map(p => p.id === id ? { ...p, [field]: parsed } : p));
@@ -371,7 +442,7 @@ export default function AdminPage() {
 
   async function togglePreorderSoldOut(id, current) {
     if (!supabaseEnabled || !supabase) return;
-    const { error } = await supabase.from('preorders').update({ sold_out: !current }).eq('id', id);
+    const { error } = await adminFetch('/api/admin/preorders', 'PATCH', { id, patch: { sold_out: !current } });
     if (error) setPreordersError(`Update failed: ${error.message}`);
     else setPreorders(prev => prev.map(p => p.id === id ? { ...p, sold_out: !current } : p));
   }
@@ -379,7 +450,7 @@ export default function AdminPage() {
   async function deletePreorder(id) {
     if (!supabaseEnabled || !supabase) return;
     setDeletingPreorderId(id);
-    const { error } = await supabase.from('preorders').delete().eq('id', id);
+    const { error } = await adminFetch('/api/admin/preorders', 'DELETE', { id });
     if (error) setPreordersError(`Delete failed: ${error.message}`);
     else { setPreorders(prev => prev.filter(p => p.id !== id)); setPreordersError(''); }
     setDeletingPreorderId('');
@@ -400,22 +471,23 @@ export default function AdminPage() {
     e.preventDefault();
     if (!supabaseEnabled || !supabase) return;
     setSavingProduct(true);
+    // Multi-currency price columns (usd/aud/eur) are intentionally NOT sent for
+    // products — the live `products` schema cache doesn't have them and the
+    // shop doesn't surface multi-currency pricing for on-hand stock. Pre-orders
+    // keep usd_price/aud_price because lead-time FX matters there.
     const payload = {
       id:        addProdForm.id.trim() || `prod-${Date.now()}`,
       title:     addProdForm.title.trim(),
       subtitle:  addProdForm.subtitle.trim() || null,
       language:  addProdForm.language || 'English',
       price:     parseFloat(addProdForm.price) || 0,
-      usd_price: parseFloat(addProdForm.usd_price) || null,
-      aud_price: parseFloat(addProdForm.aud_price) || null,
-      eur_price: parseFloat(addProdForm.eur_price) || null,
       stock:     parseInt(addProdForm.stock, 10) || 0,
       badge:     addProdForm.in_stock ? 'In Stock' : 'Sold Out',
       in_stock:  addProdForm.in_stock,
       image_url: addProdForm.image_url.trim() || null,
       tag:       addProdForm.tag || 'One Piece',
     };
-    const { data, error } = await supabase.from('products').insert(payload).select().single();
+    const { data, error } = await adminFetch('/api/admin/products', 'POST', payload);
     if (error) { setDbProductsError(`Add failed: ${error.message}`); }
     else {
       setDbProducts(prev => [...prev, data]);
@@ -429,12 +501,18 @@ export default function AdminPage() {
 
   async function updateDbProduct(id, field, value) {
     if (!supabaseEnabled || !supabase) return;
+    // Guard against editing columns the `products` table doesn't expose. The
+    // multi-currency fields exist in the migration but the live schema cache
+    // rejects writes — only preorders surface usd/aud/eur pricing.
+    if (field === 'usd_price' || field === 'aud_price' || field === 'eur_price') {
+      setProdEditCell({ id: '', field: '' }); setProdEditVal('');
+      return;
+    }
     let parsed = value;
     if (field === 'price') parsed = parseFloat(value) || 0;
-    if (field === 'usd_price' || field === 'aud_price' || field === 'eur_price') parsed = parseFloat(value) || null;
     if (field === 'stock') parsed = parseInt(value, 10) || 0;
     const extra = field === 'in_stock' ? { badge: value ? 'In Stock' : 'Sold Out' } : {};
-    const { error } = await supabase.from('products').update({ [field]: parsed, ...extra }).eq('id', id);
+    const { error } = await adminFetch('/api/admin/products', 'PATCH', { id, patch: { [field]: parsed, ...extra } });
     if (error) setDbProductsError(`Update failed: ${error.message}`);
     else {
       setDbProducts(prev => prev.map(p => p.id === id ? { ...p, [field]: parsed, ...extra } : p));
@@ -446,7 +524,7 @@ export default function AdminPage() {
   async function toggleProductInStock(id, current) {
     if (!supabaseEnabled || !supabase) return;
     const next = !current;
-    const { error } = await supabase.from('products').update({ in_stock: next, badge: next ? 'In Stock' : 'Sold Out' }).eq('id', id);
+    const { error } = await adminFetch('/api/admin/products', 'PATCH', { id, patch: { in_stock: next, badge: next ? 'In Stock' : 'Sold Out' } });
     if (error) setDbProductsError(`Update failed: ${error.message}`);
     else setDbProducts(prev => prev.map(p => p.id === id ? { ...p, in_stock: next, badge: next ? 'In Stock' : 'Sold Out' } : p));
   }
@@ -454,7 +532,7 @@ export default function AdminPage() {
   async function deleteDbProduct(id) {
     if (!supabaseEnabled || !supabase) return;
     setDeletingProductId(id);
-    const { error } = await supabase.from('products').delete().eq('id', id);
+    const { error } = await adminFetch('/api/admin/products', 'DELETE', { id });
     if (error) setDbProductsError(`Delete failed: ${error.message}`);
     else { setDbProducts(prev => prev.filter(p => p.id !== id)); setDbProductsError(''); }
     setDeletingProductId('');
@@ -520,7 +598,7 @@ export default function AdminPage() {
     const nextVisibleOrders = orders.filter((order) => {
       if (orderFilter === 'pending' && order.status !== 'pending') return false;
       if (orderFilter === 'confirmed' && order.status !== 'confirmed') return false;
-      if (orderTypeFilter === 'on_hand' && order.order_type !== 'on_hand') return false;
+      if (orderTypeFilter === 'on_hand' && !ON_HAND_TYPES.has(order.order_type)) return false;
       if (orderTypeFilter === 'pre_order' && order.order_type !== 'pre_order') return false;
       return true;
     });
@@ -536,13 +614,66 @@ export default function AdminPage() {
     }
   }, [orders, orderFilter, orderTypeFilter, selectedOrderId]);
 
-  function login() {
-    if (pw === ADMIN_PASSWORD) {
-      sessionStorage.setItem('cnc_admin', '1');
+  // Pull order_items for the currently selected order so the details panel can
+  // render the per-line breakdown. Cleared between selections to avoid showing
+  // stale lines for the wrong order while the next fetch is in flight.
+  useEffect(() => {
+    if (!selectedOrderId || !supabaseEnabled || !supabase) {
+      setSelectedOrderItems([]);
+      return;
+    }
+    let cancelled = false;
+    setSelectedOrderItemsLoading(true);
+    supabase
+      .from('order_items')
+      .select('*')
+      .eq('order_id', selectedOrderId)
+      .order('created_at', { ascending: true })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        setSelectedOrderItemsLoading(false);
+        if (error) {
+          // Surface gracefully — table may not exist yet in dev environments
+          // that haven't run docs/cart-migration.sql.
+          setSelectedOrderItems([]);
+          return;
+        }
+        setSelectedOrderItems(data ?? []);
+      });
+    return () => { cancelled = true; };
+  }, [selectedOrderId]);
+
+  async function login() {
+    setLoggingIn(true);
+    setPwError(false);
+    setPwErrorMsg('');
+    try {
+      const res = await fetch('/api/admin-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pw }),
+      });
+      if (!res.ok) {
+        setPwError(true);
+        if (res.status === 500) setPwErrorMsg('Admin auth is not configured on the server.');
+        return;
+      }
+      const { token } = await res.json();
+      if (!token || !readAdminTokenExp(token)) {
+        setPwError(true);
+        setPwErrorMsg('Server returned an invalid token.');
+        return;
+      }
+      sessionStorage.setItem(ADMIN_TOKEN_KEY, token);
+      // Clean up any legacy flag from the old client-side check.
+      sessionStorage.removeItem('cnc_admin');
       setAuthed(true);
       setPwError(false);
-    } else {
+    } catch (err) {
       setPwError(true);
+      setPwErrorMsg('Could not reach auth server. Check your connection.');
+    } finally {
+      setLoggingIn(false);
     }
   }
 
@@ -571,7 +702,7 @@ export default function AdminPage() {
       quantity: product.stock,
     }));
 
-    const {error} = await supabase.from('stock').upsert(rows, {onConflict: 'id'});
+    const {error} = await adminFetch('/api/admin/stock', 'POST', { rows });
     if (error) {
       setDbError(`Save failed: ${error.message}`);
       return;
@@ -594,7 +725,7 @@ export default function AdminPage() {
       quantity: product.stock ?? 0,
     }));
 
-    const {error} = await supabase.from('stock').upsert(rows, {onConflict: 'id'});
+    const {error} = await adminFetch('/api/admin/stock', 'POST', { rows });
     if (error) {
       setDbError(`Reset failed: ${error.message}`);
       return;
@@ -611,9 +742,7 @@ export default function AdminPage() {
     }
 
     const trimmedId = videoId.trim();
-    const {error} = await supabase
-      .from('config')
-      .upsert({key: 'video_id', value: trimmedId}, {onConflict: 'key'});
+    const {error} = await adminFetch('/api/admin/config', 'POST', { key: 'video_id', value: trimmedId });
 
     if (error) {
       setDbError(`Video save failed: ${error.message}`);
@@ -627,9 +756,7 @@ export default function AdminPage() {
 
   async function savePoCloseDate() {
     if (!supabaseEnabled || !supabase || !poCloseDate) return;
-    const { error } = await supabase
-      .from('config')
-      .upsert({ key: 'po_close_date', value: poCloseDate + 'T23:59:59' }, { onConflict: 'key' });
+    const { error } = await adminFetch('/api/admin/config', 'POST', { key: 'po_close_date', value: poCloseDate + 'T23:59:59' });
     if (error) { setDbError(`Save failed: ${error.message}`); return; }
     setDbError('');
     setPoCloseDateSaved(true);
@@ -647,7 +774,8 @@ export default function AdminPage() {
 
     try {
       if (order.product_id && order.order_type !== 'pre_order') {
-        // Pick the right source table based on order_type
+        // Pick the right source table based on order_type. Reads stay on the
+        // anon-key client (public-read), writes go through admin endpoints.
         const isSingle = order.order_type === 'single';
 
         if (isSingle) {
@@ -656,9 +784,10 @@ export default function AdminPage() {
           if (singleRow) {
             const nextQty = Math.max(0, (singleRow.stock ?? 0) - order.quantity);
             const nextInStock = nextQty > 0;
-            await supabase.from('singles')
-              .update({ stock: nextQty, in_stock: nextInStock, updated_at: new Date().toISOString() })
-              .eq('id', order.product_id);
+            await adminFetch('/api/admin/singles', 'PATCH', {
+              id: order.product_id,
+              patch: { stock: nextQty, in_stock: nextInStock, updated_at: new Date().toISOString() },
+            });
             setSingles((prev) => prev.map((s) => s.id === order.product_id ? {...s, stock: nextQty, in_stock: nextInStock} : s));
           }
         } else {
@@ -669,26 +798,28 @@ export default function AdminPage() {
           if (prodRow) {
             const nextQty = Math.max(0, (prodRow.stock ?? 0) - order.quantity);
             const nextInStock = nextQty > 0;
-            await supabase.from('products')
-              .update({ stock: nextQty, in_stock: nextInStock, badge: nextInStock ? 'In Stock' : 'Sold Out' })
-              .eq('id', order.product_id);
+            await adminFetch('/api/admin/products', 'PATCH', {
+              id: order.product_id,
+              patch: { stock: nextQty, in_stock: nextInStock, badge: nextInStock ? 'In Stock' : 'Sold Out' },
+            });
             setDbProducts((prev) => prev.map((p) => p.id === order.product_id ? {...p, stock: nextQty, in_stock: nextInStock, badge: nextInStock ? 'In Stock' : 'Sold Out'} : p));
 
             // Legacy stock table — keep for Inventory tab compatibility
-            await supabase.from('stock')
-              .upsert({ id: order.product_id, quantity: nextQty, in_stock: nextInStock }, { onConflict: 'id' });
+            await adminFetch('/api/admin/stock', 'POST', {
+              rows: [{ id: order.product_id, quantity: nextQty, in_stock: nextInStock }],
+            });
             setProducts((prev) => prev.map((product) => product.id === order.product_id ? {...product, stock: nextQty, inStock: nextInStock} : product));
           }
         }
       }
 
       const confirmedAt = new Date().toISOString();
-      const {error: orderUpdateError} = await supabase
-        .from('orders')
-        .update({status: 'confirmed', confirmed_at: confirmedAt, updated_at: confirmedAt})
-        .eq('id', order.id);
+      const {error: orderUpdateError} = await adminFetch('/api/admin/orders', 'PATCH', {
+        id: order.id,
+        patch: { status: 'confirmed', confirmed_at: confirmedAt, updated_at: confirmedAt },
+      });
 
-      if (orderUpdateError) throw orderUpdateError;
+      if (orderUpdateError) throw new Error(orderUpdateError.message);
 
       setOrders((prev) => prev.map((item) => (
         item.id === order.id
@@ -748,12 +879,9 @@ export default function AdminPage() {
     }
 
     try {
-      const {error} = await supabase
-        .from('orders')
-        .update(updatePayload)
-        .eq('id', order.id);
+      const {error} = await adminFetch('/api/admin/orders', 'PATCH', { id: order.id, patch: updatePayload });
 
-      if (error) throw error;
+      if (error) throw new Error(error.message);
 
       setOrders((prev) => prev.map((item) => (
         item.id === order.id
@@ -795,7 +923,7 @@ export default function AdminPage() {
       in_stock:    (parseInt(addForm.stock, 10) || 1) > 0,
       image_url:   addForm.image_url.trim() || null,
     };
-    const { data, error } = await supabase.from('singles').insert(payload).select().single();
+    const { data, error } = await adminFetch('/api/admin/singles', 'POST', payload);
     if (error) { setSinglesError(`Add failed: ${error.message}`); }
     else { setSingles(prev => [data, ...prev]); setAddForm(BLANK_FORM); setShowAddForm(false); setSinglesError(''); }
     setSavingAdd(false);
@@ -805,7 +933,7 @@ export default function AdminPage() {
     if (!supabaseEnabled || !supabase) return;
     const parsed = field === 'price' ? parseFloat(value) || 0 : field === 'stock' ? parseInt(value, 10) || 0 : value;
     const extra  = field === 'stock' ? { in_stock: parsed > 0 } : {};
-    const { error } = await supabase.from('singles').update({ [field]: parsed, ...extra, updated_at: new Date().toISOString() }).eq('id', id);
+    const { error } = await adminFetch('/api/admin/singles', 'PATCH', { id, patch: { [field]: parsed, ...extra, updated_at: new Date().toISOString() } });
     if (error) { setSinglesError(`Update failed: ${error.message}`); }
     else {
       setSingles(prev => prev.map(s => s.id === id ? { ...s, [field]: parsed, ...extra } : s));
@@ -818,7 +946,7 @@ export default function AdminPage() {
   async function toggleSingleInStock(id, current) {
     if (!supabaseEnabled || !supabase) return;
     const next = !current;
-    const { error } = await supabase.from('singles').update({ in_stock: next, updated_at: new Date().toISOString() }).eq('id', id);
+    const { error } = await adminFetch('/api/admin/singles', 'PATCH', { id, patch: { in_stock: next, updated_at: new Date().toISOString() } });
     if (error) setSinglesError(`Update failed: ${error.message}`);
     else setSingles(prev => prev.map(s => s.id === id ? { ...s, in_stock: next } : s));
   }
@@ -826,7 +954,7 @@ export default function AdminPage() {
   async function deleteSingle(id) {
     if (!supabaseEnabled || !supabase) return;
     setDeletingId(id);
-    const { error } = await supabase.from('singles').delete().eq('id', id);
+    const { error } = await adminFetch('/api/admin/singles', 'DELETE', { id });
     if (error) setSinglesError(`Delete failed: ${error.message}`);
     else { setSingles(prev => prev.filter(s => s.id !== id)); setSinglesError(''); }
     setDeletingId('');
@@ -906,18 +1034,20 @@ export default function AdminPage() {
               onChange={(event) => {
                 setPw(event.target.value);
                 setPwError(false);
+                setPwErrorMsg('');
               }}
-              onKeyDown={(event) => event.key === 'Enter' && login()}
+              onKeyDown={(event) => event.key === 'Enter' && !loggingIn && login()}
               placeholder="Password"
-              className={`w-full rounded-2xl border ${pwError ? 'border-red-400/60' : 'border-white/15'} bg-black/30 px-4 py-3 pr-10 text-sm text-white outline-none focus:border-cyan-300/50`}
+              disabled={loggingIn}
+              className={`w-full rounded-2xl border ${pwError ? 'border-red-400/60' : 'border-white/15'} bg-black/30 px-4 py-3 pr-10 text-sm text-white outline-none focus:border-cyan-300/50 disabled:opacity-60`}
             />
             <button onClick={() => setShowPw((value) => !value)} className="absolute right-3 top-3 text-white/40 hover:text-white/70">
               {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
-          {pwError ? <p className="mt-2 text-xs text-red-400">Wrong password.</p> : null}
-          <button onClick={login} className="mt-4 w-full rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 py-3 text-sm font-black uppercase tracking-[0.08em] text-black">
-            Enter
+          {pwError ? <p className="mt-2 text-xs text-red-400">{pwErrorMsg || 'Wrong password.'}</p> : null}
+          <button onClick={login} disabled={loggingIn} className="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 py-3 text-sm font-black uppercase tracking-[0.08em] text-black disabled:opacity-60">
+            {loggingIn ? <><Loader2 className="h-4 w-4 animate-spin" /> Signing in…</> : 'Enter'}
           </button>
         </div>
       </div>
@@ -931,7 +1061,7 @@ export default function AdminPage() {
   const filteredOrders = orders.filter((order) => {
     if (orderFilter === 'pending' && order.status !== 'pending') return false;
     if (orderFilter === 'confirmed' && order.status !== 'confirmed') return false;
-    if (orderTypeFilter === 'on_hand' && order.order_type !== 'on_hand') return false;
+    if (orderTypeFilter === 'on_hand' && !ON_HAND_TYPES.has(order.order_type)) return false;
     if (orderTypeFilter === 'pre_order' && order.order_type !== 'pre_order') return false;
     if (appliedDateFrom) { const d = new Date(order.created_at); if (d < new Date(appliedDateFrom)) return false; }
     if (appliedDateTo)   { const d = new Date(order.created_at); if (d > new Date(appliedDateTo + 'T23:59:59')) return false; }
@@ -1235,6 +1365,13 @@ export default function AdminPage() {
                 <div className="rounded-[28px] border border-white/10 bg-white/5 p-5 sticky top-6 max-h-[calc(100vh-100px)] overflow-y-auto">
                   {selectedOrder ? (
                     <>
+                      {(() => {
+                        const isPreorder = selectedOrder.order_type === 'pre_order' || selectedOrder.order_type === 'preorder_cart';
+                        const headerAmountLabel = isPreorder ? 'Deposit due' : 'Total';
+                        const headerAmount = isPreorder
+                          ? (selectedOrder.dp_amount ?? selectedOrder.total_price)
+                          : selectedOrder.total_price;
+                        return (
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <div className="text-xs font-black uppercase tracking-[0.18em] text-cyan-300/75">
@@ -1242,7 +1379,7 @@ export default function AdminPage() {
                           </div>
                           <div className="mt-2 text-2xl font-black leading-tight">{selectedOrder.product_title}</div>
                           <div className="mt-2 text-sm text-white/55">
-                            {selectedOrder.product_variant} | Qty {selectedOrder.quantity} | {formatMoney(selectedOrder.total_price)}
+                            {selectedOrder.product_variant} | Qty {selectedOrder.quantity} | {headerAmountLabel} {formatMoney(headerAmount)}
                           </div>
                         </div>
                         {selectedOrder.status === 'pending' ? (
@@ -1261,6 +1398,35 @@ export default function AdminPage() {
                           </button>
                         ) : null}
                       </div>
+                        );
+                      })()}
+
+                      {(selectedOrder.order_type === 'pre_order' || selectedOrder.order_type === 'preorder_cart') && (
+                        <div className="mt-4 rounded-2xl border border-fuchsia-400/25 bg-fuchsia-400/8 p-4">
+                          <div className="mb-2 flex items-center gap-2">
+                            <span className="text-[10px] font-black uppercase tracking-[0.18em] text-fuchsia-300/80">Pre-Order Breakdown</span>
+                            {selectedOrder.eta && (
+                              <span className="rounded-full border border-fuchsia-400/25 bg-fuchsia-400/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-fuchsia-200/85">
+                                ETA {selectedOrder.eta}
+                              </span>
+                            )}
+                          </div>
+                          <div className="grid gap-x-6 gap-y-1 text-xs sm:grid-cols-3">
+                            <div className="text-white/50">Full price</div>
+                            <div className="text-right font-black text-white/90 tabular-nums sm:col-span-2">
+                              {formatMoney(selectedOrder.full_price ?? 0)}
+                            </div>
+                            <div className="text-white/50">Deposit (30%)</div>
+                            <div className="text-right font-black text-emerald-300 tabular-nums sm:col-span-2">
+                              {formatMoney(selectedOrder.dp_amount ?? 0)}
+                            </div>
+                            <div className="text-white/50">Balance on release (70%)</div>
+                            <div className="text-right font-black text-yellow-300 tabular-nums sm:col-span-2">
+                              {formatMoney(selectedOrder.balance_due ?? 0)} <span className="text-white/40 font-normal">+ intl ship</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       <div className="mt-5 grid gap-3 md:grid-cols-2">
                         <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
@@ -1276,6 +1442,63 @@ export default function AdminPage() {
                           </div>
                           <div className="mt-1 text-xs text-white/45">{selectedOrder.buyer_address}</div>
                         </div>
+                      </div>
+
+                      <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
+                        <div className="mb-3 flex items-center justify-between">
+                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-white/40">
+                            Line Items {selectedOrderItems.length > 0 && `(${selectedOrderItems.length})`}
+                          </div>
+                          {selectedOrderItemsLoading && (
+                            <div className="text-[10px] text-white/30">Loading…</div>
+                          )}
+                        </div>
+                        {selectedOrderItems.length > 0 ? (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="text-left text-white/40 border-b border-white/10">
+                                  <th className="pb-2 pr-2 font-black uppercase tracking-[0.1em]">Item</th>
+                                  <th className="pb-2 pr-2 text-center font-black uppercase tracking-[0.1em]">Qty</th>
+                                  <th className="pb-2 pr-2 text-right font-black uppercase tracking-[0.1em]">Unit</th>
+                                  <th className="pb-2 text-right font-black uppercase tracking-[0.1em]">Line</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {selectedOrderItems.map((line) => {
+                                  const lineTotal = (Number(line.unit_price) || 0) * (line.qty || 0);
+                                  return (
+                                    <tr key={line.id} className="border-b border-white/5 last:border-0">
+                                      <td className="py-2 pr-2 text-white/80">
+                                        <div className="flex items-center gap-2">
+                                          {line.image_snapshot ? (
+                                            <img src={line.image_snapshot} alt="" className="h-10 w-8 rounded border border-white/10 object-cover bg-black/30" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                                          ) : null}
+                                          <div className="min-w-0">
+                                            <div className="font-bold truncate max-w-[260px]">{line.title_snapshot}</div>
+                                            <div className="mt-0.5 text-[10px] uppercase tracking-[0.1em] text-white/35">
+                                              {line.source_table}
+                                              {line.is_preorder && <span className="ml-1 text-fuchsia-300">· PRE-ORDER</span>}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </td>
+                                      <td className="py-2 pr-2 text-center tabular-nums text-white/70">{line.qty}</td>
+                                      <td className="py-2 pr-2 text-right tabular-nums text-white/60">{formatMoney(line.unit_price)}</td>
+                                      <td className="py-2 text-right tabular-nums font-black text-white/85">{formatMoney(lineTotal)}</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          !selectedOrderItemsLoading && (
+                            <div className="text-xs text-white/35">
+                              No line items found for this order. (If this is a legacy single-item order, run docs/cart-migration.sql to backfill.)
+                            </div>
+                          )
+                        )}
                       </div>
 
                       <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
@@ -2011,25 +2234,12 @@ export default function AdminPage() {
                   <div>
                     <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/30">Price (CAD) *</label>
                     <input type="number" step="0.01" min="0" required value={addProdForm.price}
-                      onChange={e => handleProdCadChange(e.target.value)}
+                      onChange={e => setAddProdForm(f => ({ ...f, price: e.target.value }))}
                       placeholder="129.00"
                       className="w-full rounded-xl border border-yellow-400/30 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-yellow-400/50" />
                   </div>
-                  <div>
-                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">USD Price <span className="text-white/25 normal-case font-normal">(auto +20%)</span></label>
-                    <input type="number" step="0.01" min="0" value={addProdForm.usd_price} onChange={e => setAddProdForm(f => ({ ...f, usd_price: e.target.value }))}
-                      placeholder="auto" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-cyan-400/40" />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">AUD Price <span className="text-white/25 normal-case font-normal">(auto +20%)</span></label>
-                    <input type="number" step="0.01" min="0" value={addProdForm.aud_price} onChange={e => setAddProdForm(f => ({ ...f, aud_price: e.target.value }))}
-                      placeholder="auto" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-cyan-400/40" />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">EUR Price <span className="text-white/25 normal-case font-normal">(auto +20%)</span></label>
-                    <input type="number" step="0.01" min="0" value={addProdForm.eur_price} onChange={e => setAddProdForm(f => ({ ...f, eur_price: e.target.value }))}
-                      placeholder="auto" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-cyan-400/40" />
-                  </div>
+                  {/* Multi-currency price fields removed — the products table doesn't
+                      expose usd_price / aud_price / eur_price (only preorders do). */}
                   <div>
                     <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Image URL</label>
                     <input value={addProdForm.image_url} onChange={e => setAddProdForm(f => ({ ...f, image_url: e.target.value }))}
