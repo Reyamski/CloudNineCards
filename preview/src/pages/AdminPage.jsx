@@ -1022,10 +1022,6 @@ export default function AdminPage() {
     );
   }
 
-  if (loading) {
-    return <div className="flex min-h-screen items-center justify-center bg-[#05010c] text-sm text-white/40">Loading...</div>;
-  }
-
   if (!authed) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#05010c] text-white">
@@ -1061,6 +1057,10 @@ export default function AdminPage() {
         </div>
       </div>
     );
+  }
+
+  if (loading) {
+    return <div className="flex min-h-screen items-center justify-center bg-[#05010c] text-sm text-white/40">Loading...</div>;
   }
 
   const inStockProducts = products.filter((product) => product.inStock);
