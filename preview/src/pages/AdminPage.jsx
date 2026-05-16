@@ -27,6 +27,41 @@ function hasValidAdminToken() {
   return readAdminTokenExp(token) !== null;
 }
 
+// ── Admin write fetch helper ───────────────────────────────────────────────
+// Wave 3c-1: admin writes go through service-role-backed endpoints at
+// /api/admin/*. Bearer token comes from sessionStorage (set by /api/admin-auth).
+// On 401, the session is dead — clear and force re-login. Returns the same
+// `{ data, error }` shape the Supabase JS client used to so the call sites are
+// drop-in replacements.
+async function adminFetch(path, method, body) {
+  const token = sessionStorage.getItem(ADMIN_TOKEN_KEY);
+  const opts = { method, headers: { Authorization: `Bearer ${token}` } };
+  if (body instanceof FormData) {
+    opts.body = body;
+  } else if (body !== undefined) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
+  let res;
+  try {
+    res = await fetch(path, opts);
+  } catch (err) {
+    return { data: null, error: { message: `Network error: ${err.message}` } };
+  }
+  if (res.status === 401) {
+    sessionStorage.removeItem(ADMIN_TOKEN_KEY);
+    // Force the auth gate to re-render. Reload keeps it simple and matches the
+    // existing login flow (no router push needed).
+    if (typeof window !== 'undefined') window.location.reload();
+    return { data: null, error: { message: 'Session expired' } };
+  }
+  try {
+    return await res.json();
+  } catch {
+    return { data: null, error: { message: `Bad response (status ${res.status})` } };
+  }
+}
+
 const PAYMENT_STATUS_META = {
   awaiting_payment: {
     label: 'Awaiting Payment',
@@ -56,6 +91,12 @@ const PAYMENT_STATUS_OPTIONS = [
   'payment_verified',
   'payment_rejected',
 ];
+
+// In-stock orders come through two flows that write different order_type
+// values: the legacy buy-modal writes `on_hand` (sealed) / `single` (singles),
+// and the new cart flow writes `cart`. The "On Hand" filter should match all
+// non-preorder shapes.
+const ON_HAND_TYPES = new Set(['on_hand', 'single', 'cart']);
 
 const BASE_PRODUCTS = [
   {id: 'op15jp', title: "OP-15 Adventure on Kami's Island", subtitle: 'Japanese', price: 129.00, inStock: true, stock: 12},
@@ -373,7 +414,7 @@ export default function AdminPage() {
       notes:         notesArr.length ? notesArr : null,
       display_order: parseInt(addPoForm.display_order, 10) || 0,
     };
-    const { data, error } = await supabase.from('preorders').insert(payload).select().single();
+    const { data, error } = await adminFetch('/api/admin/preorders', 'POST', payload);
     if (error) { setPreordersError(`Add failed: ${error.message}`); }
     else {
       setPreorders(prev => [...prev, data].sort((a, b) => a.display_order - b.display_order));
@@ -390,7 +431,7 @@ export default function AdminPage() {
     let parsed = value;
     if (field === 'price' || field === 'usd_price' || field === 'aud_price') parsed = parseFloat(value) || null;
     if (field === 'display_order') parsed = parseInt(value, 10) || 0;
-    const { error } = await supabase.from('preorders').update({ [field]: parsed }).eq('id', id);
+    const { error } = await adminFetch('/api/admin/preorders', 'PATCH', { id, patch: { [field]: parsed } });
     if (error) setPreordersError(`Update failed: ${error.message}`);
     else {
       setPreorders(prev => prev.map(p => p.id === id ? { ...p, [field]: parsed } : p));
@@ -401,7 +442,7 @@ export default function AdminPage() {
 
   async function togglePreorderSoldOut(id, current) {
     if (!supabaseEnabled || !supabase) return;
-    const { error } = await supabase.from('preorders').update({ sold_out: !current }).eq('id', id);
+    const { error } = await adminFetch('/api/admin/preorders', 'PATCH', { id, patch: { sold_out: !current } });
     if (error) setPreordersError(`Update failed: ${error.message}`);
     else setPreorders(prev => prev.map(p => p.id === id ? { ...p, sold_out: !current } : p));
   }
@@ -409,7 +450,7 @@ export default function AdminPage() {
   async function deletePreorder(id) {
     if (!supabaseEnabled || !supabase) return;
     setDeletingPreorderId(id);
-    const { error } = await supabase.from('preorders').delete().eq('id', id);
+    const { error } = await adminFetch('/api/admin/preorders', 'DELETE', { id });
     if (error) setPreordersError(`Delete failed: ${error.message}`);
     else { setPreorders(prev => prev.filter(p => p.id !== id)); setPreordersError(''); }
     setDeletingPreorderId('');
@@ -446,7 +487,7 @@ export default function AdminPage() {
       image_url: addProdForm.image_url.trim() || null,
       tag:       addProdForm.tag || 'One Piece',
     };
-    const { data, error } = await supabase.from('products').insert(payload).select().single();
+    const { data, error } = await adminFetch('/api/admin/products', 'POST', payload);
     if (error) { setDbProductsError(`Add failed: ${error.message}`); }
     else {
       setDbProducts(prev => [...prev, data]);
@@ -471,7 +512,7 @@ export default function AdminPage() {
     if (field === 'price') parsed = parseFloat(value) || 0;
     if (field === 'stock') parsed = parseInt(value, 10) || 0;
     const extra = field === 'in_stock' ? { badge: value ? 'In Stock' : 'Sold Out' } : {};
-    const { error } = await supabase.from('products').update({ [field]: parsed, ...extra }).eq('id', id);
+    const { error } = await adminFetch('/api/admin/products', 'PATCH', { id, patch: { [field]: parsed, ...extra } });
     if (error) setDbProductsError(`Update failed: ${error.message}`);
     else {
       setDbProducts(prev => prev.map(p => p.id === id ? { ...p, [field]: parsed, ...extra } : p));
@@ -483,7 +524,7 @@ export default function AdminPage() {
   async function toggleProductInStock(id, current) {
     if (!supabaseEnabled || !supabase) return;
     const next = !current;
-    const { error } = await supabase.from('products').update({ in_stock: next, badge: next ? 'In Stock' : 'Sold Out' }).eq('id', id);
+    const { error } = await adminFetch('/api/admin/products', 'PATCH', { id, patch: { in_stock: next, badge: next ? 'In Stock' : 'Sold Out' } });
     if (error) setDbProductsError(`Update failed: ${error.message}`);
     else setDbProducts(prev => prev.map(p => p.id === id ? { ...p, in_stock: next, badge: next ? 'In Stock' : 'Sold Out' } : p));
   }
@@ -491,7 +532,7 @@ export default function AdminPage() {
   async function deleteDbProduct(id) {
     if (!supabaseEnabled || !supabase) return;
     setDeletingProductId(id);
-    const { error } = await supabase.from('products').delete().eq('id', id);
+    const { error } = await adminFetch('/api/admin/products', 'DELETE', { id });
     if (error) setDbProductsError(`Delete failed: ${error.message}`);
     else { setDbProducts(prev => prev.filter(p => p.id !== id)); setDbProductsError(''); }
     setDeletingProductId('');
@@ -557,7 +598,7 @@ export default function AdminPage() {
     const nextVisibleOrders = orders.filter((order) => {
       if (orderFilter === 'pending' && order.status !== 'pending') return false;
       if (orderFilter === 'confirmed' && order.status !== 'confirmed') return false;
-      if (orderTypeFilter === 'on_hand' && order.order_type !== 'on_hand') return false;
+      if (orderTypeFilter === 'on_hand' && !ON_HAND_TYPES.has(order.order_type)) return false;
       if (orderTypeFilter === 'pre_order' && order.order_type !== 'pre_order') return false;
       return true;
     });
@@ -661,7 +702,7 @@ export default function AdminPage() {
       quantity: product.stock,
     }));
 
-    const {error} = await supabase.from('stock').upsert(rows, {onConflict: 'id'});
+    const {error} = await adminFetch('/api/admin/stock', 'POST', { rows });
     if (error) {
       setDbError(`Save failed: ${error.message}`);
       return;
@@ -684,7 +725,7 @@ export default function AdminPage() {
       quantity: product.stock ?? 0,
     }));
 
-    const {error} = await supabase.from('stock').upsert(rows, {onConflict: 'id'});
+    const {error} = await adminFetch('/api/admin/stock', 'POST', { rows });
     if (error) {
       setDbError(`Reset failed: ${error.message}`);
       return;
@@ -701,9 +742,7 @@ export default function AdminPage() {
     }
 
     const trimmedId = videoId.trim();
-    const {error} = await supabase
-      .from('config')
-      .upsert({key: 'video_id', value: trimmedId}, {onConflict: 'key'});
+    const {error} = await adminFetch('/api/admin/config', 'POST', { key: 'video_id', value: trimmedId });
 
     if (error) {
       setDbError(`Video save failed: ${error.message}`);
@@ -717,9 +756,7 @@ export default function AdminPage() {
 
   async function savePoCloseDate() {
     if (!supabaseEnabled || !supabase || !poCloseDate) return;
-    const { error } = await supabase
-      .from('config')
-      .upsert({ key: 'po_close_date', value: poCloseDate + 'T23:59:59' }, { onConflict: 'key' });
+    const { error } = await adminFetch('/api/admin/config', 'POST', { key: 'po_close_date', value: poCloseDate + 'T23:59:59' });
     if (error) { setDbError(`Save failed: ${error.message}`); return; }
     setDbError('');
     setPoCloseDateSaved(true);
@@ -737,7 +774,8 @@ export default function AdminPage() {
 
     try {
       if (order.product_id && order.order_type !== 'pre_order') {
-        // Pick the right source table based on order_type
+        // Pick the right source table based on order_type. Reads stay on the
+        // anon-key client (public-read), writes go through admin endpoints.
         const isSingle = order.order_type === 'single';
 
         if (isSingle) {
@@ -746,9 +784,10 @@ export default function AdminPage() {
           if (singleRow) {
             const nextQty = Math.max(0, (singleRow.stock ?? 0) - order.quantity);
             const nextInStock = nextQty > 0;
-            await supabase.from('singles')
-              .update({ stock: nextQty, in_stock: nextInStock, updated_at: new Date().toISOString() })
-              .eq('id', order.product_id);
+            await adminFetch('/api/admin/singles', 'PATCH', {
+              id: order.product_id,
+              patch: { stock: nextQty, in_stock: nextInStock, updated_at: new Date().toISOString() },
+            });
             setSingles((prev) => prev.map((s) => s.id === order.product_id ? {...s, stock: nextQty, in_stock: nextInStock} : s));
           }
         } else {
@@ -759,26 +798,28 @@ export default function AdminPage() {
           if (prodRow) {
             const nextQty = Math.max(0, (prodRow.stock ?? 0) - order.quantity);
             const nextInStock = nextQty > 0;
-            await supabase.from('products')
-              .update({ stock: nextQty, in_stock: nextInStock, badge: nextInStock ? 'In Stock' : 'Sold Out' })
-              .eq('id', order.product_id);
+            await adminFetch('/api/admin/products', 'PATCH', {
+              id: order.product_id,
+              patch: { stock: nextQty, in_stock: nextInStock, badge: nextInStock ? 'In Stock' : 'Sold Out' },
+            });
             setDbProducts((prev) => prev.map((p) => p.id === order.product_id ? {...p, stock: nextQty, in_stock: nextInStock, badge: nextInStock ? 'In Stock' : 'Sold Out'} : p));
 
             // Legacy stock table — keep for Inventory tab compatibility
-            await supabase.from('stock')
-              .upsert({ id: order.product_id, quantity: nextQty, in_stock: nextInStock }, { onConflict: 'id' });
+            await adminFetch('/api/admin/stock', 'POST', {
+              rows: [{ id: order.product_id, quantity: nextQty, in_stock: nextInStock }],
+            });
             setProducts((prev) => prev.map((product) => product.id === order.product_id ? {...product, stock: nextQty, inStock: nextInStock} : product));
           }
         }
       }
 
       const confirmedAt = new Date().toISOString();
-      const {error: orderUpdateError} = await supabase
-        .from('orders')
-        .update({status: 'confirmed', confirmed_at: confirmedAt, updated_at: confirmedAt})
-        .eq('id', order.id);
+      const {error: orderUpdateError} = await adminFetch('/api/admin/orders', 'PATCH', {
+        id: order.id,
+        patch: { status: 'confirmed', confirmed_at: confirmedAt, updated_at: confirmedAt },
+      });
 
-      if (orderUpdateError) throw orderUpdateError;
+      if (orderUpdateError) throw new Error(orderUpdateError.message);
 
       setOrders((prev) => prev.map((item) => (
         item.id === order.id
@@ -838,12 +879,9 @@ export default function AdminPage() {
     }
 
     try {
-      const {error} = await supabase
-        .from('orders')
-        .update(updatePayload)
-        .eq('id', order.id);
+      const {error} = await adminFetch('/api/admin/orders', 'PATCH', { id: order.id, patch: updatePayload });
 
-      if (error) throw error;
+      if (error) throw new Error(error.message);
 
       setOrders((prev) => prev.map((item) => (
         item.id === order.id
@@ -885,7 +923,7 @@ export default function AdminPage() {
       in_stock:    (parseInt(addForm.stock, 10) || 1) > 0,
       image_url:   addForm.image_url.trim() || null,
     };
-    const { data, error } = await supabase.from('singles').insert(payload).select().single();
+    const { data, error } = await adminFetch('/api/admin/singles', 'POST', payload);
     if (error) { setSinglesError(`Add failed: ${error.message}`); }
     else { setSingles(prev => [data, ...prev]); setAddForm(BLANK_FORM); setShowAddForm(false); setSinglesError(''); }
     setSavingAdd(false);
@@ -895,7 +933,7 @@ export default function AdminPage() {
     if (!supabaseEnabled || !supabase) return;
     const parsed = field === 'price' ? parseFloat(value) || 0 : field === 'stock' ? parseInt(value, 10) || 0 : value;
     const extra  = field === 'stock' ? { in_stock: parsed > 0 } : {};
-    const { error } = await supabase.from('singles').update({ [field]: parsed, ...extra, updated_at: new Date().toISOString() }).eq('id', id);
+    const { error } = await adminFetch('/api/admin/singles', 'PATCH', { id, patch: { [field]: parsed, ...extra, updated_at: new Date().toISOString() } });
     if (error) { setSinglesError(`Update failed: ${error.message}`); }
     else {
       setSingles(prev => prev.map(s => s.id === id ? { ...s, [field]: parsed, ...extra } : s));
@@ -908,7 +946,7 @@ export default function AdminPage() {
   async function toggleSingleInStock(id, current) {
     if (!supabaseEnabled || !supabase) return;
     const next = !current;
-    const { error } = await supabase.from('singles').update({ in_stock: next, updated_at: new Date().toISOString() }).eq('id', id);
+    const { error } = await adminFetch('/api/admin/singles', 'PATCH', { id, patch: { in_stock: next, updated_at: new Date().toISOString() } });
     if (error) setSinglesError(`Update failed: ${error.message}`);
     else setSingles(prev => prev.map(s => s.id === id ? { ...s, in_stock: next } : s));
   }
@@ -916,7 +954,7 @@ export default function AdminPage() {
   async function deleteSingle(id) {
     if (!supabaseEnabled || !supabase) return;
     setDeletingId(id);
-    const { error } = await supabase.from('singles').delete().eq('id', id);
+    const { error } = await adminFetch('/api/admin/singles', 'DELETE', { id });
     if (error) setSinglesError(`Delete failed: ${error.message}`);
     else { setSingles(prev => prev.filter(s => s.id !== id)); setSinglesError(''); }
     setDeletingId('');
@@ -1023,7 +1061,7 @@ export default function AdminPage() {
   const filteredOrders = orders.filter((order) => {
     if (orderFilter === 'pending' && order.status !== 'pending') return false;
     if (orderFilter === 'confirmed' && order.status !== 'confirmed') return false;
-    if (orderTypeFilter === 'on_hand' && order.order_type !== 'on_hand') return false;
+    if (orderTypeFilter === 'on_hand' && !ON_HAND_TYPES.has(order.order_type)) return false;
     if (orderTypeFilter === 'pre_order' && order.order_type !== 'pre_order') return false;
     if (appliedDateFrom) { const d = new Date(order.created_at); if (d < new Date(appliedDateFrom)) return false; }
     if (appliedDateTo)   { const d = new Date(order.created_at); if (d > new Date(appliedDateTo + 'T23:59:59')) return false; }
