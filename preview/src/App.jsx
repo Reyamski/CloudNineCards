@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import './index.css';
 import AnnouncementBar from './components/AnnouncementBar';
@@ -6,7 +7,9 @@ import ShopPage from './pages/ShopPage';
 import PreOrdersPage from './pages/PreOrdersPage';
 import NewArrivalsPage from './pages/NewArrivalsPage';
 import ContactPage from './pages/ContactPage';
-import AdminPage from './pages/AdminPage';
+// F6: AdminPage is the heaviest single page (~2.5k lines); lazy-load so the
+// public storefront chunk doesn't ship it.
+const AdminPage = lazy(() => import('./pages/AdminPage'));
 import ProductPage from './pages/ProductPage';
 import NotFoundPage from './pages/NotFoundPage';
 import AccountLoginPage from './pages/AccountLoginPage';
@@ -28,7 +31,7 @@ export default function App() {
           <Route path="/pre-orders" element={<PreOrdersPage />} />
           <Route path="/new-arrivals" element={<NewArrivalsPage />} />
           <Route path="/contact" element={<ContactPage />} />
-          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/admin" element={<Suspense fallback={null}><AdminPage /></Suspense>} />
           <Route path="/account" element={<AccountLoginPage />} />
           <Route path="/account/orders" element={<AccountOrdersPage />} />
           <Route path="/shop/:id" element={<ProductPage />} />

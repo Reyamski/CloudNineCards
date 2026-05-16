@@ -5,6 +5,9 @@ import {motion} from 'framer-motion';
 import {supabase, supabaseEnabled} from './lib/supabase';
 import Footer from './components/Footer';
 import Nav from './components/Nav';
+// Note: subscriber writes go through /api/subscribe (service-role) — anon
+// direct INSERT to `subscribers` is blocked once docs/wave3-followups-
+// subscribers-rls.sql is run.
 
 const DEFAULT_VIDEO_ID = 'OcLL44cDh7k';
 
@@ -67,8 +70,19 @@ function EmailSignup() {
       setStatus('error');
       return;
     }
-    if (supabaseEnabled && supabase) {
-      await supabase.from('subscribers').upsert({ email, subscribed_at: new Date().toISOString() }, { onConflict: 'email' });
+    try {
+      const res = await fetch('/api/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) {
+        setStatus('error');
+        return;
+      }
+    } catch {
+      setStatus('error');
+      return;
     }
     setStatus('success');
     setEmail('');

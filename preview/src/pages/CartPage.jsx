@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trash2, Loader2, ChevronDown, ChevronUp, MessageCircle, Copy, Check } from 'lucide-react';
 import emailjs from '@emailjs/browser';
@@ -119,6 +119,7 @@ function escapeHtml(str) {
 export default function CartPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { items, removeItem, updateQty, clear, totals } = useCart();
   const { showToast } = useToast();
 
@@ -265,6 +266,20 @@ export default function CartPage() {
     e.preventDefault();
     setSendError('');
     if (items.length === 0) return;
+
+    // Login gate: anon users can browse + fill the form, but Submit Order
+    // requires a logged-in account so orders are tied to a real user_id.
+    // Round-trip via /account with a redirect hint back to /cart.
+    if (!user) {
+      navigate('/account', {
+        state: {
+          redirect: '/cart',
+          flash: 'Please sign in or create an account to place your order.',
+        },
+      });
+      return;
+    }
+
     if (!validate()) {
       const firstErrEl = document.querySelector('[data-form-error="true"]');
       firstErrEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -735,14 +750,14 @@ export default function CartPage() {
               )}
 
               {!user && (
-                <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-[11px] text-white/55">
-                  No account needed — we'll send the confirmation to your email. <Link to="/account" className="text-cyan-300 hover:underline">Sign in</Link> if you'd like your order saved to your profile.
+                <div className="rounded-xl border border-cyan-300/30 bg-cyan-300/8 px-4 py-3 text-[12px] text-cyan-100">
+                  Sign in to place your order. We'll save it to your account so you can track payment + delivery. <Link to="/account" state={{ redirect: '/cart' }} className="font-black text-cyan-300 hover:underline">Sign in or create an account</Link>.
                 </div>
               )}
 
               <button type="submit" disabled={sending || items.length === 0}
                 className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 px-5 py-4 text-sm font-black uppercase tracking-[0.12em] text-black hover:opacity-95 disabled:opacity-60 disabled:cursor-not-allowed">
-                {sending ? <><Loader2 className="h-4 w-4 animate-spin" /> Placing order…</> : 'Place Order'}
+                {sending ? <><Loader2 className="h-4 w-4 animate-spin" /> Placing order…</> : (user ? 'Place Order' : 'Sign In to Place Order')}
               </button>
 
               {/* Messenger / mailto fallback */}

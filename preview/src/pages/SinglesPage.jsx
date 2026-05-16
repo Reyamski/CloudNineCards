@@ -216,8 +216,10 @@ export default function SinglesPage() {
 
         {/* Search + filter bar */}
         <div className="mb-6 flex flex-col gap-3">
-          <div className="flex gap-3">
-            <div className="relative flex-1">
+          {/* F7 mobile fix: search occupies full row, then sort + filters wrap
+              underneath on narrow viewports so the row doesn't overflow 390px. */}
+          <div className="flex flex-wrap gap-2 sm:gap-3">
+            <div className="relative w-full sm:flex-1">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30" />
               <input value={search} onChange={e => setSearch(e.target.value)}
                 placeholder="Search by card name, set, or number…"
@@ -226,11 +228,11 @@ export default function SinglesPage() {
             {/* Top-level sort dropdown — matches the /shop affordance so buyers
                 don't have to open the Filters accordion to re-sort. */}
             <select value={sort} onChange={e => setSort(e.target.value)}
-              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-white/70 outline-none focus:border-cyan-300/40">
+              className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-[11px] font-black uppercase tracking-[0.12em] text-white/70 outline-none focus:border-cyan-300/40 sm:flex-none sm:px-4 sm:text-xs sm:tracking-[0.14em]">
               {SORTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
             <button onClick={() => setShowFilters(f => !f)}
-              className={`flex items-center gap-2 rounded-2xl border px-4 py-3 text-xs font-black uppercase tracking-[0.14em] transition ${showFilters ? 'border-fuchsia-400/50 bg-fuchsia-400/15 text-fuchsia-200' : 'border-white/10 bg-white/5 text-white/60 hover:bg-white/10'}`}>
+              className={`flex items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-[11px] font-black uppercase tracking-[0.12em] transition sm:px-4 sm:text-xs sm:tracking-[0.14em] ${showFilters ? 'border-fuchsia-400/50 bg-fuchsia-400/15 text-fuchsia-200' : 'border-white/10 bg-white/5 text-white/60 hover:bg-white/10'}`}>
               <SlidersHorizontal className="h-4 w-4" /> Filters
             </button>
           </div>

@@ -23,6 +23,8 @@ for (const envFile of ['.env', '.env.local']) {
 
 import fetchPricesHandler from './api/fetch-prices.js';
 import analyzeCardHandler from './api/analyze-card.js';
+import subscribeHandler   from './api/subscribe.js';
+import waitlistHandler    from './api/waitlist.js';
 import adminAuthHandler from './api/admin-auth.js';
 import adminSinglesHandler   from './api/admin/singles.js';
 import adminProductsHandler  from './api/admin/products.js';
@@ -112,6 +114,14 @@ const server = http.createServer(async (req, res) => {
     const body = await readBody(req);
     handler  = adminAuthHandler;
     mockReq  = { body, method: req.method, url: req.url };
+  } else if (url.pathname.startsWith('/api/subscribe')) {
+    const body = await readBody(req);
+    handler  = subscribeHandler;
+    mockReq  = { body, method: req.method, url: req.url, headers: req.headers };
+  } else if (url.pathname.startsWith('/api/waitlist')) {
+    const body = await readBody(req);
+    handler  = waitlistHandler;
+    mockReq  = { body, method: req.method, url: req.url, headers: req.headers };
   } else {
     res.writeHead(404);
     res.end('Not found');

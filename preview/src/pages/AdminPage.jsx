@@ -892,9 +892,50 @@ export default function AdminPage() {
 
       if (error) throw new Error(error.message);
 
+      // ── Restore stock when admin rejects payment ────────────────────────
+      // The cart flow decremented stock at order-submit. If the admin marks
+      // payment as rejected the buyer never paid, so we add those units back
+      // to singles/products via restore_item_stock RPC. Idempotent: the order
+      // row carries `stock_restored_at`; if set, we skip (prevents double
+      // restore when admin toggles statuses back and forth).
+      // Preorder lines weren't decremented at submit, so they're skipped.
+      let stockRestoredAt = order.stock_restored_at ?? null;
+      if (nextStatus === 'payment_rejected' && !order.stock_restored_at) {
+        try {
+          const { data: itemRows, error: itemsErr } = await adminFetch(
+            `/api/admin/order-items?order_id=${encodeURIComponent(order.id)}`,
+            'GET'
+          );
+          if (itemsErr) {
+            console.warn('order-items fetch failed during restore', itemsErr);
+          } else {
+            for (const line of (itemRows ?? [])) {
+              if (line.is_preorder) continue;
+              const source = line.source_table;
+              const itemId = line.item_id;
+              const qty    = Number(line.qty) || 0;
+              if (!source || !itemId || qty <= 0) continue;
+              try {
+                await supabase.rpc('restore_item_stock', { source, item_id: itemId, qty });
+              } catch (rpcErr) {
+                console.warn('restore_item_stock failed for', line, rpcErr);
+              }
+            }
+            const restoredAt = new Date().toISOString();
+            const { error: stampErr } = await adminFetch('/api/admin/orders', 'PATCH', {
+              id: order.id,
+              patch: { stock_restored_at: restoredAt },
+            });
+            if (!stampErr) stockRestoredAt = restoredAt;
+          }
+        } catch (restoreErr) {
+          console.warn('Stock restore flow failed:', restoreErr);
+        }
+      }
+
       setOrders((prev) => prev.map((item) => (
         item.id === order.id
-          ? normalizeOrder({...item, ...updatePayload})
+          ? normalizeOrder({...item, ...updatePayload, stock_restored_at: stockRestoredAt})
           : item
       )));
     } catch (error) {
