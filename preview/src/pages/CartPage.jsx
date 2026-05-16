@@ -413,11 +413,12 @@ export default function CartPage() {
         }
       }
       if (stockCheckFailed && inStockOrderId) {
-        // Flag for admin reconciliation. This update will need RLS to allow
-        // updating just the `status` field by order id from anon, OR be moved
-        // to a dedicated RPC, in Wave 3c-2. For now (RLS off) it still works.
+        // Flag for admin reconciliation. Wave 3c-2 Phase B blocks direct
+        // anon UPDATE on `orders`, so the status flip goes through a
+        // SECURITY DEFINER RPC that only allows the flip from a known
+        // pre-payment status. See docs/wave3c2-mark-order-status-rpc.sql.
         try {
-          await supabase.from('orders').update({ status: 'stock_check_failed' }).eq('id', inStockOrderId);
+          await supabase.rpc('mark_order_stock_check_failed', { order_id: inStockOrderId });
         } catch { /* non-blocking */ }
       }
 
