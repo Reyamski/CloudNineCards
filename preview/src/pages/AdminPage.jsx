@@ -935,13 +935,24 @@ export default function AdminPage() {
           const { data: rj, error: rjErr } = await adminFetch(
             '/api/admin/reject-order', 'POST', { order_id: order.id }
           );
-          if (rjErr) {
-            console.warn('reject-order endpoint failed', rjErr);
+          const failedCount = rj?.failed?.length ?? 0;
+          if (rjErr || failedCount > 0) {
+            // Partial/failed restore: the endpoint deliberately did NOT stamp
+            // stock_restored_at so this stays retryable. Surface it loudly —
+            // do NOT treat it as restored, or the admin won't know stock is
+            // still missing and the retry path stays open.
+            console.warn('reject-order restore incomplete', rjErr, rj?.failed);
+            const detail = failedCount > 0
+              ? `${failedCount} item(s) did not restore — re-select Payment Rejected to retry.`
+              : (rjErr?.message || 'restore failed');
+            setDbError(`Order rejected, but stock restore incomplete: ${detail}`);
+            // leave stockRestoredAt null so the guard isn't tripped locally
           } else if (rj && !rj.already_restored) {
             stockRestoredAt = new Date().toISOString();
           }
         } catch (restoreErr) {
           console.warn('Stock restore flow failed:', restoreErr);
+          setDbError(`Order rejected, but stock restore failed: ${restoreErr.message}. Re-select Payment Rejected to retry.`);
         }
       }
 
