@@ -444,11 +444,13 @@ export default function ShopPage() {
           </div>
         )}
 
-        <div className="mb-4 flex flex-wrap items-center gap-3">
-          <div className="flex flex-wrap gap-3">
+        {/* Sticky category bar — pins below the nav so it stays reachable
+            while scrolling the catalog. Horizontal-scrolls on narrow screens. */}
+        <div className="sticky top-0 z-30 -mx-6 mb-4 border-b border-white/10 bg-[#05010c]/95 px-6 py-3 backdrop-blur">
+          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {tags.map((tag) => (
               <button key={tag} onClick={() => { setActiveTag(tag); setLangFilter('All'); }}
-                className={`rounded-full border px-5 py-2 text-xs font-black uppercase tracking-[0.18em] transition ${
+                className={`shrink-0 rounded-full border px-5 py-2 text-xs font-black uppercase tracking-[0.18em] transition ${
                   activeTag === tag
                     ? 'border-purple-400/60 bg-purple-500/15 text-purple-100 shadow-[0_0_20px_rgba(168,85,247,0.5)]'
                     : 'border-white/10 bg-white/5 text-white/65 hover:border-white/20 hover:text-white/85'
@@ -457,15 +459,18 @@ export default function ShopPage() {
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="mb-4 flex flex-wrap items-center gap-3">
           <button
             onClick={() => setShowRequest(true)}
-            className="ml-auto inline-flex items-center gap-2 rounded-full border border-cyan-300/35 bg-cyan-300/8 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-cyan-200 transition hover:border-cyan-300/55 hover:bg-cyan-300/15"
+            className="inline-flex items-center gap-2 rounded-full border border-cyan-300/35 bg-cyan-300/8 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-cyan-200 transition hover:border-cyan-300/55 hover:bg-cyan-300/15"
           >
             Request a Card
           </button>
           <button
             onClick={() => setShowFilters(true)}
-            className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-black uppercase tracking-[0.14em] transition ${
+            className={`ml-auto inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-black uppercase tracking-[0.14em] transition ${
               activeFilterCount > 0
                 ? 'border-fuchsia-400/50 bg-fuchsia-400/15 text-fuchsia-200'
                 : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'
@@ -519,7 +524,7 @@ export default function ShopPage() {
               In Stock Now
             </h2>
           </div>
-          <p className="mt-1 text-xs text-white/35 uppercase tracking-[0.16em]">Sealed product · shipped from Canada</p>
+          <p className="mt-1 text-xs text-white/35 uppercase tracking-[0.16em]">Sealed product shipped from Canada</p>
         </div>
 
         {filtered.length === 0 && (
