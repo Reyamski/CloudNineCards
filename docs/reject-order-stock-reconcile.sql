@@ -60,7 +60,7 @@ SELECT
     END                 AS current_stock,
     CASE oi.source_table
         WHEN 'singles'  THEN (SELECT s.card_name   FROM public.singles  s WHERE s.id::text = oi.item_id)
-        WHEN 'products' THEN (SELECT p.name        FROM public.products p WHERE p.id::text = oi.item_id)
+        WHEN 'products' THEN (SELECT p.title       FROM public.products p WHERE p.id::text = oi.item_id)
         ELSE NULL
     END                 AS item_name
 FROM public.orders o
@@ -86,7 +86,7 @@ BEGIN;
 
 -- Show the order + item + current stock BEFORE the fix:
 SELECT o.order_number, o.stock_restored_at, oi.source_table, oi.item_id, oi.qty,
-       p.name, p.stock AS stock_before
+       p.title, p.stock AS stock_before
 FROM public.orders o
 JOIN public.order_items oi ON oi.order_id = o.id
 JOIN public.products p ON p.id::text = oi.item_id
@@ -100,7 +100,7 @@ SET    stock    = COALESCE(stock, 0) + 1,
 WHERE  id = 'poke-ah';
 
 -- Verify stock went up by exactly 1 vs the SELECT above:
-SELECT id, name, stock, in_stock, badge FROM public.products WHERE id = 'poke-ah';
+SELECT id, title, stock, in_stock, badge FROM public.products WHERE id = 'poke-ah';
 
 COMMIT;
 -- ROLLBACK;  -- use instead of COMMIT if the before/after doesn't look right
