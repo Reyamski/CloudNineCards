@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase, supabaseEnabled } from '../lib/supabase';
-import { X, Check } from 'lucide-react';
+import { X, Check, SlidersHorizontal } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Nav from '../components/Nav';
 import Footer from '../components/Footer';
@@ -18,6 +18,28 @@ const SORTS = [
   { value: 'price_desc', label: 'Price: High → Low' },
   { value: 'name_asc',   label: 'Name A → Z' },
 ];
+
+// Availability filter (client feedback). Default = 'all'.
+//  available = on-hand product, in stock & qty>0
+//  soldout   = on-hand product, out of stock or qty 0 (excludes pre-orders)
+//  preorder  = items sourced from the preorders table (isPreorder)
+const AVAILABILITY = [
+  { value: 'all',       label: 'All' },
+  { value: 'available', label: 'Available' },
+  { value: 'soldout',   label: 'Sold Out' },
+  { value: 'preorder',  label: 'Pre-orders' },
+];
+
+// Pure availability predicate — shared by the grid filter and the drawer's
+// live "Show N" count so they never drift apart.
+function matchesAvailability(p, availability) {
+  if (availability === 'all') return true;
+  if (availability === 'preorder')  return !!p.isPreorder;
+  if (p.isPreorder) return false; // pre-orders only show under the Pre-orders tab
+  if (availability === 'available') return p.inStock && (Number(p.stock) || 0) > 0;
+  if (availability === 'soldout')   return !p.inStock || (Number(p.stock) || 0) === 0;
+  return true;
+}
 
 // ── Notify Me Modal ───────────────────────────────────────────────────────────
 function NotifyMeModal({ item, onClose }) {
@@ -133,10 +155,106 @@ function normalizeDbProduct(row) {
   };
 }
 
+// ── Unified Filter / Sort drawer ──────────────────────────────────────────────
+// Mirrors the SinglesPage Filter & Sort drawer (same Pill/Section visual
+// language) so the storefront stays consistent. Uses draft state so changes
+// only apply on "Apply"; the count preview updates live.
+function FilterModal({ open, onClose, availability, sort, onApply, resultCountFor }) {
+  const [dAvail, setDAvail] = useState(availability);
+  const [dSort, setDSort]   = useState(sort);
+
+  useEffect(() => {
+    if (open) { setDAvail(availability); setDSort(sort); }
+  }, [open, availability, sort]);
+
+  const resultCount = useMemo(
+    () => resultCountFor(dAvail),
+    [resultCountFor, dAvail]
+  );
+
+  if (!open) return null;
+
+  const Pill = ({ active, onClick, children }) => (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full border px-4 py-1.5 text-[11px] font-black uppercase tracking-[0.12em] transition ${
+        active
+          ? 'border-fuchsia-400/60 bg-fuchsia-400/15 text-fuchsia-200'
+          : 'border-white/10 bg-white/5 text-white/55 hover:border-white/20 hover:text-white/80'
+      }`}
+    >
+      {children}
+    </button>
+  );
+
+  const Section = ({ label, children }) => (
+    <div>
+      <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/35 mb-2">{label}</div>
+      <div className="flex flex-wrap gap-1.5">{children}</div>
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center px-0 sm:px-4">
+      <motion.div
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose}
+      />
+      <motion.div
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 40 }}
+        transition={{ duration: 0.25 }}
+        className="relative w-full max-w-lg rounded-t-[28px] sm:rounded-[28px] border border-white/10 bg-[#07030f] overflow-hidden max-h-[88vh] flex flex-col"
+      >
+        <div className="h-1 w-full bg-gradient-to-r from-fuchsia-500 to-cyan-400" />
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+          <div className="text-sm font-black uppercase tracking-[0.16em] text-white">Filter &amp; Sort</div>
+          <button onClick={onClose} className="rounded-xl border border-white/10 bg-white/5 p-1.5 hover:bg-white/10">
+            <X className="h-4 w-4 text-white/60" />
+          </button>
+        </div>
+
+        <div className="px-6 py-5 space-y-5 overflow-y-auto">
+          <Section label="Availability">
+            {AVAILABILITY.map(a => (
+              <Pill key={a.value} active={dAvail === a.value} onClick={() => setDAvail(a.value)}>{a.label}</Pill>
+            ))}
+          </Section>
+
+          <Section label="Sort by">
+            {SORTS.map(s => (
+              <Pill key={s.value} active={dSort === s.value} onClick={() => setDSort(s.value)}>{s.label}</Pill>
+            ))}
+          </Section>
+        </div>
+
+        <div className="px-6 py-4 border-t border-white/10 flex items-center gap-3">
+          <button
+            onClick={() => { setDAvail('all'); setDSort('newest'); }}
+            className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-xs font-black uppercase tracking-[0.12em] text-white/60 hover:bg-white/10"
+          >
+            Reset
+          </button>
+          <button
+            onClick={() => onApply({ availability: dAvail, sort: dSort })}
+            className="flex-1 rounded-2xl bg-gradient-to-r from-fuchsia-500 to-cyan-400 px-5 py-3 text-xs font-black uppercase tracking-[0.12em] text-black transition hover:opacity-90"
+          >
+            Show {resultCount} {resultCount === 1 ? 'item' : 'items'}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function ShopPage() {
   const [activeTag, setActiveTag] = useState('All');
   const [langFilter, setLangFilter] = useState('All');
+  const [availability, setAvailability] = useState('all');
+  const [showFilters, setShowFilters] = useState(false);
   const [sort, setSort] = useState('newest');
   const [notifyItem, setNotifyItem] = useState(null);
   const [showRequest, setShowRequest] = useState(false);
@@ -227,9 +345,13 @@ export default function ShopPage() {
     loadAll();
   }, []);
 
+  // When 'Pre-orders' availability is chosen we ignore the category tag —
+  // preorder items aren't tagged by game, so respecting the tag would yield
+  // an empty grid. Tag still applies for all other availability states.
   const filtered = products
-    .filter(p => activeTag === 'All' || p.tag === activeTag)
+    .filter(p => availability === 'preorder' || activeTag === 'All' || p.tag === activeTag)
     .filter(p => langFilter === 'All' || !p.language || p.language === langFilter)
+    .filter(p => matchesAvailability(p, availability))
     .sort((a, b) => {
       // Primary: in-stock first, then preorder, then sold-out
       const score = p => p.inStock ? 0 : p.isPreorder ? 1 : 2;
@@ -243,8 +365,34 @@ export default function ShopPage() {
       return new Date(b.created_at ?? 0) - new Date(a.created_at ?? 0);
     });
 
+  // Live count for the drawer: how many items the *draft* availability yields
+  // within the currently-active tag + language scope.
+  const resultCountFor = (av) =>
+    products
+      .filter(p => av === 'preorder' || activeTag === 'All' || p.tag === activeTag)
+      .filter(p => langFilter === 'All' || !p.language || p.language === langFilter)
+      .filter(p => matchesAvailability(p, av))
+      .length;
+
+  const activeFilterCount = (availability !== 'all' ? 1 : 0) + (sort !== 'newest' ? 1 : 0);
+
   return (
     <div className="min-h-screen bg-[#05010c] text-white">
+      <AnimatePresence>
+        <FilterModal
+          open={showFilters}
+          onClose={() => setShowFilters(false)}
+          availability={availability}
+          sort={sort}
+          resultCountFor={resultCountFor}
+          onApply={({ availability: av, sort: s }) => {
+            setAvailability(av);
+            setSort(s);
+            setShowFilters(false);
+          }}
+        />
+      </AnimatePresence>
+
       <AnimatePresence>
         {notifyItem && <NotifyMeModal item={notifyItem} onClose={() => setNotifyItem(null)} />}
       </AnimatePresence>
@@ -315,11 +463,37 @@ export default function ShopPage() {
           >
             Request a Card
           </button>
-          <select value={sort} onChange={(e) => setSort(e.target.value)}
-            className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-white/70 outline-none focus:border-cyan-300/40">
-            {SORTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
+          <button
+            onClick={() => setShowFilters(true)}
+            className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-black uppercase tracking-[0.14em] transition ${
+              activeFilterCount > 0
+                ? 'border-fuchsia-400/50 bg-fuchsia-400/15 text-fuchsia-200'
+                : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'
+            }`}
+          >
+            <SlidersHorizontal className="h-4 w-4" /> Filter &amp; Sort
+            {activeFilterCount > 0 && (
+              <span className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-fuchsia-400 px-1 text-[10px] font-black text-black">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
         </div>
+
+        {/* Active availability chip row */}
+        {availability !== 'all' && (
+          <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
+            <span className="rounded-full border border-fuchsia-400/30 bg-fuchsia-400/10 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-fuchsia-300">
+              {AVAILABILITY.find(a => a.value === availability)?.label}
+            </span>
+            <button
+              onClick={() => setAvailability('all')}
+              className="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-white/45 hover:text-white/70"
+            >
+              Clear
+            </button>
+          </div>
+        )}
 
         {/* Language sub-filter — hidden for Accessories */}
         {activeTag !== 'Accessories' && activeTag !== 'Pre-orders' && (

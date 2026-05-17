@@ -32,6 +32,9 @@ import adminProductsHandler  from './api/admin/products.js';
 import adminPreordersHandler from './api/admin/preorders.js';
 import adminOrdersHandler    from './api/admin/orders.js';
 import adminOrderItemsHandler from './api/admin/order-items.js';
+import adminCardRequestsHandler from './api/admin/card-requests.js';
+import adminSubscribersHandler  from './api/admin/subscribers.js';
+import adminWaitlistHandler     from './api/admin/waitlist.js';
 import adminConfigHandler    from './api/admin/config.js';
 import adminStockHandler     from './api/admin/stock.js';
 import adminUploadHandler    from './api/admin/upload.js';
@@ -98,6 +101,21 @@ const server = http.createServer(async (req, res) => {
     // GET-only — service-role read. Pass query so the handler can read order_id.
     const query = Object.fromEntries(url.searchParams.entries());
     handler = adminOrderItemsHandler;
+    mockReq = { query, method: req.method, url: req.url, headers: req.headers };
+  } else if (url.pathname === '/api/admin/card-requests') {
+    // GET-only — service-role read of card_requests (RLS-locked table).
+    const query = Object.fromEntries(url.searchParams.entries());
+    handler = adminCardRequestsHandler;
+    mockReq = { query, method: req.method, url: req.url, headers: req.headers };
+  } else if (url.pathname === '/api/admin/subscribers') {
+    // GET-only — service-role read of subscribers (RLS-locked table).
+    const query = Object.fromEntries(url.searchParams.entries());
+    handler = adminSubscribersHandler;
+    mockReq = { query, method: req.method, url: req.url, headers: req.headers };
+  } else if (url.pathname === '/api/admin/waitlist') {
+    // GET-only — service-role read of waitlist (RLS-locked table).
+    const query = Object.fromEntries(url.searchParams.entries());
+    handler = adminWaitlistHandler;
     mockReq = { query, method: req.method, url: req.url, headers: req.headers };
   } else if (adminTableMap[url.pathname]) {
     // GET on /api/admin/orders has no body; PATCH/POST/DELETE do. readBody is

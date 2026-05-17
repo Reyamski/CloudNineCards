@@ -13,6 +13,7 @@ export default function Nav() {
   const links = [
     { label: 'Home', to: '/' },
     { label: 'Shop', to: '/shop' },
+    { label: 'Deck Packs', to: '/deck-builder-packs' },
     { label: 'Singles', to: '/singles' },
     { label: 'Pre-orders', to: '/pre-orders' },
     { label: 'Sell Cards', to: '/buylist' },
