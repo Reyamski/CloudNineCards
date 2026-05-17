@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ShieldCheck, BookOpen, Sparkles } from 'lucide-react';
+import { ChevronDown, ShieldCheck, BookOpen, Sparkles, X, Check } from 'lucide-react';
 import Nav from '../components/Nav';
 import Footer from '../components/Footer';
 import { supabase, supabaseEnabled } from '../lib/supabase';
@@ -14,7 +14,9 @@ import { useToast } from '../components/Toast';
 const THEMES = {
   red: {
     label: 'Red Aggression',
-    blurb: 'Fast, aggressive red — apply pressure early and close games quickly.',
+    blurb: 'Fast, aggressive red. Apply pressure early and close games quickly.',
+    keywords: ['Aggression', 'Fire', 'Speed'],
+    image: '/luffy.png',
     accentText: 'text-red-300',
     accentBorder: 'border-red-400/30',
     accentBg: 'bg-red-400/10',
@@ -24,7 +26,9 @@ const THEMES = {
   },
   green: {
     label: 'Green Fortress',
-    blurb: 'Defensive board-control green — stall, stabilize, and grind out the win.',
+    blurb: 'Defensive board-control green. Stall, stabilize, and grind out the win.',
+    keywords: ['Defense', 'Nature', 'Board Control'],
+    image: '/zoro.png',
     accentText: 'text-emerald-300',
     accentBorder: 'border-emerald-400/30',
     accentBg: 'bg-emerald-400/10',
@@ -34,7 +38,9 @@ const THEMES = {
   },
   purple: {
     label: 'Purple Chaos',
-    blurb: 'Ramp and resource purple — build mana, then unload bigger threats.',
+    blurb: 'Ramp and resource purple. Build power, then unload bigger threats.',
+    keywords: ['Power', 'Ramp', 'DON Manipulation'],
+    image: '/robin.png',
     accentText: 'text-purple-300',
     accentBorder: 'border-purple-400/30',
     accentBg: 'bg-purple-400/10',
@@ -44,7 +50,9 @@ const THEMES = {
   },
   black: {
     label: 'Black Control',
-    blurb: 'Removal and tactical black — pick apart their board and dictate the game.',
+    blurb: 'Removal and tactical black. Pick apart their board and dictate the game.',
+    keywords: ['Removal', 'Tactics', 'Shadow'],
+    image: '/nami.png',
     accentText: 'text-zinc-300',
     accentBorder: 'border-zinc-400/30',
     accentBg: 'bg-zinc-400/10',
@@ -52,7 +60,34 @@ const THEMES = {
     cardBg: 'bg-[linear-gradient(180deg,#070707,#141414)]',
     btn: 'bg-gradient-to-r from-zinc-600 to-slate-400',
   },
+  yellow: {
+    label: 'Yellow Destiny',
+    blurb: 'Life-control yellow. Swing the game on fate and big-payoff moments.',
+    keywords: ['Life Control', 'Fate', 'Lightning'],
+    image: '/op15.webp',
+    accentText: 'text-yellow-300',
+    accentBorder: 'border-yellow-400/30',
+    accentBg: 'bg-yellow-400/10',
+    bar: 'from-yellow-500 via-amber-400 to-yellow-300',
+    cardBg: 'bg-[linear-gradient(180deg,#1a1404,#2a2207)]',
+    btn: 'bg-gradient-to-r from-yellow-500 to-amber-400',
+  },
+  blue: {
+    label: 'Blue Strategy',
+    blurb: 'Tempo and control blue. Outpace and outthink the opponent turn by turn.',
+    keywords: ['Tempo', 'Intelligence', 'Battlefield Manipulation'],
+    image: '/ac1.webp',
+    accentText: 'text-sky-300',
+    accentBorder: 'border-sky-400/30',
+    accentBg: 'bg-sky-400/10',
+    bar: 'from-sky-500 via-cyan-400 to-blue-400',
+    cardBg: 'bg-[linear-gradient(180deg,#04101a,#07202a)]',
+    btn: 'bg-gradient-to-r from-sky-500 to-cyan-400',
+  },
 };
+
+// Stable theme display order on the listing.
+const THEME_ORDER = ['red', 'green', 'purple', 'black', 'yellow', 'blue'];
 
 // id slug → theme key + tier. Drives card styling + badges. Prices/titles come
 // from the live `products` row so the DB stays the source of truth.
@@ -65,21 +100,47 @@ const PACK_META = {
   'dbp-purple-premium':  { theme: 'purple', tier: 'premium'  },
   'dbp-black-standard':  { theme: 'black',  tier: 'standard' },
   'dbp-black-premium':   { theme: 'black',  tier: 'premium'  },
+  'dbp-yellow-standard': { theme: 'yellow', tier: 'standard' },
+  'dbp-yellow-premium':  { theme: 'yellow', tier: 'premium'  },
+  'dbp-blue-standard':   { theme: 'blue',   tier: 'standard' },
+  'dbp-blue-premium':    { theme: 'blue',   tier: 'premium'  },
 };
 const PACK_ORDER = Object.keys(PACK_META);
 
+// Tier model. Each tier is still its own products row (id below) — the cart,
+// order, stock-decrement, admin and reject-restore pipeline are unchanged.
 const TIER_INFO = {
   standard: {
     name: 'Standard',
+    price: 9.99,
+    idSuffix: 'standard',
     contents: '25 same-color commons & uncommons, chosen for deck-building. Max 4 copies of any card.',
     badges: ['Great for Beginners', 'Build Your First Deck', 'Casual Friendly'],
+    // Difference-table rows, keyed by feature label.
+    diff: {
+      'Card count': '25 cards',
+      'Rarities': 'Commons and uncommons',
+      'Focus': 'Deck-building basics',
+      'Copy limit': 'Up to 4 copies of a card',
+      'Best for': 'A first deck on a budget',
+    },
   },
   premium: {
-    name: 'Premium Plus',
+    name: 'Premium',
+    price: 19.99,
+    idSuffix: 'premium',
     contents: '40 same-color cards with rares & staples when available, picked for stronger synergy.',
     badges: ['Starter Upgrade Pack', 'Casual Friendly'],
+    diff: {
+      'Card count': '40 cards',
+      'Rarities': 'Includes rares and staples when available',
+      'Focus': 'Better synergy, stronger starter upgrade',
+      'Copy limit': 'Up to 4 copies of a card',
+      'Best for': 'Pushing a theme further',
+    },
   },
 };
+const DIFF_ROWS = ['Card count', 'Rarities', 'Focus', 'Copy limit', 'Best for'];
 
 const DISCLAIMERS = [
   'Cards are randomly selected from current single-color inventory within the listed theme.',
@@ -160,8 +221,40 @@ export default function DeckBuilderPacksPage() {
   const [packs, setPacks] = useState([]);
   const [loadError, setLoadError] = useState('');
   const [openFaq, setOpenFaq] = useState(0);
+  // Tier-picker modal: holds the theme key currently open, plus the chosen tier.
+  const [pickerTheme, setPickerTheme] = useState(null);
+  const [pickerTier, setPickerTier] = useState('standard');
   const { addItem } = useCart();
   const { showToast } = useToast();
+
+  // Lock background scroll while the tier picker is open.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    document.body.style.overflow = pickerTheme ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [pickerTheme]);
+
+  // Close the picker on Escape for keyboard / mobile-back friendliness.
+  useEffect(() => {
+    if (!pickerTheme) return;
+    function onKey(e) { if (e.key === 'Escape') setPickerTheme(null); }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [pickerTheme]);
+
+  // Live products row for a given theme + tier (may be undefined until the
+  // owner runs the seed SQL — the picker handles that case gracefully).
+  function rowFor(themeKey, tier) {
+    const id = `dbp-${themeKey}-${TIER_INFO[tier].idSuffix}`;
+    return packs.find(p => p.id === id);
+  }
+
+  function openPicker(themeKey) {
+    setPickerTheme(themeKey);
+    // Default to a tier that's actually buyable if possible.
+    const std = rowFor(themeKey, 'standard');
+    setPickerTier(std && std.in_stock ? 'standard' : 'premium');
+  }
 
   useEffect(() => {
     document.title = 'Deck Builder Packs — Build Your First Deck | CloudNineCards';
@@ -188,7 +281,13 @@ export default function DeckBuilderPacksPage() {
       }
       const ordered = (data ?? [])
         .filter(r => PACK_META[r.id])
-        .sort((a, b) => PACK_ORDER.indexOf(a.id) - PACK_ORDER.indexOf(b.id));
+        .sort((a, b) => {
+          // Primary: in-stock packs before sold-out ones
+          const stockDiff = (a.in_stock ? 0 : 1) - (b.in_stock ? 0 : 1);
+          if (stockDiff !== 0) return stockDiff;
+          // Secondary: stable theme/tier order
+          return PACK_ORDER.indexOf(a.id) - PACK_ORDER.indexOf(b.id);
+        });
       setPacks(ordered);
       if (ordered.length === 0) {
         setLoadError('Deck Builder Packs are not seeded yet — they will appear once stock is added.');
@@ -261,7 +360,7 @@ export default function DeckBuilderPacksPage() {
         </div>
       </section>
 
-      {/* Packs grouped by theme */}
+      {/* Theme cards — one per color. Click opens the tier picker. */}
       <section className="mx-auto max-w-7xl px-6 pt-12">
         {loadError && (
           <div className="mb-6 rounded-2xl border border-yellow-400/20 bg-yellow-400/10 px-4 py-3 text-sm text-yellow-100">
@@ -269,82 +368,241 @@ export default function DeckBuilderPacksPage() {
           </div>
         )}
 
-        {['red', 'green', 'purple', 'black'].map((themeKey) => {
-          const t = THEMES[themeKey];
-          const themePacks = packs.filter(p => PACK_META[p.id]?.theme === themeKey);
-          if (themePacks.length === 0) return null;
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {THEME_ORDER.map((themeKey) => {
+            const t = THEMES[themeKey];
+            const std = rowFor(themeKey, 'standard');
+            const prem = rowFor(themeKey, 'premium');
+            const anySeeded = !!(std || prem);
+            const anyInStock = !!((std && std.in_stock) || (prem && prem.in_stock));
+            return (
+              <button
+                key={themeKey}
+                type="button"
+                onClick={() => openPicker(themeKey)}
+                className={`group relative flex flex-col overflow-hidden rounded-[28px] border ${t.accentBorder} ${t.cardBg} text-left transition hover:border-white/30`}
+              >
+                <div className={`absolute inset-x-0 top-0 z-10 h-1 bg-gradient-to-r ${t.bar}`} />
+                <div className="relative overflow-hidden">
+                  <img
+                    src={t.image}
+                    alt={t.label}
+                    loading="lazy"
+                    onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/product-fallback.svg'; }}
+                    className="h-[220px] w-full object-cover transition duration-500 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 to-transparent" />
+                  {!anyInStock && anySeeded && (
+                    <span className="absolute right-3 top-3 rounded-full border border-white/15 bg-black/60 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white/50">
+                      Sold Out
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-1 flex-col p-5">
+                  <div className={`text-xl font-black uppercase tracking-[0.06em] ${t.accentText}`}>
+                    {t.label}
+                  </div>
+                  <p className="mt-2 text-xs text-white/55 leading-5">{t.blurb}</p>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {t.keywords.map((k) => (
+                      <span
+                        key={k}
+                        className={`rounded-full border ${t.accentBorder} ${t.accentBg} px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${t.accentText}`}
+                      >
+                        {k}
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 flex items-baseline gap-2 text-xs text-white/45">
+                    <span className="text-base font-black text-white">CAD $9.99</span>
+                    <span>Standard</span>
+                    <span className="text-white/25">/</span>
+                    <span className="text-base font-black text-white">CAD $19.99</span>
+                    <span>Premium</span>
+                  </div>
+
+                  <div
+                    className={`mt-auto pt-4 inline-flex w-full items-center justify-center rounded-2xl ${t.btn} px-4 py-3 text-sm font-black uppercase tracking-[0.08em] text-black transition group-hover:opacity-95`}
+                  >
+                    Choose a Pack
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Tier picker — Standard vs Premium for the chosen theme. */}
+      <AnimatePresence>
+        {pickerTheme && (() => {
+          const t = THEMES[pickerTheme];
+          const stdRow = rowFor(pickerTheme, 'standard');
+          const premRow = rowFor(pickerTheme, 'premium');
+          const selectedRow = pickerTier === 'standard' ? stdRow : premRow;
+          const selectedTier = TIER_INFO[pickerTier];
+          const expectedId = `dbp-${pickerTheme}-${selectedTier.idSuffix}`;
+          const canBuy = !!(selectedRow && selectedRow.in_stock);
           return (
-            <div key={themeKey} className="mb-12">
-              <div className="mb-4 flex items-baseline gap-3">
-                <h2 className={`text-2xl font-black uppercase tracking-[0.08em] ${t.accentText}`}>{t.label}</h2>
-                <span className="text-xs text-white/40">{t.blurb}</span>
-              </div>
-              <div className="grid gap-6 md:grid-cols-2">
-                {themePacks.map((row) => {
-                  const meta = PACK_META[row.id];
-                  const tier = TIER_INFO[meta.tier];
-                  return (
-                    <div
-                      key={row.id}
-                      className={`group relative overflow-hidden rounded-[28px] border ${t.accentBorder} ${t.cardBg} flex flex-col`}
-                    >
-                      <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${t.bar}`} />
-                      <Link to={`/shop/${row.id}`} className="relative overflow-hidden block">
-                        <img
-                          src={row.image_url ?? '/product-fallback.svg'}
-                          alt={row.title}
-                          loading="lazy"
-                          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/product-fallback.svg'; }}
-                          className="h-[220px] w-full object-cover transition duration-500 group-hover:scale-105"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-                      </Link>
-                      <div className="p-5 flex flex-1 flex-col">
-                        <div className={`text-xs font-black uppercase tracking-[0.18em] ${t.accentText}`}>
-                          {tier.name}
-                        </div>
-                        <Link to={`/shop/${row.id}`} className="mt-1.5 block text-lg font-black leading-snug hover:text-white/80 transition">
-                          {row.title}
-                        </Link>
-                        <p className="mt-2 text-xs text-white/50 leading-5">{tier.contents}</p>
-
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {tier.badges.map((b) => (
-                            <span
-                              key={b}
-                              className={`rounded-full border ${t.accentBorder} ${t.accentBg} px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${t.accentText}`}
-                            >
-                              {b}
-                            </span>
-                          ))}
-                        </div>
-
-                        <div className="mt-4 text-3xl font-black">CAD ${Number(row.price).toFixed(2)}</div>
-                        <div className="mt-1 text-xs text-white/30">+ shipping & tax calculated at checkout</div>
-
-                        <div className="mt-auto pt-4">
-                          {row.in_stock ? (
-                            <button
-                              onClick={() => addToCart(row)}
-                              className={`w-full rounded-2xl ${t.btn} px-4 py-3 text-sm font-black uppercase tracking-[0.08em] text-black transition hover:opacity-95`}
-                            >
-                              Add to Cart
-                            </button>
-                          ) : (
-                            <button disabled className="w-full rounded-2xl border border-white/8 bg-white/4 px-4 py-2.5 text-sm font-black uppercase tracking-[0.08em] text-white/25 cursor-not-allowed">
-                              Sold Out
-                            </button>
-                          )}
-                        </div>
+            <motion.div
+              className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+            >
+              <div
+                className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+                onClick={() => setPickerTheme(null)}
+              />
+              <motion.div
+                role="dialog"
+                aria-modal="true"
+                aria-label={`${t.label} pack options`}
+                initial={{ y: 40, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 40, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className={`relative z-10 max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-[28px] border ${t.accentBorder} ${t.cardBg} sm:rounded-[28px]`}
+              >
+                <div className={`sticky top-0 z-10 h-1 bg-gradient-to-r ${t.bar}`} />
+                <div className="p-6 md:p-8">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className={`text-2xl font-black uppercase tracking-[0.06em] ${t.accentText}`}>
+                        {t.label}
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {t.keywords.map((k) => (
+                          <span
+                            key={k}
+                            className={`rounded-full border ${t.accentBorder} ${t.accentBg} px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${t.accentText}`}
+                          >
+                            {k}
+                          </span>
+                        ))}
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
+                    <button
+                      type="button"
+                      onClick={() => setPickerTheme(null)}
+                      aria-label="Close"
+                      className="shrink-0 rounded-full border border-white/10 bg-white/5 p-2 text-white/60 transition hover:bg-white/10 hover:text-white"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  {/* Tier toggle */}
+                  <div className="mt-6 grid grid-cols-2 gap-3">
+                    {['standard', 'premium'].map((tierKey) => {
+                      const ti = TIER_INFO[tierKey];
+                      const row = tierKey === 'standard' ? stdRow : premRow;
+                      const active = pickerTier === tierKey;
+                      return (
+                        <button
+                          key={tierKey}
+                          type="button"
+                          onClick={() => setPickerTier(tierKey)}
+                          aria-pressed={active}
+                          className={`rounded-2xl border px-4 py-4 text-left transition ${
+                            active
+                              ? `${t.accentBorder} ${t.accentBg}`
+                              : 'border-white/10 bg-white/4 hover:border-white/20'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className={`text-sm font-black uppercase tracking-[0.1em] ${active ? t.accentText : 'text-white/70'}`}>
+                              {ti.name}
+                            </span>
+                            {active && <Check className={`h-4 w-4 ${t.accentText}`} />}
+                          </div>
+                          <div className="mt-1 text-2xl font-black text-white">CAD ${ti.price.toFixed(2)}</div>
+                          {row && !row.in_stock && (
+                            <div className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] text-white/35">Sold Out</div>
+                          )}
+                          {!row && (
+                            <div className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] text-white/35">Coming soon</div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Difference table — Standard vs Premium side by side */}
+                  <div className="mt-6 overflow-hidden rounded-2xl border border-white/10">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="bg-white/5 text-white/45">
+                          <th className="px-4 py-3 font-black uppercase tracking-[0.1em]"> </th>
+                          <th className={`px-4 py-3 font-black uppercase tracking-[0.1em] ${pickerTier === 'standard' ? t.accentText : 'text-white/55'}`}>
+                            Standard
+                          </th>
+                          <th className={`px-4 py-3 font-black uppercase tracking-[0.1em] ${pickerTier === 'premium' ? t.accentText : 'text-white/55'}`}>
+                            Premium
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {DIFF_ROWS.map((label, i) => (
+                          <tr key={label} className={i % 2 ? 'bg-white/[0.02]' : ''}>
+                            <td className="px-4 py-3 font-black uppercase tracking-[0.08em] text-white/40">{label}</td>
+                            <td className={`px-4 py-3 leading-5 ${pickerTier === 'standard' ? 'text-white/85' : 'text-white/55'}`}>
+                              {TIER_INFO.standard.diff[label]}
+                            </td>
+                            <td className={`px-4 py-3 leading-5 ${pickerTier === 'premium' ? 'text-white/85' : 'text-white/55'}`}>
+                              {TIER_INFO.premium.diff[label]}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <p className="mt-4 text-xs text-white/40 leading-5">{selectedTier.contents}</p>
+                  <div className="mt-1 text-xs text-white/30">+ shipping and tax calculated at checkout</div>
+
+                  {/* Add to cart for the selected tier's products row */}
+                  <div className="mt-6">
+                    {canBuy ? (
+                      <button
+                        type="button"
+                        onClick={() => { addToCart(selectedRow); setPickerTheme(null); }}
+                        className={`w-full rounded-2xl ${t.btn} px-4 py-4 text-sm font-black uppercase tracking-[0.08em] text-black transition hover:opacity-95`}
+                      >
+                        Add {selectedTier.name} to Cart — CAD ${selectedTier.price.toFixed(2)}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled
+                        className="w-full cursor-not-allowed rounded-2xl border border-white/8 bg-white/4 px-4 py-4 text-sm font-black uppercase tracking-[0.08em] text-white/30"
+                      >
+                        {selectedRow ? `${selectedTier.name} Sold Out` : `${selectedTier.name} Coming Soon`}
+                      </button>
+                    )}
+                    {selectedRow && (
+                      <Link
+                        to={`/shop/${selectedRow.id}`}
+                        className="mt-3 block text-center text-xs font-black uppercase tracking-[0.12em] text-white/45 transition hover:text-white/70"
+                      >
+                        View full product page
+                      </Link>
+                    )}
+                    {!selectedRow && (
+                      <div className="mt-3 text-center text-[11px] text-white/30">
+                        Item id: {expectedId}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
           );
-        })}
-      </section>
+        })()}
+      </AnimatePresence>
 
       {/* Disclaimers */}
       <section className="mx-auto max-w-7xl px-6 pb-2">

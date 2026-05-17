@@ -12,8 +12,16 @@
  *   - Idempotent: if orders.stock_restored_at is already set, the order is
  *     just (re)flagged payment_rejected and stock is NOT restored again.
  *   - Pre-order lines are skipped (they never decremented stock).
+ *   - stock_restored_at is stamped ONLY if every eligible in-stock line was
+ *     restored successfully. If any line fails, the order is still flagged
+ *     payment_rejected (the admin did reject it) but stock_restored_at is
+ *     left NULL so the idempotent guard isn't tripped and the admin can
+ *     retry until restore actually succeeds. The recurring "rejected but
+ *     stock didn't come back" bug was caused by stamping unconditionally.
  *
- * Response shape mirrors the Supabase client: { data, error }.
+ * Response shape mirrors the Supabase client:
+ *   { data: { order_id, already_restored, restored:[...], failed:[...] },
+ *     error }
  */
 import { getServiceClient } from '../_lib/db.js';
 import { verifyAdminRequest } from '../_lib/admin-auth-verify.js';
@@ -69,12 +77,24 @@ export default async function handler(req, res) {
 
     const alreadyRestored = !!order.stock_restored_at;
     let restored = [];
+    let failed = [];
 
     if (!alreadyRestored) {
-      const { data: items } = await db
+      const { data: items, error: iErr } = await db
         .from('order_items')
         .select('source_table, item_id, qty, is_preorder')
         .eq('order_id', orderId);
+
+      // If we can't even read the lines we don't know what to restore — bail
+      // BEFORE stamping so the admin can retry. Order is not flagged here;
+      // the AdminPage already PATCHed payment_status separately.
+      if (iErr) {
+        res.status(400).json({
+          data: { order_id: orderId, already_restored: false, restored: [], failed: [] },
+          error: { message: `could not read order_items: ${iErr.message}` },
+        });
+        return;
+      }
 
       for (const line of (items || [])) {
         if (line.is_preorder) continue;                 // never decremented
@@ -82,30 +102,53 @@ export default async function handler(req, res) {
         const qty = Number(line.qty) || 0;
         if ((src !== 'singles' && src !== 'products') || qty <= 0 || !line.item_id) continue;
 
-        // Read current stock then write back +qty. Cast id to text so it
-        // works whether the table PK is uuid (singles) or text (products).
-        const { data: cur } = await db.from(src).select('id, stock').limit(1)
-          .filter('id', 'eq', line.item_id);
-        const row = Array.isArray(cur) ? cur[0] : cur;
-        if (!row) continue;
-        const next = (Number(row.stock) || 0) + qty;
-        const patch = src === 'products'
-          ? { stock: next, in_stock: next > 0, badge: next > 0 ? 'In Stock' : 'Sold Out' }
-          : { stock: next, in_stock: next > 0 };
-        await db.from(src).update(patch).eq('id', row.id);
-        restored.push({ source: src, item_id: line.item_id, qty, remaining: next });
+        // Atomic increment via SECURITY DEFINER RPC (granted to service_role
+        // per docs/vuln-rpc-hardening.sql). No read-then-write race; the RPC
+        // RAISEs (→ PostgREST error) if the item row is missing, so a silent
+        // "item not found" can no longer masquerade as success.
+        const { data: rpcData, error: rpcErr } = await db.rpc('restore_item_stock', {
+          source:  src,
+          item_id: line.item_id,
+          qty,
+        });
+
+        if (rpcErr) {
+          failed.push({
+            source: src, item_id: line.item_id, qty,
+            error: rpcErr.message || 'restore_item_stock failed',
+          });
+          continue;
+        }
+
+        const remaining = (rpcData && typeof rpcData.remaining === 'number')
+          ? rpcData.remaining
+          : null;
+        restored.push({ source: src, item_id: line.item_id, qty, remaining });
       }
     }
 
+    // Flag the order rejected regardless (the admin DID reject it). Only
+    // stamp stock_restored_at when there were NO failures — stamping on a
+    // partial/failed restore is exactly the bug that permanently lost stock,
+    // because the alreadyRestored guard then blocks every retry.
+    const fullySucceeded = !alreadyRestored && failed.length === 0;
     const patch = { payment_status: 'payment_rejected' };
-    if (!alreadyRestored) patch.stock_restored_at = new Date().toISOString();
+    if (fullySucceeded) patch.stock_restored_at = new Date().toISOString();
 
     const { error: uErr } = await db.from('orders').update(patch).eq('id', orderId);
     if (uErr) { res.status(400).json({ data: null, error: { message: uErr.message } }); return; }
 
-    res.status(200).json({
-      data: { order_id: orderId, already_restored: alreadyRestored, restored },
-      error: null,
+    const partialFailure = !alreadyRestored && failed.length > 0;
+    res.status(partialFailure ? 207 : 200).json({
+      data: {
+        order_id: orderId,
+        already_restored: alreadyRestored,
+        restored,
+        failed,
+      },
+      error: partialFailure
+        ? { message: `${failed.length} item(s) failed to restore; stock_restored_at NOT set — retry the rejection.` }
+        : null,
     });
   } catch (err) {
     res.status(500).json({ data: null, error: { message: err.message } });
