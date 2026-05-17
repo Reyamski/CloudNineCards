@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -13,6 +13,28 @@ export default function CardRequestModal({ onClose, onSuccess }) {
   const [submitted, setSubmitted] = useState(false);
   const [sending, setSending]   = useState(false);
   const [sendError, setSendError] = useState('');
+
+  // Single source of truth for dismissing the modal. Never block dismissal
+  // once the request succeeded (submitted) — that screen has its own Close.
+  // While a submit is in flight, ignore Escape/backdrop so an accidental
+  // dismissal can't drop an in-progress request; the user can still wait.
+  const requestClose = useCallback(() => {
+    if (sending && !submitted) return;
+    onClose?.();
+  }, [sending, submitted, onClose]);
+
+  // Escape-to-close. Listener is attached on mount and removed on unmount
+  // so it never leaks (the modal only exists in the tree while open).
+  useEffect(() => {
+    function onKeyDown(e) {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        requestClose();
+      }
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [requestClose]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -44,22 +66,33 @@ export default function CardRequestModal({ onClose, onSuccess }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center px-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="card-request-heading"
+    >
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-        onClick={onClose}
+        onClick={requestClose}
       />
       <motion.div
         initial={{ opacity: 0, y: 24, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 24, scale: 0.97 }}
         transition={{ duration: 0.25 }}
+        onClick={e => e.stopPropagation()}
         className="relative w-full max-w-md rounded-[32px] border border-white/10 bg-[#07030f] overflow-hidden max-h-[90vh] overflow-y-auto"
       >
         <div className="h-1 w-full bg-gradient-to-r from-fuchsia-500 to-cyan-400" />
         <div className="p-6">
-          <button onClick={onClose} className="absolute right-5 top-5 rounded-xl border border-white/10 bg-white/5 p-1.5 hover:bg-white/10">
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={requestClose}
+            className="absolute right-5 top-5 z-10 rounded-xl border border-white/10 bg-white/5 p-1.5 hover:bg-white/10"
+          >
             <X className="h-4 w-4 text-white/60" />
           </button>
 
@@ -68,12 +101,12 @@ export default function CardRequestModal({ onClose, onSuccess }) {
               <div className="rounded-full border border-fuchsia-400/30 bg-fuchsia-400/10 p-5">
                 <Check className="h-10 w-10 text-fuchsia-300" />
               </div>
-              <div className="text-2xl font-black uppercase">Request received</div>
+              <div id="card-request-heading" className="text-2xl font-black uppercase">Request received</div>
               <p className="max-w-xs text-sm text-white/60 leading-6">
                 We'll hunt for <span className="text-white/80">{cardName}</span> and email{' '}
                 <span className="text-fuchsia-300">{email}</span> if we can source it. No payment until you confirm.
               </p>
-              <button onClick={onClose} className="rounded-2xl border border-white/10 bg-white/5 px-6 py-2.5 text-sm font-black uppercase text-white/65 hover:bg-white/10">
+              <button type="button" onClick={requestClose} className="rounded-2xl border border-white/10 bg-white/5 px-6 py-2.5 text-sm font-black uppercase text-white/65 hover:bg-white/10">
                 Close
               </button>
             </motion.div>
@@ -81,7 +114,7 @@ export default function CardRequestModal({ onClose, onSuccess }) {
             <>
               <div className="mb-5">
                 <div className="text-xs font-black uppercase tracking-[0.2em] text-fuchsia-300/70 mb-1">Source an Item</div>
-                <div className="text-xl font-black leading-snug">Can't find a card? Request it</div>
+                <div id="card-request-heading" className="text-xl font-black leading-snug">Can't find a card? Request it</div>
                 <p className="mt-1.5 text-xs text-white/45 leading-5">
                   Tell us what you're after and we'll track it down. No account needed — just an email so we can reach you.
                 </p>

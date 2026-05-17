@@ -9,9 +9,12 @@ import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
-// Load .env into process.env for local dev
+// Load .env into process.env for local dev.
+// Order matters: first file to set a key wins (see guard below). So a present
+// .env.development (local Supabase) overrides prod values in .env. On Vercel
+// there are no .env files and process.env is pre-populated, so this is a no-op.
 const __dir = dirname(fileURLToPath(import.meta.url));
-for (const envFile of ['.env', '.env.local']) {
+for (const envFile of ['.env.development', '.env', '.env.local']) {
   try {
     const lines = readFileSync(resolve(__dir, envFile), 'utf8').split('\n');
     for (const line of lines) {

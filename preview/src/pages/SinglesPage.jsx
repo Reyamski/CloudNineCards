@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, SlidersHorizontal, Package, Globe, ShieldCheck, X, Plus } from 'lucide-react';
+import { Package, Globe, ShieldCheck, X, Plus } from 'lucide-react';
 import Nav from '../components/Nav';
 import Footer from '../components/Footer';
 import { supabase, supabaseEnabled } from '../lib/supabase';
 import { useCart } from '../contexts/CartContext';
 import { useToast } from '../components/Toast';
 import CardRequestModal from '../components/CardRequestModal';
+import { ControlsBar, RequestCardBanner } from '../components/CatalogControls';
 
 const GAMES      = ['All', 'One Piece', 'Pokemon', 'Dragon Ball', 'Yu-Gi-Oh!', 'Union Arena'];
 const LANGS      = ['All', 'English', 'Japanese'];
@@ -379,29 +380,17 @@ export default function SinglesPage() {
       </AnimatePresence>
 
       <section className="mx-auto max-w-7xl px-6 py-8">
-        {/* Unified controls: search + single Filter & Sort button + request CTA */}
+        {/* Search + Filter & Sort, then a clearly explained request CTA */}
         <div className="mb-5 flex flex-col gap-3">
-          <div className="flex flex-wrap gap-2 sm:gap-3">
-            <div className="relative w-full sm:flex-1">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30" />
-              <input value={search} onChange={e => setSearch(e.target.value)}
-                placeholder="Search by card name, set, or number…"
-                className="w-full rounded-2xl border border-white/10 bg-white/5 py-3 pl-11 pr-4 text-sm text-white placeholder-white/30 outline-none focus:border-cyan-300/40" />
-            </div>
-            <button onClick={() => setShowFilters(true)}
-              className={`flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-[11px] font-black uppercase tracking-[0.12em] transition sm:text-xs sm:tracking-[0.14em] ${activeFilterCount > 0 ? 'border-fuchsia-400/50 bg-fuchsia-400/15 text-fuchsia-200' : 'border-white/10 bg-white/5 text-white/65 hover:bg-white/10'}`}>
-              <SlidersHorizontal className="h-4 w-4" /> Filter &amp; Sort
-              {activeFilterCount > 0 && (
-                <span className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-fuchsia-400 px-1 text-[10px] font-black text-black">
-                  {activeFilterCount}
-                </span>
-              )}
-            </button>
-            <button onClick={() => setShowRequest(true)}
-              className="flex items-center justify-center gap-2 rounded-2xl border border-cyan-300/35 bg-cyan-300/8 px-4 py-3 text-[11px] font-black uppercase tracking-[0.12em] text-cyan-200 transition hover:border-cyan-300/55 hover:bg-cyan-300/15 sm:text-xs sm:tracking-[0.14em]">
-              <Plus className="h-4 w-4" /> Request a Card
-            </button>
-          </div>
+          <ControlsBar
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search by card name, set, or number…"
+            activeFilterCount={activeFilterCount}
+            onOpenFilters={() => setShowFilters(true)}
+          />
+
+          <RequestCardBanner onRequest={() => setShowRequest(true)} />
 
           {/* Result count + active filter chips */}
           <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -432,10 +421,10 @@ export default function SinglesPage() {
           <div className="py-20 text-center">
             <div className="text-5xl mb-4">🃏</div>
             <div className="text-xl font-black uppercase">No cards found</div>
-            <p className="mt-2 text-sm text-white/50">Try adjusting your filters — or ask us to source it for you.</p>
+            <p className="mt-2 text-sm text-white/50">Try adjusting your filters, or ask us to source the card for you.</p>
             <button
               onClick={() => setShowRequest(true)}
-              className="mt-6 inline-flex items-center gap-2 rounded-2xl border border-cyan-300/35 bg-cyan-300/8 px-6 py-2.5 text-sm font-black uppercase tracking-[0.1em] text-cyan-200 hover:bg-cyan-300/15"
+              className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 px-6 py-3 text-sm font-black uppercase tracking-[0.1em] text-black transition hover:opacity-90"
             >
               <Plus className="h-4 w-4" /> Request a Card
             </button>

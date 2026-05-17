@@ -1,6 +1,6 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {Link} from 'react-router-dom';
-import {BellRing, ChevronRight, Flame, Package, ShieldCheck, Sparkles, Star, Truck, Zap, Globe} from 'lucide-react';
+import {BellRing, ChevronLeft, ChevronRight, Flame, Package, ShieldCheck, Sparkles, Star, Truck, Zap, Globe} from 'lucide-react';
 import {motion} from 'framer-motion';
 import {supabase, supabaseEnabled} from './lib/supabase';
 import Footer from './components/Footer';
@@ -53,6 +53,39 @@ const BASE_STOCK_SPOTLIGHT = [
     subtitle: 'English',
   },
 ];
+
+// A spotlight card as the Home UI renders it.
+type SpotlightCard = {
+  id: string;
+  link: string;
+  badge: string;
+  title: string;
+  body: string;
+  image: string;
+  price: string;
+  subtitle: string;
+};
+
+function formatCad(value: number): string {
+  return `CAD $${(Number(value) || 0).toFixed(2)}`;
+}
+
+// Normalize a Supabase `products` row into the spotlight card shape.
+// Mirrors ShopPage's normalizeDbProduct, then maps to Home's card fields.
+function normalizeProductToSpotlight(row: any): SpotlightCard {
+  const inStock = row.in_stock;
+  const subtitle = row.language || row.subtitle || 'Sealed';
+  return {
+    id: String(row.id),
+    link: `/shop?product=${row.id}`,
+    badge: row.badge || (inStock ? 'In Stock' : 'Sold Out'),
+    title: row.title || 'Untitled',
+    body: row.subtitle || `${subtitle}. In stock, ready to ship from Canada.`,
+    image: row.image_url || '/product-fallback.svg',
+    price: formatCad(Number(row.price)),
+    subtitle,
+  };
+}
 
 const trust = [
   {icon: ShieldCheck, title: 'Verified Seller', desc: 'Real buyers, real orders, fast replies. You know what you\'re getting before you pay.'},
@@ -125,35 +158,52 @@ export default function HomePage() {
     async function loadHomepageData() {
       if (!supabaseEnabled || !supabase) return;
 
-      const [{data: stockRows}, {data: videoRow}] = await Promise.all([
-        supabase.from('stock').select('*'),
+      const [{data: videoRow}, prodRes] = await Promise.all([
         supabase.from('config').select('value').eq('key', 'video_id').maybeSingle(),
+        supabase.from('products').select('*'),
       ]);
 
       if (videoRow?.value) {
         setVideoId(extractYoutubeId(videoRow.value) || DEFAULT_VIDEO_ID);
       }
 
+      // Primary source: the `products` table. Show every product that is
+      // actually on hand (in_stock true AND stock > 0), not a hardcoded list.
+      const prodRows = prodRes?.data;
+      const prodError = prodRes?.error;
+      if (!prodError && prodRows && prodRows.length > 0) {
+        const inStockCards = prodRows
+          .filter((row) => row.in_stock && (Number(row.stock) || 0) > 0)
+          .map(normalizeProductToSpotlight);
+        if (inStockCards.length) {
+          setSpotlightCards(inStockCards);
+          return;
+        }
+      }
+
+      // Fallback: overlay the `stock` table onto BASE_STOCK_SPOTLIGHT so the
+      // page never goes blank if `products` is unavailable / empty. Mirrors
+      // ShopPage's products → stock fallback path.
+      const {data: stockRows} = await supabase.from('stock').select('*');
       if (stockRows?.length) {
         const nextCards = BASE_STOCK_SPOTLIGHT
           .map((card) => {
             const row = stockRows.find((stock) => stock.id === card.id);
-            const quantity = row?.quantity ?? 0;
-            const inStock = row?.in_stock ?? true;
-
             return {
               ...card,
-              quantity,
-              inStock,
+              quantity: row?.quantity ?? 0,
+              inStock: row?.in_stock ?? true,
             };
           })
           .filter((card) => card.inStock && card.quantity > 0)
-          .slice(0, 4);
+          .map(({quantity: _q, inStock: _i, ...card}) => card);
 
         if (nextCards.length) {
           setSpotlightCards(nextCards);
         }
       }
+      // If both paths fail, the initial BASE_STOCK_SPOTLIGHT state remains,
+      // so the spotlight is never empty.
     }
 
     loadHomepageData();
@@ -205,7 +255,42 @@ export default function HomePage() {
 
   const heroCard = spotlightCards[0];
   const sideCards = spotlightCards.slice(1, 3);
-  const featuredCards = spotlightCards.slice(0, 3);
+  // The full in-stock list drives the carousel below.
+  const carouselCards = spotlightCards;
+
+  // Carousel scroll controls (horizontal snap + prev/next + keyboard).
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const [canPrev, setCanPrev] = useState(false);
+  const [canNext, setCanNext] = useState(false);
+
+  function updateCarouselNav() {
+    const el = trackRef.current;
+    if (!el) return;
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    setCanPrev(el.scrollLeft > 4);
+    setCanNext(el.scrollLeft < maxScroll - 4);
+  }
+
+  useEffect(() => {
+    // Recompute nav affordances after layout settles (cards may have just
+    // mounted from the async stock load), and whenever the viewport resizes.
+    const raf = requestAnimationFrame(updateCarouselNav);
+    const onResize = () => updateCarouselNav();
+    window.addEventListener('resize', onResize);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', onResize);
+    };
+  }, [carouselCards.length]);
+
+  function scrollCarousel(dir: 1 | -1) {
+    const el = trackRef.current;
+    if (!el) return;
+    // Advance by roughly one card width so paging feels deliberate.
+    const firstCard = el.querySelector<HTMLElement>('[data-carousel-card]');
+    const step = firstCard ? firstCard.offsetWidth + 24 : Math.round(el.clientWidth * 0.85);
+    el.scrollBy({left: dir * step, behavior: 'smooth'});
+  }
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#05010c] text-white">
@@ -327,16 +412,28 @@ export default function HomePage() {
                 {heroCard ? (
                   <Link
                     to={heroCard.link}
-                    className="relative block overflow-hidden rounded-[34px] border border-fuchsia-400/20 bg-white/5 shadow-[0_28px_90px_rgba(0,0,0,0.48)] transition hover:scale-[1.01] hover:border-cyan-300/35"
+                    className="group relative flex flex-col overflow-hidden rounded-[34px] border border-fuchsia-400/20 bg-[linear-gradient(180deg,#0b1022,#14081d)] shadow-[0_28px_90px_rgba(0,0,0,0.48)] transition hover:scale-[1.01] hover:border-cyan-300/35"
                   >
-                    <img src={heroCard.image} alt={heroCard.title} className="h-[420px] w-full object-cover saturate-[1.35] contrast-[1.04]" />
-                    <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.95),rgba(0,0,0,0.34),transparent)]" />
-                    <div className="absolute bottom-0 left-0 right-0 p-5 md:p-6">
-                      <div className="mb-3 inline-flex rounded-full bg-cyan-300/90 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-black shadow-lg">
+                    <div className="pointer-events-none absolute inset-x-0 top-0 z-30 h-1 bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-yellow-300" />
+                    <div className="flex h-[300px] w-full shrink-0 items-center justify-center bg-[radial-gradient(circle_at_center,#1a0b2e,#05010c)] md:h-[340px]">
+                      <img
+                        src={heroCard.image}
+                        alt={heroCard.title}
+                        loading="eager"
+                        decoding="async"
+                        onError={(event) => {
+                          event.currentTarget.onerror = null;
+                          event.currentTarget.src = '/product-fallback.svg';
+                        }}
+                        className="h-full w-full object-contain saturate-[1.2] contrast-[1.02] transition duration-500 group-hover:scale-[1.03]"
+                      />
+                    </div>
+                    <div className="flex flex-col p-5 md:p-6">
+                      <div className="inline-flex w-fit rounded-full bg-cyan-300/90 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-black">
                         {heroCard.badge}
                       </div>
-                      <div className="text-3xl font-black uppercase leading-none md:text-4xl">{heroCard.title}</div>
-                      <div className="mt-2 max-w-sm text-sm leading-6 text-white/78">{heroCard.body}</div>
+                      <div className="mt-3 text-2xl font-black uppercase leading-tight md:text-3xl">{heroCard.title}</div>
+                      <div className="mt-2 text-sm leading-6 text-white/65">{heroCard.body}</div>
                       <div className="mt-3 text-sm font-black uppercase tracking-[0.16em] text-cyan-200">
                         {heroCard.subtitle} | {heroCard.price}
                       </div>
@@ -349,13 +446,24 @@ export default function HomePage() {
                     <Link
                       key={card.id}
                       to={card.link}
-                      className="relative block overflow-hidden rounded-[24px] border border-cyan-300/20 bg-white/5 shadow-xl transition hover:scale-[1.01] hover:border-cyan-300/35"
+                      className="group relative flex flex-col overflow-hidden rounded-[24px] border border-cyan-300/20 bg-[linear-gradient(180deg,#0b1022,#14081d)] shadow-xl transition hover:scale-[1.01] hover:border-cyan-300/35"
                     >
-                      <img src={card.image} alt={card.title} className="h-[196px] w-full object-cover saturate-[1.35]" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/88 via-black/30 to-transparent" />
-                      <div className="absolute bottom-0 p-4">
-                        <div className="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-200">{card.badge}</div>
-                        <div className="mt-1 text-lg font-black uppercase leading-tight">{card.title}</div>
+                      <div className="relative aspect-[4/5] w-full overflow-hidden bg-[radial-gradient(circle_at_center,#1a0b2e,#05010c)]">
+                        <img
+                          src={card.image}
+                          alt={card.title}
+                          loading="eager"
+                          decoding="async"
+                          onError={(event) => {
+                            event.currentTarget.onerror = null;
+                            event.currentTarget.src = '/product-fallback.svg';
+                          }}
+                          className="absolute inset-0 h-full w-full object-contain saturate-[1.2] transition duration-500 group-hover:scale-[1.03]"
+                        />
+                      </div>
+                      <div className="flex flex-col p-4">
+                        <div className="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-300/75">{card.badge}</div>
+                        <div className="mt-1.5 text-base font-black uppercase leading-tight">{card.title}</div>
                       </div>
                     </Link>
                   ))}
@@ -431,44 +539,130 @@ export default function HomePage() {
           <div>
             <div className="text-sm font-black uppercase tracking-[0.22em] text-cyan-300/75">Live inventory</div>
             <h2 className="mt-2 text-3xl font-black uppercase md:text-5xl">In Stock Now</h2>
+            <p className="mt-2 text-sm text-white/55">
+              {carouselCards.length} {carouselCards.length === 1 ? 'product' : 'products'} on hand right now.
+            </p>
           </div>
-          <Link to="/shop" className="hidden rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-black uppercase tracking-[0.08em] text-white/80 md:inline-flex">
-            View all products
-          </Link>
+          <div className="hidden flex-wrap items-center justify-end gap-3 md:flex">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => scrollCarousel(-1)}
+                disabled={!canPrev}
+                aria-label="Previous products"
+                className="rounded-full border border-white/15 bg-white/5 p-2.5 text-white/80 transition hover:border-cyan-300/40 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollCarousel(1)}
+                disabled={!canNext}
+                aria-label="Next products"
+                className="rounded-full border border-white/15 bg-white/5 p-2.5 text-white/80 transition hover:border-cyan-300/40 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
+            <Link to="/shop" className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-black uppercase tracking-[0.08em] text-white/80 transition hover:border-cyan-300/40 hover:bg-white/10">
+              View all products
+            </Link>
+            <Link to="/singles" className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 px-4 py-2 text-sm font-black uppercase tracking-[0.08em] text-black transition hover:opacity-95">
+              Browse Singles <ChevronRight className="h-4 w-4" />
+            </Link>
+          </div>
         </div>
-        <div className="relative grid gap-6 md:grid-cols-3">
-          {featuredCards.map((item) => (
-            <div key={item.id} className="group relative overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,#0b1022,#14081d)]">
-              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-yellow-300" />
-              <div className="relative overflow-hidden">
+
+        <div
+          ref={trackRef}
+          onScroll={updateCarouselNav}
+          role="region"
+          aria-label="In stock products carousel"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowRight') { e.preventDefault(); scrollCarousel(1); }
+            if (e.key === 'ArrowLeft') { e.preventDefault(); scrollCarousel(-1); }
+          }}
+          className="relative flex snap-x snap-mandatory gap-6 overflow-x-auto scroll-smooth pb-4 outline-none [-ms-overflow-style:none] [scrollbar-width:none] focus-visible:ring-2 focus-visible:ring-cyan-300/40 [&::-webkit-scrollbar]:hidden"
+        >
+          {carouselCards.map((item, idx) => (
+            <motion.div
+              key={item.id}
+              data-carousel-card
+              initial={{opacity: 0, y: 20}}
+              whileInView={{opacity: 1, y: 0}}
+              viewport={{once: true}}
+              transition={{duration: 0.4, delay: Math.min(idx, 5) * 0.05}}
+              className="group relative flex w-[78vw] shrink-0 snap-start flex-col overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,#0b1022,#14081d)] sm:w-[340px] md:w-[360px]"
+            >
+              <Link
+                to={item.link}
+                aria-label={`View ${item.title}`}
+                className="absolute inset-0 z-20 rounded-[32px] outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60"
+              />
+              <div className="pointer-events-none absolute inset-x-0 top-0 z-30 h-1 bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-yellow-300" />
+              <div className="relative aspect-[4/5] w-full shrink-0 overflow-hidden bg-[radial-gradient(circle_at_center,#1a0b2e,#05010c)]">
                 <img
                   src={item.image}
                   alt={item.title}
-                  loading="lazy"
+                  loading="eager"
                   decoding="async"
                   onError={(event) => {
                     event.currentTarget.onerror = null;
                     event.currentTarget.src = '/product-fallback.svg';
                   }}
-                  className="h-[295px] w-full object-cover saturate-[1.35] transition duration-500 group-hover:scale-105"
+                  className="absolute inset-0 h-full w-full object-contain saturate-[1.2] transition duration-500 group-hover:scale-[1.04]"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                <div className="absolute left-4 top-4 rounded-full border border-white/10 bg-black/72 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-white backdrop-blur">
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
+                <div className="pointer-events-none absolute left-4 top-4 z-30 rounded-full border border-white/10 bg-black/72 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-white backdrop-blur">
                   {item.badge}
                 </div>
               </div>
-              <div className="p-5">
+              <div className="pointer-events-none relative z-30 flex flex-1 flex-col p-5">
                 <div className="text-sm font-black uppercase tracking-[0.18em] text-cyan-300/75">{item.subtitle}</div>
-                <div className="mt-2 text-xl font-black leading-snug">{item.title}</div>
-                <div className="mt-4 text-3xl font-black">{item.price}</div>
-                <div className="mt-5 flex gap-3">
-                  <Link to={item.link} className="flex-1 rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 px-4 py-3 text-center text-sm font-black uppercase tracking-[0.08em] text-black transition hover:opacity-95">
-                    Buy Now — Wise
-                  </Link>
+                <div className="mt-2 line-clamp-2 min-h-[3.5rem] text-xl font-black leading-snug">{item.title}</div>
+                <div className="mt-auto pt-4">
+                  <div className="text-3xl font-black">{item.price}</div>
+                  <div className="mt-5 flex gap-3">
+                    <span className="flex-1 rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 px-4 py-3 text-center text-sm font-black uppercase tracking-[0.08em] text-black transition group-hover:opacity-95">
+                      View Product
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
           ))}
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 md:hidden">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => scrollCarousel(-1)}
+              disabled={!canPrev}
+              aria-label="Previous products"
+              className="rounded-full border border-white/15 bg-white/5 p-2.5 text-white/80 transition hover:bg-white/10 disabled:opacity-30"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollCarousel(1)}
+              disabled={!canNext}
+              aria-label="Next products"
+              className="rounded-full border border-white/15 bg-white/5 p-2.5 text-white/80 transition hover:bg-white/10 disabled:opacity-30"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="flex flex-1 items-center justify-end gap-2">
+            <Link to="/shop" className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-black uppercase tracking-[0.06em] text-white/80">
+              View all products
+            </Link>
+            <Link to="/singles" className="inline-flex items-center gap-1.5 rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 px-3 py-2 text-xs font-black uppercase tracking-[0.06em] text-black">
+              Browse Singles <ChevronRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
         </div>
       </section>
 

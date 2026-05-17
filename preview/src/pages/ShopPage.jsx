@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase, supabaseEnabled } from '../lib/supabase';
-import { X, Check, SlidersHorizontal } from 'lucide-react';
+import { X, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Nav from '../components/Nav';
 import Footer from '../components/Footer';
 import CardRequestModal from '../components/CardRequestModal';
+import { ControlsBar, RequestCardBanner } from '../components/CatalogControls';
 import { allProducts } from '../data/products';
 import { useCart } from '../contexts/CartContext';
 import { useToast } from '../components/Toast';
@@ -461,28 +462,12 @@ export default function ShopPage() {
           </div>
         </div>
 
-        <div className="mb-4 flex flex-wrap items-center gap-3">
-          <button
-            onClick={() => setShowRequest(true)}
-            className="inline-flex items-center gap-2 rounded-full border border-cyan-300/35 bg-cyan-300/8 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-cyan-200 transition hover:border-cyan-300/55 hover:bg-cyan-300/15"
-          >
-            Request a Card
-          </button>
-          <button
-            onClick={() => setShowFilters(true)}
-            className={`ml-auto inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-black uppercase tracking-[0.14em] transition ${
-              activeFilterCount > 0
-                ? 'border-fuchsia-400/50 bg-fuchsia-400/15 text-fuchsia-200'
-                : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'
-            }`}
-          >
-            <SlidersHorizontal className="h-4 w-4" /> Filter &amp; Sort
-            {activeFilterCount > 0 && (
-              <span className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-fuchsia-400 px-1 text-[10px] font-black text-black">
-                {activeFilterCount}
-              </span>
-            )}
-          </button>
+        <div className="mb-4 flex flex-col gap-3">
+          <ControlsBar
+            activeFilterCount={activeFilterCount}
+            onOpenFilters={() => setShowFilters(true)}
+          />
+          <RequestCardBanner onRequest={() => setShowRequest(true)} />
         </div>
 
         {/* Active availability chip row */}
