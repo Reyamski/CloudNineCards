@@ -322,15 +322,19 @@ export default function DeckBuilderPacksPage() {
                 className={`group relative flex flex-col overflow-hidden rounded-[28px] border ${t.accentBorder} ${t.cardBg} text-left`}
               >
                 <div className={`absolute inset-x-0 top-0 z-10 h-1 bg-gradient-to-r ${t.bar}`} />
-                <div className="relative overflow-hidden">
+                {/* Poster is the hero: self-contained art already carries the pack
+                    name, character and keyword line. Use a portrait container
+                    sized to the tallest poster ratio (2:3) with object-contain
+                    so every poster shows in full — no face/title crop — across
+                    the mixed source ratios (2:3 and 4:5). */}
+                <div className="relative aspect-[2/3] w-full overflow-hidden bg-black/40">
                   <img
                     src={t.image}
                     alt={title}
                     loading="lazy"
                     onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/product-fallback.svg'; }}
-                    className="h-[260px] w-full object-cover transition duration-500 group-hover:scale-105"
+                    className="absolute inset-0 h-full w-full object-contain transition duration-500 group-hover:scale-[1.03]"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
                   {!inStock && seeded && (
                     <span className="absolute right-3 top-3 rounded-full border border-white/15 bg-black/60 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white/50">
                       Sold Out
@@ -340,22 +344,11 @@ export default function DeckBuilderPacksPage() {
                     Includes 2 Rares
                   </span>
                 </div>
+                {/* Pack name + keyword line are baked into the poster above, so
+                    the card stays clean here: blurb (not in art), contents,
+                    price and CTA only — no duplicate text title/chips. */}
                 <div className="flex flex-1 flex-col p-5">
-                  <div className={`text-xl font-black uppercase tracking-[0.06em] ${t.accentText}`}>
-                    {title}
-                  </div>
-                  <p className="mt-2 text-xs text-white/55 leading-5">{t.blurb}</p>
-
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {t.keywords.map((k) => (
-                      <span
-                        key={k}
-                        className={`rounded-full border ${t.accentBorder} ${t.accentBg} px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] ${t.accentText}`}
-                      >
-                        {k}
-                      </span>
-                    ))}
-                  </div>
+                  <p className="text-xs text-white/55 leading-5">{t.blurb}</p>
 
                   <p className="mt-3 text-xs text-white/45 leading-5">
                     Includes 2 rare cards plus 25 same-color commons and uncommons.
