@@ -1,3 +1,7 @@
+-- ⚠️ SUPERSEDED — DO NOT RUN. Premium tier was removed. The canonical seed is
+-- now docs/deck-builder-packs-final.sql (6 Standard-only products, optimized
+-- /deck-builder/*.webp art). This file is kept for history only.
+--
 -- ── Deck Builder Packs — seed 12 products (6 themes × Standard / Premium) ────
 -- Structured deck-building bundles for beginners. NOT a mystery / loot-box /
 -- gambling product. Each pack is a fixed-size, single-color set of

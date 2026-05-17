@@ -1,3 +1,7 @@
+-- ⚠️ SUPERSEDED — DO NOT RUN. Premium tier was removed and the art is now the
+-- optimized /deck-builder/*.webp pack art. The canonical seed is now
+-- docs/deck-builder-packs-final.sql. This file is kept for history only.
+--
 -- ── Deck Builder Packs — repoint to self-hosted One Piece sample images ─────
 -- Replaces the themed placeholders with One Piece character art that is
 -- ALREADY shipped and live in preview/public/ (reused, not newly downloaded
