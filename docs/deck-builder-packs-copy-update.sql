@@ -1,3 +1,7 @@
+-- ⚠️ SUPERSEDED — DO NOT RUN. Premium tier was removed. The canonical seed is
+-- now docs/deck-builder-packs-final.sql (6 Standard-only products). This file
+-- is kept for history only.
+--
 -- ── Deck Builder Packs — plain-text copy update (12 rows) ───────────────────
 -- Rewrites the 12 pack titles and subtitles to natural plain text, removing
 -- any AI-looking em-dash (—) from titles and middle-dot (·) from subtitles.
