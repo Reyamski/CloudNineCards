@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 560" width="400" height="560" role="img" aria-label="Purple Chaos Deck Builder Pack — sample image">
+  <defs>
+    <radialGradient id="g" cx="50%" cy="38%" r="70%">
+      <stop offset="0%" stop-color="#a855f7" stop-opacity="0.32"/>
+      <stop offset="55%" stop-color="#4c1d95" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#120420" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2c0f44"/>
+      <stop offset="100%" stop-color="#120420"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="560" fill="#120420"/>
+  <rect width="400" height="560" fill="url(#g)"/>
+  <g transform="translate(200 250)" opacity="0.9">
+    <rect x="-92" y="-128" width="184" height="256" rx="14" transform="rotate(-9)" fill="url(#card)" stroke="#c084fc" stroke-opacity="0.35"/>
+    <rect x="-92" y="-128" width="184" height="256" rx="14" transform="rotate(5)"  fill="url(#card)" stroke="#c084fc" stroke-opacity="0.5"/>
+    <rect x="-92" y="-128" width="184" height="256" rx="14" fill="url(#card)" stroke="#c084fc" stroke-opacity="0.85" stroke-width="2"/>
+    <g fill="#c084fc" fill-opacity="0.88">
+      <circle cx="0" cy="-2" r="14"/>
+      <path d="M0 -56 L9 -20 L0 -2 L-9 -20 Z"/>
+      <path d="M0 52 L9 18 L0 -2 L-9 18 Z"/>
+      <path d="M-54 -2 L-18 -9 L0 -2 L-18 9 Z"/>
+      <path d="M54 -2 L18 -9 L0 -2 L18 9 Z"/>
+    </g>
+  </g>
+  <text x="200" y="60" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" letter-spacing="6" fill="#c084fc" fill-opacity="0.75">DECK BUILDER</text>
+  <text x="200" y="446" text-anchor="middle" font-family="Arial, sans-serif" font-weight="800" font-size="40" letter-spacing="2" fill="#f3e8ff">PURPLE</text>
+  <text x="200" y="486" text-anchor="middle" font-family="Arial, sans-serif" font-weight="800" font-size="26" letter-spacing="6" fill="#c084fc">CHAOS</text>
+  <text x="200" y="528" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" letter-spacing="3" fill="#d8b4fe" fill-opacity="0.6">SAMPLE IMAGE · ACTUAL CARDS VARY</text>
+</svg>

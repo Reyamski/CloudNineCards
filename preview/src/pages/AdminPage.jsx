@@ -291,6 +291,17 @@ export default function AdminPage() {
   const [prodDragOver, setProdDragOver]                 = useState(false);
   const prodFileInputRef                                = useRef(null);
 
+  // ── Leads tab (read-only) ────────────────────────────────────────────────
+  // Card requests / newsletter subscribers / restock waitlist. These tables
+  // are RLS-locked, so reads go through service-role /api/admin/* endpoints.
+  const [leadsSubTab, setLeadsSubTab]       = useState('card-requests');
+  const [cardRequests, setCardRequests]     = useState([]);
+  const [subscribers, setSubscribers]       = useState([]);
+  const [waitlist, setWaitlist]             = useState([]);
+  const [leadsLoaded, setLeadsLoaded]       = useState(false);
+  const [leadsLoading, setLeadsLoading]     = useState(false);
+  const [leadsError, setLeadsError]         = useState('');
+
   function fileToBase64(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -472,6 +483,26 @@ export default function AdminPage() {
     else { setDbProducts(data ?? []); setDbProductsError(''); }
     setDbProductsLoading(false);
     setDbProductsLoaded(true);
+  }
+
+  async function loadLeads() {
+    setLeadsLoading(true);
+    setLeadsError('');
+    const [cr, subs, wl] = await Promise.all([
+      adminFetch('/api/admin/card-requests', 'GET'),
+      adminFetch('/api/admin/subscribers', 'GET'),
+      adminFetch('/api/admin/waitlist', 'GET'),
+    ]);
+    const errs = [];
+    if (cr.error)   errs.push(`Card requests: ${cr.error.message}`);
+    else            setCardRequests(cr.data ?? []);
+    if (subs.error) errs.push(`Subscribers: ${subs.error.message}`);
+    else            setSubscribers(subs.data ?? []);
+    if (wl.error)   errs.push(`Waitlist: ${wl.error.message}`);
+    else            setWaitlist(wl.data ?? []);
+    setLeadsError(errs.join(' · '));
+    setLeadsLoading(false);
+    setLeadsLoaded(true);
   }
 
   async function addDbProduct(e) {
@@ -1254,6 +1285,14 @@ export default function AdminPage() {
               }`}
             >
               Analytics
+            </button>
+            <button
+              onClick={() => { setActiveTab('leads'); if (!leadsLoaded) loadLeads(); }}
+              className={`rounded-2xl px-4 py-2.5 text-sm font-black uppercase tracking-[0.08em] transition ${
+                activeTab === 'leads' ? 'bg-gradient-to-r from-emerald-300 via-cyan-300 to-sky-400 text-black' : 'border border-white/15 bg-white/5 text-white/70 hover:bg-white/10'
+              }`}
+            >
+              Leads
             </button>
           </div>
         </div>
@@ -2489,6 +2528,118 @@ export default function AdminPage() {
                   </div>
                 )}
               </div>
+            </div>
+          );
+        })() : null}
+
+        {activeTab === 'leads' ? (() => {
+          const SUB_TABS = [
+            { key: 'card-requests', label: 'Card Requests',         count: cardRequests.length },
+            { key: 'subscribers',   label: 'Newsletter Subscribers', count: subscribers.length },
+            { key: 'waitlist',      label: 'Restock Waitlist',       count: waitlist.length },
+          ];
+
+          function fmtCell(v) {
+            if (v == null) return '—';
+            if (typeof v === 'object') return JSON.stringify(v);
+            const s = String(v);
+            // Render ISO timestamps a bit more readably.
+            if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
+              const d = new Date(s);
+              if (!isNaN(d)) return d.toLocaleString('en-CA');
+            }
+            return s;
+          }
+
+          function Table({ rows, columns, empty }) {
+            if (rows.length === 0) {
+              return <p className="py-10 text-center text-sm text-white/30">{empty}</p>;
+            }
+            // If no fixed columns given (subscribers — schema may vary), derive
+            // them defensively from the union of keys across rows.
+            const cols = columns ?? Array.from(
+              rows.reduce((set, r) => { Object.keys(r).forEach(k => set.add(k)); return set; }, new Set())
+            );
+            return (
+              <div className="overflow-x-auto rounded-[20px] border border-white/10">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-white/10 bg-white/4">
+                      {cols.map(c => (
+                        <th key={c} className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.14em] text-white/45 whitespace-nowrap">{c}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r, i) => (
+                      <tr key={r.id ?? i} className="border-b border-white/5 last:border-0">
+                        {cols.map(c => (
+                          <td key={c} className="px-4 py-3 text-white/70 align-top max-w-[320px] break-words">{fmtCell(r[c])}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          }
+
+          return (
+            <div>
+              <div className="mb-6 flex flex-wrap items-center gap-3">
+                <div className="text-xs font-black uppercase tracking-[0.2em] text-emerald-300/70">Leads — Read Only</div>
+                <button
+                  onClick={() => loadLeads()}
+                  disabled={leadsLoading}
+                  className="flex items-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.08em] text-white/70 hover:bg-white/10 disabled:opacity-50"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" /> {leadsLoading ? 'Loading…' : 'Refresh'}
+                </button>
+              </div>
+
+              {leadsError ? (
+                <div className="mb-6 rounded-2xl border border-red-400/25 bg-red-400/10 px-4 py-3 text-sm text-red-200">
+                  {leadsError}
+                </div>
+              ) : null}
+
+              <div className="mb-6 flex flex-wrap gap-2">
+                {SUB_TABS.map(s => (
+                  <button
+                    key={s.key}
+                    onClick={() => setLeadsSubTab(s.key)}
+                    className={`rounded-full px-4 py-2 text-xs font-black uppercase tracking-[0.1em] transition ${
+                      leadsSubTab === s.key
+                        ? 'bg-gradient-to-r from-emerald-300 to-cyan-300 text-black'
+                        : 'border border-white/15 bg-white/5 text-white/65 hover:bg-white/10'
+                    }`}
+                  >
+                    {s.label} <span className="opacity-60">({s.count})</span>
+                  </button>
+                ))}
+              </div>
+
+              {leadsLoading && !leadsLoaded ? (
+                <p className="py-10 text-center text-sm text-white/40">Loading leads…</p>
+              ) : leadsSubTab === 'card-requests' ? (
+                <Table
+                  rows={cardRequests}
+                  columns={['email', 'card_name', 'set_or_details', 'notes', 'created_at']}
+                  empty="No card requests yet."
+                />
+              ) : leadsSubTab === 'subscribers' ? (
+                <Table
+                  rows={subscribers}
+                  columns={null}
+                  empty="No newsletter subscribers yet."
+                />
+              ) : (
+                <Table
+                  rows={waitlist}
+                  columns={['email', 'product_id', 'product_title', 'created_at']}
+                  empty="No restock waitlist entries yet."
+                />
+              )}
             </div>
           );
         })() : null}

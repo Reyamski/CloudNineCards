@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 560" width="400" height="560" role="img" aria-label="Red Aggression Deck Builder Pack — sample image">
+  <defs>
+    <radialGradient id="g" cx="50%" cy="38%" r="70%">
+      <stop offset="0%" stop-color="#ef4444" stop-opacity="0.32"/>
+      <stop offset="55%" stop-color="#7f1d1d" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#1a0606" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3a1010"/>
+      <stop offset="100%" stop-color="#1a0606"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="560" fill="#140404"/>
+  <rect width="400" height="560" fill="url(#g)"/>
+  <g transform="translate(200 250)" opacity="0.9">
+    <rect x="-92" y="-128" width="184" height="256" rx="14" transform="rotate(-9)" fill="url(#card)" stroke="#f87171" stroke-opacity="0.35"/>
+    <rect x="-92" y="-128" width="184" height="256" rx="14" transform="rotate(5)"  fill="url(#card)" stroke="#f87171" stroke-opacity="0.5"/>
+    <rect x="-92" y="-128" width="184" height="256" rx="14" fill="url(#card)" stroke="#f87171" stroke-opacity="0.85" stroke-width="2"/>
+    <path d="M0 -54 L34 28 L-40 -18 L40 -18 L-34 28 Z" fill="#f87171" fill-opacity="0.9"/>
+  </g>
+  <text x="200" y="60" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" letter-spacing="6" fill="#f87171" fill-opacity="0.75">DECK BUILDER</text>
+  <text x="200" y="446" text-anchor="middle" font-family="Arial, sans-serif" font-weight="800" font-size="40" letter-spacing="2" fill="#fee2e2">RED</text>
+  <text x="200" y="486" text-anchor="middle" font-family="Arial, sans-serif" font-weight="800" font-size="26" letter-spacing="5" fill="#f87171">AGGRESSION</text>
+  <text x="200" y="528" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" letter-spacing="3" fill="#fca5a5" fill-opacity="0.6">SAMPLE IMAGE · ACTUAL CARDS VARY</text>
+</svg>

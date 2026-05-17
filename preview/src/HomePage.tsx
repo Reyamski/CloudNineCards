@@ -472,6 +472,55 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section className="mx-auto max-w-7xl px-6 py-8 md:py-12">
+        <motion.div
+          initial={{opacity: 0, y: 20}}
+          whileInView={{opacity: 1, y: 0}}
+          viewport={{once: true}}
+          transition={{duration: 0.5}}
+          className="relative overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(135deg,rgba(34,211,238,0.10),rgba(168,85,247,0.12))]"
+        >
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-yellow-300" />
+          <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(5,1,12,0.7),transparent)]" />
+          <div className="relative px-6 py-8 md:px-10 md:py-10">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <div className="text-sm font-black uppercase tracking-[0.22em] text-cyan-300/80">New for beginners</div>
+                <h2 className="mt-2 text-3xl font-black uppercase md:text-4xl">
+                  Deck Builder Packs — <span className="bg-gradient-to-r from-cyan-300 via-fuchsia-300 to-yellow-300 bg-clip-text text-transparent">Build Your First Deck</span>
+                </h2>
+                <p className="mt-2 max-w-xl text-sm leading-6 text-white/60">
+                  Affordable, single-color card bundles to learn the game. Fixed price, fixed contents —
+                  not a mystery or gambling pack. Standard from CAD $9.99.
+                </p>
+              </div>
+              <Link
+                to="/deck-builder-packs"
+                className="mt-4 shrink-0 inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 px-6 py-3 text-sm font-black uppercase tracking-[0.1em] text-black transition hover:opacity-95 sm:mt-0"
+              >
+                Browse Packs <ChevronRight className="h-4 w-4" />
+              </Link>
+            </div>
+            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {[
+                { name: 'Red Aggression', cls: 'border-red-400/30 bg-red-400/10 text-red-200' },
+                { name: 'Green Fortress', cls: 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200' },
+                { name: 'Purple Chaos', cls: 'border-purple-400/30 bg-purple-400/10 text-purple-200' },
+                { name: 'Black Control', cls: 'border-zinc-400/30 bg-zinc-400/10 text-zinc-200' },
+              ].map((tile) => (
+                <Link
+                  key={tile.name}
+                  to="/deck-builder-packs"
+                  className={`rounded-2xl border ${tile.cls} px-4 py-4 text-center text-sm font-black uppercase tracking-[0.08em] transition hover:scale-[1.02]`}
+                >
+                  {tile.name}
+                </Link>
+              ))}
+            </div>
+          </div>
+        </motion.div>
+      </section>
+
       <section className="mx-auto max-w-7xl px-6 py-10 md:py-14">
         <motion.div initial={{opacity: 0, y: 24}} whileInView={{opacity: 1, y: 0}} viewport={{once: true}} transition={{duration: 0.6}}>
           <div className="mb-6 text-center">

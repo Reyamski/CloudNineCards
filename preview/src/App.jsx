@@ -7,6 +7,7 @@ import ShopPage from './pages/ShopPage';
 import PreOrdersPage from './pages/PreOrdersPage';
 import HowPreordersPage from './pages/HowPreordersPage';
 import NewArrivalsPage from './pages/NewArrivalsPage';
+import DeckBuilderPacksPage from './pages/DeckBuilderPacksPage';
 import ContactPage from './pages/ContactPage';
 // F6: AdminPage is the heaviest single page (~2.5k lines); lazy-load so the
 // public storefront chunk doesn't ship it.
@@ -33,6 +34,7 @@ export default function App() {
           <Route path="/pre-orders" element={<PreOrdersPage />} />
           <Route path="/how-preorders-work" element={<HowPreordersPage />} />
           <Route path="/new-arrivals" element={<NewArrivalsPage />} />
+          <Route path="/deck-builder-packs" element={<DeckBuilderPacksPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/admin" element={<Suspense fallback={null}><AdminPage /></Suspense>} />
           <Route path="/account" element={<AccountLoginPage />} />
