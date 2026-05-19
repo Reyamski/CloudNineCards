@@ -10,11 +10,24 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 // Load .env into process.env for local dev.
-// Order matters: first file to set a key wins (see guard below). So a present
-// .env.development (local Supabase) overrides prod values in .env. On Vercel
-// there are no .env files and process.env is pre-populated, so this is a no-op.
+//
+// Order matters: first file to set a key wins (see guard below — we never
+// override an already-set process.env value). The chosen order is
+// production-safe:
+//   - In production (NODE_ENV=production or running on Vercel): load
+//     ['.env', '.env.local'] ONLY. We deliberately skip .env.development so a
+//     stray local-dev file (e.g. pointing at local Supabase 127.0.0.1:55321)
+//     can never shadow real prod values. On Vercel there are normally no .env
+//     files at all and process.env is pre-populated, so this stays a no-op
+//     there — but the explicit skip removes the latent footgun if one exists.
+//   - In local dev: load ['.env.development', '.env', '.env.local'] so the
+//     dev-specific file (local Supabase) intentionally takes precedence.
 const __dir = dirname(fileURLToPath(import.meta.url));
-for (const envFile of ['.env.development', '.env', '.env.local']) {
+const isProd = process.env.NODE_ENV === 'production' || !!process.env.VERCEL;
+const envFiles = isProd
+  ? ['.env', '.env.local']
+  : ['.env.development', '.env', '.env.local'];
+for (const envFile of envFiles) {
   try {
     const lines = readFileSync(resolve(__dir, envFile), 'utf8').split('\n');
     for (const line of lines) {

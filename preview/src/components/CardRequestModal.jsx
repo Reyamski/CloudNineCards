@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -13,6 +13,13 @@ export default function CardRequestModal({ onClose, onSuccess }) {
   const [submitted, setSubmitted] = useState(false);
   const [sending, setSending]   = useState(false);
   const [sendError, setSendError] = useState('');
+
+  // Refs for focus management: the dialog panel (focus-trap scope), the close
+  // button (initial focus target / always present in both states), and the
+  // element that had focus before the modal opened (restored on unmount).
+  const panelRef = useRef(null);
+  const closeBtnRef = useRef(null);
+  const prevFocusRef = useRef(null);
 
   // Single source of truth for dismissing the modal. Never block dismissal
   // once the request succeeded (submitted) — that screen has its own Close.
@@ -35,6 +42,62 @@ export default function CardRequestModal({ onClose, onSuccess }) {
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [requestClose]);
+
+  // Focus management (a11y): on mount, remember whatever had focus on the
+  // background page, then move focus into the dialog (the Close button — it
+  // exists in both the form and success states). On unmount/close, restore
+  // focus to that original element so keyboard users aren't dumped at the top
+  // of the page. Runs once for the modal's lifetime (it only exists while open).
+  useEffect(() => {
+    prevFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    // Defer to after first paint so the ref is attached and the element is
+    // actually focusable.
+    const id = requestAnimationFrame(() => closeBtnRef.current?.focus());
+    return () => {
+      cancelAnimationFrame(id);
+      const prev = prevFocusRef.current;
+      if (prev && typeof prev.focus === 'function' && document.contains(prev)) {
+        prev.focus();
+      }
+    };
+  }, []);
+
+  // Focus trap: keep Tab / Shift+Tab cycling inside the dialog while open.
+  // Recomputes the focusable set on each Tab so it stays correct across the
+  // form ↔ success state swap. Capture phase so it wins before anything else.
+  useEffect(() => {
+    function onTabKey(e) {
+      if (e.key !== 'Tab') return;
+      const panel = panelRef.current;
+      if (!panel) return;
+      const focusable = panel.querySelectorAll(
+        'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable.length === 0) {
+        e.preventDefault();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      // If focus somehow escaped the panel, pull it back in.
+      if (!panel.contains(active)) {
+        e.preventDefault();
+        first.focus();
+        return;
+      }
+      if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+    document.addEventListener('keydown', onTabKey, true);
+    return () => document.removeEventListener('keydown', onTabKey, true);
+  }, []);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -78,24 +141,33 @@ export default function CardRequestModal({ onClose, onSuccess }) {
         onClick={requestClose}
       />
       <motion.div
+        ref={panelRef}
         initial={{ opacity: 0, y: 24, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 24, scale: 0.97 }}
         transition={{ duration: 0.25 }}
         onClick={e => e.stopPropagation()}
-        className="relative w-full max-w-md rounded-[32px] border border-white/10 bg-[#07030f] overflow-hidden max-h-[90vh] overflow-y-auto"
+        className="relative w-full max-w-md rounded-[32px] border border-white/10 bg-[#07030f] overflow-hidden max-h-[90vh]"
       >
+        {/* Close button is a direct child of the panel (NOT inside the
+            scrolling content) with a stacking layer above everything else, so
+            it can never be painted over by sibling content or clipped by the
+            scroll container and stays clickable at any scroll position. */}
+        <button
+          type="button"
+          aria-label="Close"
+          ref={closeBtnRef}
+          onClick={requestClose}
+          className="absolute right-5 top-5 z-20 rounded-xl border border-white/10 bg-white/5 p-1.5 hover:bg-white/10"
+        >
+          <X className="h-4 w-4 text-white/60" />
+        </button>
+
+        {/* Scroll layer: the panel itself no longer scrolls, so the absolutely
+            positioned close button above stays pinned and on top. */}
+        <div className="relative z-0 max-h-[90vh] overflow-y-auto">
         <div className="h-1 w-full bg-gradient-to-r from-fuchsia-500 to-cyan-400" />
         <div className="p-6">
-          <button
-            type="button"
-            aria-label="Close"
-            onClick={requestClose}
-            className="absolute right-5 top-5 z-10 rounded-xl border border-white/10 bg-white/5 p-1.5 hover:bg-white/10"
-          >
-            <X className="h-4 w-4 text-white/60" />
-          </button>
-
           {submitted ? (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center gap-4 py-8 text-center">
               <div className="rounded-full border border-fuchsia-400/30 bg-fuchsia-400/10 p-5">
@@ -161,6 +233,7 @@ export default function CardRequestModal({ onClose, onSuccess }) {
               </form>
             </>
           )}
+        </div>
         </div>
       </motion.div>
     </div>
