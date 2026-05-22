@@ -5,8 +5,24 @@
  * Calls Claude Vision API → returns parsed TCG card details as JSON.
  * If mediaType is image/heic or image/heif, converts to JPEG via sharp first.
  *
+ * Behavior notes (2026-05 update):
+ *   - Markdown-fenced and array-shaped Claude responses are tolerated.
+ *     The parser strips ```json fences and, if the model returns an array
+ *     of cards, picks the first object (Claude is prompted to return one,
+ *     but multi-card photos sometimes coerce it into an array anyway).
+ *   - imgbb upload runs sequentially BEFORE the Claude call, so the
+ *     resulting public image_url is available on every return path —
+ *     including parse failures. (Sequential, not parallel: simpler error
+ *     handling and the extra latency vs the slow vision call is trivial.)
+ *   - On Claude/parse failure, if imgbb succeeded, the handler returns
+ *     HTTP 200 with a partial body { image_url, _parse_error } so the
+ *     admin still gets the image attached and can fill the other fields
+ *     manually. Total failure (Claude err AND no imgbb url) still 500s.
+ *
  * Requires env var: ANTHROPIC_API_KEY
+ * Optional env var: VITE_IMGBB_API_KEY or IMGBB_API_KEY (for image hosting)
  */
+
 async function convertHeicToJpeg(base64Data) {
   const { default: convert } = await import('heic-convert');
   const inputBuffer = Buffer.from(base64Data, 'base64');
@@ -20,6 +36,64 @@ async function uploadToImgbb(base64Data, imgbbKey) {
   const res = await fetch(`https://api.imgbb.com/1/upload?key=${imgbbKey}`, { method: 'POST', body });
   const json = await res.json();
   return json.success ? json.data.url : null;
+}
+
+/**
+ * Extract a single card object from Claude's text response.
+ *
+ * Handles three shapes Claude tends to return:
+ *   1. Raw JSON object               → { ...fields }
+ *   2. JSON object inside ```json``` → strip fence, parse
+ *   3. JSON array of objects         → take the first, add _detected_count
+ *
+ * Returns null if nothing parseable can be salvaged. Exported as a named
+ * export so unit tests can verify behavior without invoking the handler.
+ *
+ * @param {string} text - raw text from Claude content[0].text
+ * @returns {object|null}
+ */
+export function parseClaudeText(text) {
+  if (typeof text !== 'string') return null;
+  let cleaned = text.trim();
+
+  // Strip ```json ... ``` or ``` ... ``` fences if present.
+  // Match: optional language tag, optional leading newline, body, closing fence.
+  const fenceMatch = cleaned.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```\s*$/i);
+  if (fenceMatch) cleaned = fenceMatch[1].trim();
+
+  // First attempt: parse the cleaned text directly.
+  let parsed;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    // Fallback: hunt for the first {...} or [...] substring. This catches
+    // cases where Claude adds prose before/after the JSON despite the prompt.
+    const objMatch = cleaned.match(/\{[\s\S]*\}/);
+    const arrMatch = cleaned.match(/\[[\s\S]*\]/);
+    // Prefer whichever appears first (lower index).
+    const candidate =
+      arrMatch && (!objMatch || arrMatch.index < objMatch.index)
+        ? arrMatch[0]
+        : objMatch
+        ? objMatch[0]
+        : null;
+    if (!candidate) return null;
+    try {
+      parsed = JSON.parse(candidate);
+    } catch {
+      return null;
+    }
+  }
+
+  // If array: pick first object, annotate with count for the frontend.
+  if (Array.isArray(parsed)) {
+    const first = parsed.find((x) => x && typeof x === 'object' && !Array.isArray(x));
+    if (!first) return null;
+    return { ...first, _detected_count: parsed.length };
+  }
+
+  if (parsed && typeof parsed === 'object') return parsed;
+  return null;
 }
 
 export default async function handler(req, res) {
@@ -57,6 +131,18 @@ export default async function handler(req, res) {
     }
   }
 
+  // Upload to imgbb FIRST (sequential, before Claude). This guarantees we
+  // have a public image_url available on every subsequent return path,
+  // including Claude/parse failures. Sequential keeps error flow simple;
+  // the extra ~200ms vs Claude's ~5s vision call is negligible.
+  let imageUrlFromImgbb = null;
+  const imgbbKey = process.env.VITE_IMGBB_API_KEY ?? process.env.IMGBB_API_KEY;
+  if (imgbbKey && imageBase64) {
+    try {
+      imageUrlFromImgbb = await uploadToImgbb(imageBase64, imgbbKey);
+    } catch { /* non-fatal — we still try Claude */ }
+  }
+
   const imageSource = imageUrl
     ? { type: 'url', url: imageUrl }
     : { type: 'base64', media_type: mediaType, data: imageBase64 };
@@ -86,6 +172,10 @@ Analyze this card image carefully. Look at ALL parts of the card:
 - Set code: prefix of the card number (e.g. OP-01, EB-03, SV7) — also on the card back or set symbol
 - Rarity: indicated by the symbol/color near the card number, or text like SR, R, C, UC, L, SP
 
+IMPORTANT OUTPUT RULES:
+- If multiple cards are visible in the photo, identify ONLY the most prominent / largest / most-centered card. Ignore the rest.
+- Return a SINGLE JSON OBJECT — NEVER a JSON array, NEVER markdown code fences (no \`\`\`json), NEVER any text or explanation outside the JSON.
+
 Return ONLY valid JSON — no explanation, no markdown:
 {
   "card_name": "card name in English — translate from Japanese/Korean if needed",
@@ -105,6 +195,14 @@ Only use "Unknown" if a field is truly impossible to determine from the image.`,
       signal: AbortSignal.timeout(20000),
     });
   } catch (err) {
+    // Network/abort failure. Still return image_url if we have one so the
+    // admin keeps the upload and can fill fields manually.
+    if (imageUrlFromImgbb) {
+      return res.status(200).json({
+        image_url: imageUrlFromImgbb,
+        _parse_error: `Claude API request failed: ${err.message}`,
+      });
+    }
     return res.status(500).json({ error: `Claude API request failed: ${err.message}` });
   }
 
@@ -113,29 +211,34 @@ Only use "Unknown" if a field is truly impossible to determine from the image.`,
     console.error('[analyze-card] Anthropic error', claudeRes.status, errText);
     let detail = errText;
     try { detail = JSON.parse(errText)?.error?.message ?? errText; } catch { /* keep raw */ }
-    return res.status(500).json({ error: `Claude API ${claudeRes.status}`, detail: detail.slice(0, 500) });
+    if (imageUrlFromImgbb) {
+      return res.status(200).json({
+        image_url: imageUrlFromImgbb,
+        _parse_error: `Claude API ${claudeRes.status}: ${String(detail).slice(0, 200)}`,
+      });
+    }
+    return res.status(500).json({ error: `Claude API ${claudeRes.status}`, detail: String(detail).slice(0, 500) });
   }
 
   const data = await claudeRes.json();
   const text = (data.content?.[0]?.text ?? '').trim();
 
-  let parsed;
-  try {
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    parsed = JSON.parse(jsonMatch ? jsonMatch[0] : text);
-  } catch {
+  const parsed = parseClaudeText(text);
+  if (!parsed) {
     console.error('[analyze-card] parse fail, raw text:', text.slice(0, 400));
+    if (imageUrlFromImgbb) {
+      // Partial success: frontend already merges result.image_url onto the
+      // form; all other fields fall back to existing form values.
+      return res.status(200).json({
+        image_url: imageUrlFromImgbb,
+        _parse_error: 'Could not parse AI response — fill fields manually.',
+      });
+    }
     return res.status(500).json({ error: 'Could not parse AI response', detail: text.slice(0, 400) });
   }
 
-  // Upload the (possibly converted) JPEG to imgbb so the client gets a public image URL
-  const imgbbKey = process.env.VITE_IMGBB_API_KEY ?? process.env.IMGBB_API_KEY;
-  if (imgbbKey && imageBase64) {
-    try {
-      const url = await uploadToImgbb(imageBase64, imgbbKey);
-      if (url) parsed.image_url = url;
-    } catch { /* non-fatal */ }
-  }
+  // Success path — attach image_url if we got one.
+  if (imageUrlFromImgbb) parsed.image_url = imageUrlFromImgbb;
 
   return res.json(parsed);
 }
