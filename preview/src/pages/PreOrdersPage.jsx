@@ -149,7 +149,8 @@ export default function PreOrdersPage() {
         const { data, error } = await supabase
           .from('preorders')
           .select('*')
-          .order('display_order', { ascending: true });
+          .order('sold_out', { ascending: true })
+          .order('created_at', { ascending: false });
         if (!error && data) {
           setPreorders(data.map(normalizeDbPreorder));
         }

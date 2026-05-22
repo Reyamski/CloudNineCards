@@ -303,7 +303,8 @@ export default function ShopPage() {
       const { data: poData } = await supabase
         .from('preorders')
         .select('*')
-        .order('display_order', { ascending: true });
+        .order('sold_out', { ascending: true })
+        .order('created_at', { ascending: false });
       const preorderProducts = (poData ?? []).map(po => ({
         id:        po.id,
         title:     po.title,

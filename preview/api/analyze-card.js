@@ -5,6 +5,14 @@
  * Calls Claude Vision API → returns parsed TCG card details as JSON.
  * If mediaType is image/heic or image/heif, converts to JPEG via sharp first.
  *
+ * Manual-upload mode (2026-05-22):
+ *   Body flag `skip_parse: true` → handler does imgbb upload only (still
+ *   handles HEIC conversion), skips the Claude vision call entirely, and
+ *   returns `{ image_url }` 200. If imgbb upload fails in this mode → 500
+ *   with the imgbb error. Used by the admin add forms when uploading
+ *   non-card images (sealed sets, bundles) where the owner wants to type
+ *   the product details by hand. Default behavior (no flag) unchanged.
+ *
  * Behavior notes (2026-05 update):
  *   - Markdown-fenced and array-shaped Claude responses are tolerated.
  *     The parser strips ```json fences and, if the model returns an array
@@ -109,6 +117,7 @@ export default async function handler(req, res) {
 
   const body = req.body ?? {};
   let { imageUrl, imageBase64, mediaType = 'image/jpeg' } = body;
+  const skipParse = body.skip_parse === true;
 
   if (!imageUrl && !imageBase64) {
     return res.status(400).json({ error: 'imageUrl or imageBase64 required' });
@@ -136,11 +145,29 @@ export default async function handler(req, res) {
   // including Claude/parse failures. Sequential keeps error flow simple;
   // the extra ~200ms vs Claude's ~5s vision call is negligible.
   let imageUrlFromImgbb = null;
+  let imgbbError = null;
   const imgbbKey = process.env.VITE_IMGBB_API_KEY ?? process.env.IMGBB_API_KEY;
   if (imgbbKey && imageBase64) {
     try {
       imageUrlFromImgbb = await uploadToImgbb(imageBase64, imgbbKey);
-    } catch { /* non-fatal — we still try Claude */ }
+    } catch (err) {
+      // Non-fatal for AI mode — we still try Claude. Captured here so the
+      // manual-upload short-circuit below can surface the real reason if
+      // imgbb is the only thing the caller asked for.
+      imgbbError = err;
+    }
+  }
+
+  // Manual-upload mode: skip Claude entirely, return image_url only.
+  // If imgbb upload failed (or wasn't configured), this is a hard 500 since
+  // the caller's whole purpose was to get a hosted image_url back.
+  if (skipParse) {
+    if (imageUrlFromImgbb) {
+      return res.status(200).json({ image_url: imageUrlFromImgbb });
+    }
+    const detail = imgbbError?.message
+      || (!imgbbKey ? 'IMGBB API key not configured on server' : 'imgbb upload returned no URL');
+    return res.status(500).json({ error: 'Image upload failed', detail });
   }
 
   const imageSource = imageUrl

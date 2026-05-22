@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
 import {Link} from 'react-router-dom';
-import {BellRing, ChevronLeft, ChevronRight, Flame, Package, ShieldCheck, Sparkles, Star, Truck, Zap, Globe} from 'lucide-react';
+import {BellRing, ChevronLeft, ChevronRight, Clock, Flame, Package, ShieldCheck, Sparkles, Star, Truck, Zap, Globe} from 'lucide-react';
 import {motion} from 'framer-motion';
 import {supabase, supabaseEnabled} from './lib/supabase';
 import Footer from './components/Footer';
@@ -64,6 +64,15 @@ type SpotlightCard = {
   image: string;
   price: string;
   subtitle: string;
+};
+
+// A minimal preorder card shape used by the home preorders surface.
+type PreorderCard = {
+  id: string;
+  title: string;
+  image: string;
+  eta: string;
+  deadline: Date | null;
 };
 
 function formatCad(value: number): string {
@@ -146,11 +155,74 @@ function EmailSignup() {
   );
 }
 
+// Live "Closes in Xd Yh" line for an active pre-order card. Ticks once a
+// minute, color-codes by urgency, returns null if deadline is missing.
+function PreorderCountdown({deadline, size = 'sm'}: {deadline: Date | string | null | undefined; size?: 'sm' | 'md'}) {
+  const target = deadline ? (deadline instanceof Date ? deadline : new Date(deadline)) : null;
+  const targetMs = target && !isNaN(target.getTime()) ? target.getTime() : null;
+
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (targetMs == null) return;
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, [targetMs]);
+
+  if (targetMs == null) return null;
+
+  const diffMs = targetMs - now;
+  const textSize = size === 'md' ? 'text-sm md:text-base' : 'text-xs';
+
+  if (diffMs <= 0) {
+    return (
+      <div className={`inline-flex items-center gap-1.5 ${textSize} text-white/45`} data-testid="po-countdown" data-bucket="closed">
+        <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+        <span>Pre-order window closed</span>
+      </div>
+    );
+  }
+
+  const totalMinutes = Math.floor(diffMs / 60_000);
+  const totalHours = Math.floor(totalMinutes / 60);
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours - days * 24;
+  const minutes = totalMinutes - totalHours * 60;
+
+  let label: string;
+  let colorClass: string;
+  let bucket: string;
+  if (totalHours >= 48) {
+    label = `Closes in ${days}d ${hours}h`;
+    colorClass = 'text-white/55';
+    bucket = 'far';
+  } else if (totalHours >= 24) {
+    label = `Closes in ${days}d ${hours}h`;
+    colorClass = 'text-yellow-300/90';
+    bucket = 'soon';
+  } else {
+    label = `Closes in ${totalHours}h ${minutes}m`;
+    colorClass = 'text-rose-300';
+    bucket = 'urgent';
+  }
+
+  return (
+    <div
+      className={`inline-flex items-center gap-1.5 ${textSize} ${colorClass}`}
+      data-testid="po-countdown"
+      data-bucket={bucket}
+    >
+      <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+      <span>{label}</span>
+    </div>
+  );
+}
+
 export default function HomePage() {
   const [spotlightCards, setSpotlightCards] = useState(BASE_STOCK_SPOTLIGHT);
   const [videoId, setVideoId] = useState(DEFAULT_VIDEO_ID);
   const [browsing, setBrowsing] = useState(() => Math.floor(Math.random() * 14) + 8); // 8-21
   const [news, setNews] = useState<Array<{title: string; link: string; pubDate: string; thumbnail: string}>>([]);
+  const [activePreorders, setActivePreorders] = useState<PreorderCard[]>([]);
 
   useEffect(() => { document.title = 'CloudNineCards | One Piece TCG Canada'; }, []);
 
@@ -158,13 +230,34 @@ export default function HomePage() {
     async function loadHomepageData() {
       if (!supabaseEnabled || !supabase) return;
 
-      const [{data: videoRow}, prodRes] = await Promise.all([
+      const [{data: videoRow}, prodRes, preRes] = await Promise.all([
         supabase.from('config').select('value').eq('key', 'video_id').maybeSingle(),
         supabase.from('products').select('*'),
+        supabase
+          .from('preorders')
+          .select('*')
+          .eq('sold_out', false)
+          .order('created_at', { ascending: false })
+          .limit(3),
       ]);
 
       if (videoRow?.value) {
         setVideoId(extractYoutubeId(videoRow.value) || DEFAULT_VIDEO_ID);
+      }
+
+      // Active preorders (newest 3, in-stock only) — drives the dynamic
+      // home preorders surface. If empty, the fallback Get Notified panel
+      // renders instead.
+      const preRows = preRes?.data;
+      if (Array.isArray(preRows) && preRows.length > 0) {
+        const cards: PreorderCard[] = preRows.map((row: any) => ({
+          id:       String(row.id),
+          title:    String(row.title ?? 'Pre-Order'),
+          image:    row.image_url || '/product-fallback.svg',
+          eta:      row.eta ? String(row.eta) : '',
+          deadline: row.deadline ? new Date(row.deadline) : null,
+        }));
+        setActivePreorders(cards);
       }
 
       // Primary source: the `products` table. Show every product that is
@@ -335,10 +428,12 @@ export default function HomePage() {
                   <Flame className="h-3.5 w-3.5 skew-x-12" />
                   <span className="skew-x-12">Fresh Drops</span>
                 </span>
-                <span className="inline-flex -skew-x-12 items-center gap-2 border border-rose-300/35 bg-rose-300/12 px-4 py-2 text-[11px] font-black uppercase tracking-[0.24em] text-rose-100">
-                  <BellRing className="h-3.5 w-3.5 skew-x-12" />
-                  <span className="skew-x-12">OP-18 Coming</span>
-                </span>
+                {activePreorders.length > 0 ? (
+                  <span className="inline-flex -skew-x-12 items-center gap-2 border border-rose-300/35 bg-rose-300/12 px-4 py-2 text-[11px] font-black uppercase tracking-[0.24em] text-rose-100">
+                    <BellRing className="h-3.5 w-3.5 skew-x-12" />
+                    <span className="skew-x-12 line-clamp-1 max-w-[18ch]">{activePreorders[0].title}</span>
+                  </span>
+                ) : null}
               </div>
 
               <div className="relative mt-6 max-w-5xl">
@@ -477,32 +572,173 @@ export default function HomePage() {
 
 
       <section className="mx-auto max-w-7xl px-6 pb-2 pt-6">
-        <motion.div initial={{opacity: 0, y: 16}} animate={{opacity: 1, y: 0}} transition={{duration: 0.55}} className="relative overflow-hidden rounded-[32px] border border-fuchsia-500/30">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(168,85,247,0.18),transparent_50%),radial-gradient(circle_at_bottom_left,rgba(34,211,238,0.10),transparent_50%)]" />
-          <div className="absolute inset-0 bg-[linear-gradient(110deg,rgba(5,1,12,0.97)_0%,rgba(30,5,60,0.85)_50%,rgba(5,1,12,0.95)_100%)]" />
-          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-fuchsia-500 via-purple-400 to-cyan-400" />
-          <div className="relative flex flex-col items-center gap-6 px-8 py-10 text-center sm:flex-row sm:text-left md:px-12">
-            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border border-fuchsia-500/40 bg-fuchsia-500/10 shadow-[0_0_30px_rgba(168,85,247,0.25)]">
-              <BellRing className="h-8 w-8 text-fuchsia-300" />
-            </div>
-            <div className="flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex items-center gap-1.5 rounded-full border border-fuchsia-400/35 bg-fuchsia-400/12 px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-fuchsia-200">
-                  Coming Soon
+        {activePreorders.length > 0 ? (
+          <motion.div
+            initial={{opacity: 0, y: 16}}
+            animate={{opacity: 1, y: 0}}
+            transition={{duration: 0.55}}
+            className="relative overflow-hidden rounded-[32px] border border-fuchsia-500/30"
+          >
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(168,85,247,0.18),transparent_50%),radial-gradient(circle_at_bottom_left,rgba(34,211,238,0.10),transparent_50%)]" />
+            <div className="absolute inset-0 bg-[linear-gradient(110deg,rgba(5,1,12,0.97)_0%,rgba(30,5,60,0.85)_50%,rgba(5,1,12,0.95)_100%)]" />
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-fuchsia-500 via-purple-400 to-cyan-400" />
+            <div className="relative px-6 py-10 md:px-10">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <div className="inline-flex items-center gap-1.5 rounded-full border border-fuchsia-400/35 bg-fuchsia-400/12 px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-fuchsia-200">
+                    Open Pre-Orders
+                  </div>
+                  <div className="mt-3 text-2xl font-black uppercase leading-tight md:text-3xl">
+                    Active <span className="bg-gradient-to-r from-fuchsia-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent">Pre-Orders</span>
+                  </div>
+                  <p className="mt-1.5 text-sm text-white/55">Reserve your slot before the window closes.</p>
                 </div>
+                <Link
+                  to="/pre-orders"
+                  className="inline-flex items-center gap-2 rounded-full border border-fuchsia-400/35 bg-fuchsia-400/12 px-5 py-2.5 text-xs font-black uppercase tracking-[0.18em] text-fuchsia-200 transition hover:bg-fuchsia-400/20"
+                >
+                  View All <ChevronRight className="h-3.5 w-3.5" />
+                </Link>
               </div>
-              <div className="mt-2 text-2xl font-black uppercase leading-tight md:text-3xl">
-                One Piece <span className="bg-gradient-to-r from-fuchsia-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent">OP-18 Pre-Order</span>
+
+              {activePreorders.length === 1 ? (
+                (() => {
+                  const po = activePreorders[0];
+                  return (
+                    <Link
+                      to="/pre-orders"
+                      data-testid="preorder-hero"
+                      className="group relative mt-6 grid overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,#0b1022,#14081d)] shadow-2xl transition hover:border-fuchsia-300/40 md:grid-cols-[1.2fr_1fr]"
+                    >
+                      <div className="relative aspect-[4/5] w-full overflow-hidden bg-[radial-gradient(circle_at_center,#1a0b2e,#05010c)] md:aspect-auto md:min-h-[460px]">
+                        <img
+                          src={po.image}
+                          alt={po.title}
+                          loading="lazy"
+                          decoding="async"
+                          onError={(event) => {
+                            event.currentTarget.onerror = null;
+                            event.currentTarget.src = '/product-fallback.svg';
+                          }}
+                          className="absolute inset-0 h-full w-full object-contain saturate-[1.15] transition duration-500 group-hover:scale-[1.02]"
+                        />
+                      </div>
+                      <div className="flex flex-col justify-center gap-4 p-6 md:p-10">
+                        <div className="inline-flex w-fit items-center gap-1.5 rounded-full border border-fuchsia-400/35 bg-fuchsia-400/12 px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-fuchsia-200">
+                          Pre-Order
+                        </div>
+                        <div className="text-3xl font-black uppercase leading-tight md:text-5xl">
+                          {po.title}
+                        </div>
+                        {(po.eta || po.deadline) && (
+                          <div className="space-y-1 text-sm text-white/60">
+                            {po.eta ? <div>ETA {po.eta}</div> : null}
+                            {po.deadline ? (
+                              <div>
+                                Closes {po.deadline.toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' })}
+                              </div>
+                            ) : null}
+                          </div>
+                        )}
+                        <PreorderCountdown deadline={po.deadline} size="md" />
+                        <div className="pt-2">
+                          <span className="inline-flex items-center gap-2 rounded-full border border-fuchsia-400/35 bg-fuchsia-400/12 px-6 py-3 text-xs font-black uppercase tracking-[0.18em] text-fuchsia-200 transition group-hover:bg-fuchsia-400/20">
+                            Reserve Now <ChevronRight className="h-4 w-4" />
+                          </span>
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })()
+              ) : (
+                <div
+                  className={`mt-6 grid ${activePreorders.length === 2 ? 'gap-6 md:grid-cols-2' : 'gap-4 md:grid-cols-3'}`}
+                  data-testid={`preorder-grid-${activePreorders.length}`}
+                >
+                  {activePreorders.map((po) => (
+                    <Link
+                      key={po.id}
+                      to="/pre-orders"
+                      className="group relative flex flex-col overflow-hidden rounded-[22px] border border-white/10 bg-[linear-gradient(180deg,#0b1022,#14081d)] shadow-xl transition hover:scale-[1.01] hover:border-fuchsia-300/40"
+                    >
+                      <div className="relative aspect-[4/5] w-full overflow-hidden bg-[radial-gradient(circle_at_center,#1a0b2e,#05010c)]">
+                        <img
+                          src={po.image}
+                          alt={po.title}
+                          loading="lazy"
+                          decoding="async"
+                          onError={(event) => {
+                            event.currentTarget.onerror = null;
+                            event.currentTarget.src = '/product-fallback.svg';
+                          }}
+                          className="absolute inset-0 h-full w-full object-contain saturate-[1.15] transition duration-500 group-hover:scale-[1.03]"
+                        />
+                      </div>
+                      <div className="flex flex-1 flex-col p-4">
+                        <div className="text-[11px] font-black uppercase tracking-[0.18em] text-fuchsia-300/80">
+                          Pre-Order
+                        </div>
+                        <div className="mt-1.5 line-clamp-2 min-h-[3.5rem] text-base font-black uppercase leading-tight">
+                          {po.title}
+                        </div>
+                        {(po.eta || po.deadline) && (
+                          <div className="mt-2 space-y-0.5 text-xs text-white/55">
+                            {po.eta ? <div>ETA {po.eta}</div> : null}
+                            {po.deadline ? (
+                              <div>
+                                Closes {po.deadline.toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' })}
+                              </div>
+                            ) : null}
+                          </div>
+                        )}
+                        <div className="mt-3">
+                          <PreorderCountdown deadline={po.deadline} size="sm" />
+                        </div>
+                        <div className="mt-auto pt-4">
+                          <span className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-fuchsia-400/35 bg-fuchsia-400/12 px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-fuchsia-200 transition group-hover:bg-fuchsia-400/20">
+                            View Details <ChevronRight className="h-3.5 w-3.5" />
+                          </span>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            initial={{opacity: 0, y: 16}}
+            animate={{opacity: 1, y: 0}}
+            transition={{duration: 0.55}}
+            className="relative overflow-hidden rounded-[32px] border border-fuchsia-500/30"
+          >
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(168,85,247,0.18),transparent_50%),radial-gradient(circle_at_bottom_left,rgba(34,211,238,0.10),transparent_50%)]" />
+            <div className="absolute inset-0 bg-[linear-gradient(110deg,rgba(5,1,12,0.97)_0%,rgba(30,5,60,0.85)_50%,rgba(5,1,12,0.95)_100%)]" />
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-fuchsia-500 via-purple-400 to-cyan-400" />
+            <div className="relative flex flex-col items-center gap-6 px-8 py-10 text-center sm:flex-row sm:text-left md:px-12">
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border border-fuchsia-500/40 bg-fuchsia-500/10 shadow-[0_0_30px_rgba(168,85,247,0.25)]">
+                <BellRing className="h-8 w-8 text-fuchsia-300" />
               </div>
-              <p className="mt-1.5 text-sm text-white/55">Next pre-order window opening soon. Join the email list to get notified first — before it sells out.</p>
+              <div className="flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="inline-flex items-center gap-1.5 rounded-full border border-fuchsia-400/35 bg-fuchsia-400/12 px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-fuchsia-200">
+                    Pre-Orders Closed
+                  </div>
+                </div>
+                <div className="mt-2 text-2xl font-black uppercase leading-tight md:text-3xl">
+                  Get <span className="bg-gradient-to-r from-fuchsia-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent">Notified</span>
+                </div>
+                <p className="mt-1.5 text-sm text-white/55">No active pre-orders right now. Join the email list to hear about the next window first.</p>
+              </div>
+              <div className="shrink-0">
+                <Link to="/contact" className="inline-flex items-center gap-2 rounded-full border border-fuchsia-400/35 bg-fuchsia-400/12 px-6 py-2.5 text-xs font-black uppercase tracking-[0.18em] text-fuchsia-200 transition hover:bg-fuchsia-400/20">
+                  Get Notified <ChevronRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
             </div>
-            <div className="shrink-0">
-              <Link to="/contact" className="inline-flex items-center gap-2 rounded-full border border-fuchsia-400/35 bg-fuchsia-400/12 px-6 py-2.5 text-xs font-black uppercase tracking-[0.18em] text-fuchsia-200 transition hover:bg-fuchsia-400/20">
-                Get Notified <ChevronRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
-          </div>
-        </motion.div>
+          </motion.div>
+        )}
       </section>
 
       <section className="relative mx-auto max-w-7xl px-6 py-8 md:py-12">

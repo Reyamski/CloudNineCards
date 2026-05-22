@@ -217,6 +217,9 @@ export default function AdminPage() {
   const [uploadingImg, setUploadingImg]     = useState(false);
   const [dragOver, setDragOver]             = useState(false);
   const fileInputRef                        = useRef(null);
+  // Upload mode for the Singles add form: 'ai' = default AI parse + image,
+  // 'manual' = image-only upload (skip_parse:true on /api/analyze-card).
+  const [singleUploadMode, setSingleUploadMode] = useState('ai');
 
   // ── Pre-Orders state ──────────────────────────────────────────────────────
   const [preorders, setPreorders]                   = useState([]);
@@ -269,6 +272,7 @@ export default function AdminPage() {
   const [poUploadingImg, setPoUploadingImg]         = useState(false);
   const [poDragOver, setPoDragOver]                 = useState(false);
   const poFileInputRef                              = useRef(null);
+  const [poUploadMode, setPoUploadMode]             = useState('ai');
 
   // ── Products (on-hand) state ──────────────────────────────────────────────
   const [dbProducts, setDbProducts]                     = useState([]);
@@ -290,6 +294,15 @@ export default function AdminPage() {
   const [prodUploadingImg, setProdUploadingImg]         = useState(false);
   const [prodDragOver, setProdDragOver]                 = useState(false);
   const prodFileInputRef                                = useRef(null);
+  const [prodUploadMode, setProdUploadMode]             = useState('ai');
+
+  // ── Edit-row modal state (shared across Singles/Products/Preorders) ──────
+  // editingRow.table tells the modal what schema to render.
+  // editingRow.row is a shallow copy of the row; user edits this object,
+  // Save sends a PATCH with the diff, Cancel discards.
+  const [editingRow, setEditingRow]                     = useState(null);
+  const [editingSaving, setEditingSaving]               = useState(false);
+  const [editingError, setEditingError]                 = useState('');
 
   // ── Leads tab (read-only) ────────────────────────────────────────────────
   // Card requests / newsletter subscribers / restock waitlist. These tables
@@ -315,7 +328,7 @@ export default function AdminPage() {
 
   async function _runAnalyzeUpload(file, {
     setPreview, setAnalyzing, setAnalyzed, setError, setUploading, setForm, bucket,
-    mapResult,
+    mapResult, skipParse = false,
   }) {
     if (!file) return;
 
@@ -333,30 +346,39 @@ export default function AdminPage() {
 
     try {
       const base64 = await fileToBase64(file);
+      // Manual mode posts skip_parse:true so the server only does imgbb upload
+      // and returns { image_url } — no Claude call. AI mode (default) is byte
+      // identical to the existing flow.
+      const reqBody = { imageBase64: base64, mediaType: file.type };
+      if (skipParse) reqBody.skip_parse = true;
       const res = await fetch('/api/analyze-card', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: base64, mediaType: file.type }),
+        body: JSON.stringify(reqBody),
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.detail != null ? `${result.error}: ${result.detail}` : result.error || 'Analysis failed');
       setForm(f => {
+        // In manual mode we ONLY merge image_url onto the existing form so
+        // the owner can type all other fields by hand.
+        if (skipParse) return result.image_url ? { ...f, image_url: result.image_url } : f;
         const mapped = mapResult(f, result);
         // Server uploads to imgbb and returns image_url alongside card details
         return result.image_url ? { ...mapped, image_url: result.image_url } : mapped;
       });
       setAnalyzed(true);
     } catch (err) {
-      setError(err.message || 'Analysis failed — fill fields manually.');
+      setError(err.message || (skipParse ? 'Image upload failed.' : 'Analysis failed — fill fields manually.'));
     }
 
     setAnalyzing(false);
   }
 
-  function analyzeCard(rawFile) {
+  function analyzeCard(rawFile, { skipParse = false } = {}) {
     return _runAnalyzeUpload(rawFile, {
       setPreview: setImagePreview, setAnalyzing, setAnalyzed, setError: setAnalyzeError,
       setUploading: setUploadingImg, setForm: setAddForm, bucket: 'singles',
+      skipParse,
       mapResult: (f, r) => ({
         ...f,
         card_name:   r.card_name   || f.card_name,
@@ -382,10 +404,11 @@ export default function AdminPage() {
   // ── Generic AI analysis for a given setter bundle ────────────────────────
   // Used by both the Pre-Orders and Products add forms.
   // setters: { setPreview, setAnalyzing, setAnalyzed, setError, setUploading, setForm, bucket }
-  function analyzeForForm(rawFile, setters) {
+  function analyzeForForm(rawFile, setters, { skipParse = false } = {}) {
     const { setPreview, setAnalyzing, setAnalyzed, setError, setUploading, setForm, bucket } = setters;
     return _runAnalyzeUpload(rawFile, {
       setPreview, setAnalyzing, setAnalyzed, setError, setUploading, setForm, bucket,
+      skipParse,
       mapResult: (f, r) => ({
         ...f,
         title:    r.card_name || f.title,
@@ -399,7 +422,7 @@ export default function AdminPage() {
   async function loadPreorders() {
     if (!supabaseEnabled || !supabase) { setPreordersError('Supabase not configured.'); return; }
     setPreordersLoading(true);
-    const { data, error } = await supabase.from('preorders').select('*').order('display_order', { ascending: true });
+    const { data, error } = await supabase.from('preorders').select('*').order('sold_out', { ascending: true }).order('created_at', { ascending: false });
     if (error) setPreordersError(`Load failed: ${error.message}`);
     else { setPreorders(data ?? []); setPreordersError(''); }
     setPreordersLoading(false);
@@ -574,6 +597,96 @@ export default function AdminPage() {
     if (error) setDbProductsError(`Delete failed: ${error.message}`);
     else { setDbProducts(prev => prev.filter(p => p.id !== id)); setDbProductsError(''); }
     setDeletingProductId('');
+  }
+
+  // ── Edit-row modal helpers ────────────────────────────────────────────────
+  // Single modal handles editing rows from the singles / products / preorders
+  // tables. openEditRow snapshots the row + original values; saveEditRow
+  // diffs against the original and PATCHes only the changed fields through
+  // the existing /api/admin/{table} endpoint (mirrors the inline-edit code
+  // path so auth + write goes through the same service-role server).
+  function openEditRow(table, row) {
+    setEditingError('');
+    setEditingRow({ table, row: { ...row }, original: { ...row } });
+  }
+  function closeEditRow() {
+    setEditingRow(null);
+    setEditingError('');
+    setEditingSaving(false);
+  }
+  function setEditField(field, value) {
+    setEditingRow(curr => curr ? { ...curr, row: { ...curr.row, [field]: value } } : curr);
+  }
+  // Coerce form-string inputs back to the column type expected by the table.
+  // Mirrors the parsing done in addSingle/addDbProduct/addPreorder and the
+  // existing inline updateSingle/updateDbProduct/updatePreorder paths.
+  function coerceEditValue(table, field, value) {
+    const numFields = {
+      singles:   new Set(['price', 'stock']),
+      products:  new Set(['price', 'usd_price', 'aud_price', 'eur_price', 'stock']),
+      preorders: new Set(['price', 'usd_price', 'aud_price', 'eur_price', 'display_order']),
+    }[table] || new Set();
+    if (numFields.has(field)) {
+      if (value === '' || value === null || value === undefined) {
+        // stock/display_order should stay numeric; price can be null on
+        // preorders (TBA pricing). Default to 0 for stock/display_order.
+        if (field === 'stock' || field === 'display_order') return 0;
+        return null;
+      }
+      if (field === 'stock' || field === 'display_order') return parseInt(value, 10) || 0;
+      return parseFloat(value);
+    }
+    return value;
+  }
+  async function saveEditRow() {
+    if (!editingRow) return;
+    const { table, row, original } = editingRow;
+    // Diff: only send fields whose value changed. Avoids touching columns the
+    // schema cache rejects (e.g. products.usd_price) and keeps the audit
+    // surface small.
+    const patch = {};
+    for (const k of Object.keys(row)) {
+      if (k === 'id' || k === 'created_at' || k === 'updated_at') continue;
+      const before = original[k];
+      const after  = coerceEditValue(table, k, row[k]);
+      // Treat empty string as null for nullable text-ish fields when the
+      // original was null (avoids spurious "" vs null diffs).
+      const beforeN = before == null ? '' : before;
+      const afterN  = after  == null ? '' : after;
+      if (String(beforeN) !== String(afterN)) {
+        patch[k] = after;
+      }
+    }
+    if (Object.keys(patch).length === 0) {
+      closeEditRow();
+      return;
+    }
+    // Singles in_stock is auto-derived from stock>0 to mirror the existing
+    // updateSingle/addSingle behavior.
+    if (table === 'singles' && 'stock' in patch) {
+      patch.in_stock = (Number(patch.stock) || 0) > 0;
+    }
+    // Products badge auto-syncs with in_stock toggle, same as toggleProductInStock.
+    if (table === 'products' && 'in_stock' in patch) {
+      patch.badge = patch.in_stock ? 'In Stock' : 'Sold Out';
+    }
+    // Singles writes have always tagged updated_at server-side — keep parity.
+    if (table === 'singles') patch.updated_at = new Date().toISOString();
+
+    setEditingSaving(true);
+    setEditingError('');
+    const { data, error } = await adminFetch(`/api/admin/${table}`, 'PATCH', { id: row.id, patch });
+    setEditingSaving(false);
+    if (error) {
+      setEditingError(`Update failed: ${error.message}`);
+      return;
+    }
+    // Reconcile with server response when available; fall back to local merge.
+    const merged = data ? data : { ...row, ...patch };
+    if (table === 'singles')       setSingles(prev => prev.map(r => r.id === merged.id ? { ...r, ...merged } : r));
+    else if (table === 'products') setDbProducts(prev => prev.map(r => r.id === merged.id ? { ...r, ...merged } : r));
+    else if (table === 'preorders')setPreorders(prev => prev.map(r => r.id === merged.id ? { ...r, ...merged } : r));
+    closeEditRow();
   }
 
   useEffect(() => {
@@ -1750,12 +1863,33 @@ export default function AdminPage() {
             {showAddForm && (
               <form onSubmit={e => { addSingle(e); resetImageState(); }} className="mb-6 rounded-[24px] border border-fuchsia-400/25 bg-fuchsia-400/8 p-5">
                 <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-fuchsia-300 mb-4">
-                  <Sparkles className="h-3.5 w-3.5" /> New Single — AI Card Reader
+                  <Sparkles className="h-3.5 w-3.5" /> New Single — {singleUploadMode === 'ai' ? 'AI Card Reader' : 'Manual Entry'}
+                </div>
+
+                {/* AI / Manual upload toggle (segmented control) */}
+                <div className="mb-3 flex flex-wrap items-center gap-3">
+                  <div className="inline-flex rounded-full border border-white/10 bg-black/30 p-1" role="radiogroup" aria-label="Upload mode">
+                    <button type="button" role="radio" aria-checked={singleUploadMode === 'ai'}
+                      data-testid="single-mode-ai"
+                      onClick={() => setSingleUploadMode('ai')}
+                      className={`rounded-full px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] transition ${singleUploadMode === 'ai' ? 'bg-gradient-to-r from-cyan-300 to-fuchsia-400 text-black shadow' : 'text-white/55 hover:text-white'}`}>
+                      AI Auto-Parse
+                    </button>
+                    <button type="button" role="radio" aria-checked={singleUploadMode === 'manual'}
+                      data-testid="single-mode-manual"
+                      onClick={() => setSingleUploadMode('manual')}
+                      className={`rounded-full px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] transition ${singleUploadMode === 'manual' ? 'bg-gradient-to-r from-cyan-300 to-fuchsia-400 text-black shadow' : 'text-white/55 hover:text-white'}`}>
+                      Manual
+                    </button>
+                  </div>
+                  <span className="text-[10px] text-white/40">
+                    {singleUploadMode === 'ai' ? 'Recommended for single cards.' : 'Upload image, type details by hand.'}
+                  </span>
                 </div>
 
                 {/* Image drop zone */}
                 <input ref={fileInputRef} type="file" accept="image/*,.heic,.heif" className="hidden"
-                  onChange={e => { const f = e.target.files?.[0]; if (f) analyzeCard(f); e.target.value = ''; }} />
+                  onChange={e => { const f = e.target.files?.[0]; if (f) analyzeCard(f, { skipParse: singleUploadMode === 'manual' }); e.target.value = ''; }} />
 
                 {imagePreview ? (
                   <div className="mb-4 flex gap-4 items-start">
@@ -1767,7 +1901,7 @@ export default function AdminPage() {
                       </button>
                     </div>
                     <div className="flex-1">
-                      {analyzing ? (
+                      {singleUploadMode === 'ai' && (analyzing ? (
                         <div className="flex items-center gap-2 text-sm text-fuchsia-300">
                           <Loader2 className="h-4 w-4 animate-spin" />
                           Analyzing card with AI…
@@ -1778,14 +1912,17 @@ export default function AdminPage() {
                         </div>
                       ) : analyzeError ? (
                         <div className="text-sm text-red-300">{analyzeError}</div>
-                      ) : null}
+                      ) : null)}
+                      {singleUploadMode === 'manual' && analyzeError && (
+                        <div className="text-sm text-red-300">{analyzeError}</div>
+                      )}
                       {uploadingImg && (
                         <div className="mt-1 flex items-center gap-2 text-xs text-white/40">
                           <Loader2 className="h-3 w-3 animate-spin" /> Uploading image to storage…
                         </div>
                       )}
                       {addForm.image_url && !uploadingImg && (
-                        <div className="mt-1 text-xs text-emerald-400/70">✓ Image uploaded to storage</div>
+                        <div className="mt-1 text-xs text-emerald-400/70">Image uploaded to storage</div>
                       )}
                     </div>
                   </div>
@@ -1797,13 +1934,17 @@ export default function AdminPage() {
                     onClick={() => fileInputRef.current?.click()}
                     onDragOver={e => { e.preventDefault(); setDragOver(true); }}
                     onDragLeave={() => setDragOver(false)}
-                    onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) analyzeCard(f); }}
+                    onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) analyzeCard(f, { skipParse: singleUploadMode === 'manual' }); }}
                   >
                     <Upload className="h-7 w-7 text-fuchsia-300/50" />
-                    <div className="text-sm font-black uppercase tracking-[0.14em] text-white/50">Drop card photo here or click to upload</div>
-                    <div className="flex items-center gap-1.5 text-xs text-fuchsia-300/60">
-                      <Sparkles className="h-3 w-3" /> AI will read name, set, number, language, rarity, condition
+                    <div className="text-sm font-black uppercase tracking-[0.14em] text-white/50">
+                      {singleUploadMode === 'manual' ? 'Drop image here or click to upload' : 'Drop card photo here or click to upload'}
                     </div>
+                    {singleUploadMode === 'ai' && (
+                      <div className="flex items-center gap-1.5 text-xs text-fuchsia-300/60">
+                        <Sparkles className="h-3 w-3" /> AI will read name, set, number, language, rarity, condition
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1959,11 +2100,18 @@ export default function AdminPage() {
                         </td>
 
                         <td className="px-4 py-3">
-                          <button onClick={() => { if (window.confirm(`Delete "${s.card_name}"?`)) deleteSingle(s.id); }}
-                            disabled={deletingId === s.id}
-                            className="rounded-lg border border-red-400/25 bg-red-400/8 px-2.5 py-1 text-[10px] font-black uppercase text-red-300 hover:bg-red-400/15 disabled:opacity-40 transition">
-                            {deletingId === s.id ? '…' : 'Delete'}
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            <button onClick={() => openEditRow('singles', s)}
+                              data-testid={`edit-single-${s.id}`}
+                              className="rounded-lg border border-cyan-400/25 bg-cyan-400/8 px-2.5 py-1 text-[10px] font-black uppercase text-cyan-300 hover:bg-cyan-400/15 transition">
+                              Edit
+                            </button>
+                            <button onClick={() => { if (window.confirm(`Delete "${s.card_name}"?`)) deleteSingle(s.id); }}
+                              disabled={deletingId === s.id}
+                              className="rounded-lg border border-red-400/25 bg-red-400/8 px-2.5 py-1 text-[10px] font-black uppercase text-red-300 hover:bg-red-400/15 disabled:opacity-40 transition">
+                              {deletingId === s.id ? '…' : 'Delete'}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1971,7 +2119,7 @@ export default function AdminPage() {
                 </table>
               </div>
             )}
-            <p className="mt-3 text-xs text-white/25">Click price or stock to edit inline. Press Enter to save, Escape to cancel.</p>
+            <p className="mt-3 text-xs text-white/25">Click price or stock to edit inline, or Edit for the full row. Press Enter to save inline edits, Escape to cancel.</p>
           </div>
         ) : null}
 
@@ -2001,12 +2149,33 @@ export default function AdminPage() {
             {showAddPreorder && (
               <form onSubmit={addPreorder} className="mb-6 rounded-[24px] border border-pink-400/25 bg-pink-400/8 p-5">
                 <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-pink-300 mb-4">
-                  <Sparkles className="h-3.5 w-3.5" /> New Pre-Order
+                  <Sparkles className="h-3.5 w-3.5" /> New Pre-Order {poUploadMode === 'manual' ? '— Manual Entry' : ''}
+                </div>
+
+                {/* AI / Manual upload toggle (segmented control) */}
+                <div className="mb-3 flex flex-wrap items-center gap-3">
+                  <div className="inline-flex rounded-full border border-white/10 bg-black/30 p-1" role="radiogroup" aria-label="Upload mode">
+                    <button type="button" role="radio" aria-checked={poUploadMode === 'ai'}
+                      data-testid="preorder-mode-ai"
+                      onClick={() => setPoUploadMode('ai')}
+                      className={`rounded-full px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] transition ${poUploadMode === 'ai' ? 'bg-gradient-to-r from-cyan-300 to-fuchsia-400 text-black shadow' : 'text-white/55 hover:text-white'}`}>
+                      AI Auto-Parse
+                    </button>
+                    <button type="button" role="radio" aria-checked={poUploadMode === 'manual'}
+                      data-testid="preorder-mode-manual"
+                      onClick={() => setPoUploadMode('manual')}
+                      className={`rounded-full px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] transition ${poUploadMode === 'manual' ? 'bg-gradient-to-r from-cyan-300 to-fuchsia-400 text-black shadow' : 'text-white/55 hover:text-white'}`}>
+                      Manual
+                    </button>
+                  </div>
+                  <span className="text-[10px] text-white/40">
+                    {poUploadMode === 'ai' ? 'Recommended for single cards.' : 'Upload image, type details by hand.'}
+                  </span>
                 </div>
 
                 {/* Image drop zone */}
                 <input ref={poFileInputRef} type="file" accept="image/*,.heic,.heif" className="hidden"
-                  onChange={e => { const f = e.target.files?.[0]; if (f) analyzeForForm(f, { setPreview: setPoImagePreview, setAnalyzing: setPoAnalyzing, setAnalyzed: setPoAnalyzed, setError: setPoAnalyzeError, setUploading: setPoUploadingImg, setForm: setAddPoForm, bucket: 'preorders' }); e.target.value = ''; }} />
+                  onChange={e => { const f = e.target.files?.[0]; if (f) analyzeForForm(f, { setPreview: setPoImagePreview, setAnalyzing: setPoAnalyzing, setAnalyzed: setPoAnalyzed, setError: setPoAnalyzeError, setUploading: setPoUploadingImg, setForm: setAddPoForm, bucket: 'preorders' }, { skipParse: poUploadMode === 'manual' }); e.target.value = ''; }} />
 
                 {poImagePreview ? (
                   <div className="mb-4 flex gap-4 items-start">
@@ -2018,9 +2187,12 @@ export default function AdminPage() {
                       </button>
                     </div>
                     <div className="flex-1">
-                      {poAnalyzing ? <div className="flex items-center gap-2 text-sm text-pink-300"><Loader2 className="h-4 w-4 animate-spin" /> Analyzing…</div>
+                      {poUploadMode === 'ai' && (poAnalyzing ? <div className="flex items-center gap-2 text-sm text-pink-300"><Loader2 className="h-4 w-4 animate-spin" /> Analyzing…</div>
                         : poAnalyzed ? <div className="flex items-center gap-2 text-sm text-emerald-300"><Check className="h-4 w-4" /> AI filled title — review below.</div>
-                        : poAnalyzeError ? <div className="text-sm text-red-300">{poAnalyzeError}</div> : null}
+                        : poAnalyzeError ? <div className="text-sm text-red-300">{poAnalyzeError}</div> : null)}
+                      {poUploadMode === 'manual' && poAnalyzeError && (
+                        <div className="text-sm text-red-300">{poAnalyzeError}</div>
+                      )}
                       {poUploadingImg && <div className="mt-1 flex items-center gap-2 text-xs text-white/40"><Loader2 className="h-3 w-3 animate-spin" /> Uploading…</div>}
                       {addPoForm.image_url && !poUploadingImg && <div className="mt-1 text-xs text-emerald-400/70">Image uploaded</div>}
                     </div>
@@ -2031,10 +2203,12 @@ export default function AdminPage() {
                     onClick={() => poFileInputRef.current?.click()}
                     onDragOver={e => { e.preventDefault(); setPoDragOver(true); }}
                     onDragLeave={() => setPoDragOver(false)}
-                    onDrop={e => { e.preventDefault(); setPoDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) analyzeForForm(f, { setPreview: setPoImagePreview, setAnalyzing: setPoAnalyzing, setAnalyzed: setPoAnalyzed, setError: setPoAnalyzeError, setUploading: setPoUploadingImg, setForm: setAddPoForm, bucket: 'preorders' }); }}
+                    onDrop={e => { e.preventDefault(); setPoDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) analyzeForForm(f, { setPreview: setPoImagePreview, setAnalyzing: setPoAnalyzing, setAnalyzed: setPoAnalyzed, setError: setPoAnalyzeError, setUploading: setPoUploadingImg, setForm: setAddPoForm, bucket: 'preorders' }, { skipParse: poUploadMode === 'manual' }); }}
                   >
                     <Upload className="h-6 w-6 text-pink-300/50" />
-                    <div className="text-sm font-black uppercase tracking-[0.14em] text-white/50">Drop product image or click to upload</div>
+                    <div className="text-sm font-black uppercase tracking-[0.14em] text-white/50">
+                      {poUploadMode === 'manual' ? 'Drop image here or click to upload' : 'Drop product image or click to upload'}
+                    </div>
                   </div>
                 )}
 
@@ -2200,11 +2374,18 @@ export default function AdminPage() {
                         </td>
 
                         <td className="px-4 py-3">
-                          <button onClick={() => { if (window.confirm(`Delete "${po.title}"?`)) deletePreorder(po.id); }}
-                            disabled={deletingPreorderId === po.id}
-                            className="rounded-lg border border-red-400/25 bg-red-400/8 px-2.5 py-1 text-[10px] font-black uppercase text-red-300 hover:bg-red-400/15 disabled:opacity-40 transition">
-                            {deletingPreorderId === po.id ? '…' : 'Delete'}
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            <button onClick={() => openEditRow('preorders', po)}
+                              data-testid={`edit-preorder-${po.id}`}
+                              className="rounded-lg border border-cyan-400/25 bg-cyan-400/8 px-2.5 py-1 text-[10px] font-black uppercase text-cyan-300 hover:bg-cyan-400/15 transition">
+                              Edit
+                            </button>
+                            <button onClick={() => { if (window.confirm(`Delete "${po.title}"?`)) deletePreorder(po.id); }}
+                              disabled={deletingPreorderId === po.id}
+                              className="rounded-lg border border-red-400/25 bg-red-400/8 px-2.5 py-1 text-[10px] font-black uppercase text-red-300 hover:bg-red-400/15 disabled:opacity-40 transition">
+                              {deletingPreorderId === po.id ? '…' : 'Delete'}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -2242,11 +2423,32 @@ export default function AdminPage() {
             {showAddProduct && (
               <form onSubmit={addDbProduct} className="mb-6 rounded-[24px] border border-cyan-400/25 bg-cyan-400/8 p-5">
                 <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-cyan-300 mb-4">
-                  <Package className="h-3.5 w-3.5" /> New Product — AI Reader
+                  <Package className="h-3.5 w-3.5" /> New Product — {prodUploadMode === 'ai' ? 'AI Reader' : 'Manual Entry'}
+                </div>
+
+                {/* AI / Manual upload toggle (segmented control) */}
+                <div className="mb-3 flex flex-wrap items-center gap-3">
+                  <div className="inline-flex rounded-full border border-white/10 bg-black/30 p-1" role="radiogroup" aria-label="Upload mode">
+                    <button type="button" role="radio" aria-checked={prodUploadMode === 'ai'}
+                      data-testid="product-mode-ai"
+                      onClick={() => setProdUploadMode('ai')}
+                      className={`rounded-full px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] transition ${prodUploadMode === 'ai' ? 'bg-gradient-to-r from-cyan-300 to-fuchsia-400 text-black shadow' : 'text-white/55 hover:text-white'}`}>
+                      AI Auto-Parse
+                    </button>
+                    <button type="button" role="radio" aria-checked={prodUploadMode === 'manual'}
+                      data-testid="product-mode-manual"
+                      onClick={() => setProdUploadMode('manual')}
+                      className={`rounded-full px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] transition ${prodUploadMode === 'manual' ? 'bg-gradient-to-r from-cyan-300 to-fuchsia-400 text-black shadow' : 'text-white/55 hover:text-white'}`}>
+                      Manual
+                    </button>
+                  </div>
+                  <span className="text-[10px] text-white/40">
+                    {prodUploadMode === 'ai' ? 'Recommended for single cards.' : 'Upload image, type details by hand.'}
+                  </span>
                 </div>
 
                 <input ref={prodFileInputRef} type="file" accept="image/*,.heic,.heif" className="hidden"
-                  onChange={e => { const f = e.target.files?.[0]; if (f) analyzeForForm(f, { setPreview: setProdImagePreview, setAnalyzing: setProdAnalyzing, setAnalyzed: setProdAnalyzed, setError: setProdAnalyzeError, setUploading: setProdUploadingImg, setForm: setAddProdForm, bucket: 'products' }); e.target.value = ''; }} />
+                  onChange={e => { const f = e.target.files?.[0]; if (f) analyzeForForm(f, { setPreview: setProdImagePreview, setAnalyzing: setProdAnalyzing, setAnalyzed: setProdAnalyzed, setError: setProdAnalyzeError, setUploading: setProdUploadingImg, setForm: setAddProdForm, bucket: 'products' }, { skipParse: prodUploadMode === 'manual' }); e.target.value = ''; }} />
 
                 {prodImagePreview ? (
                   <div className="mb-4 flex gap-4 items-start">
@@ -2258,9 +2460,12 @@ export default function AdminPage() {
                       </button>
                     </div>
                     <div className="flex-1">
-                      {prodAnalyzing ? <div className="flex items-center gap-2 text-sm text-cyan-300"><Loader2 className="h-4 w-4 animate-spin" /> Analyzing…</div>
+                      {prodUploadMode === 'ai' && (prodAnalyzing ? <div className="flex items-center gap-2 text-sm text-cyan-300"><Loader2 className="h-4 w-4 animate-spin" /> Analyzing…</div>
                         : prodAnalyzed ? <div className="flex items-center gap-2 text-sm text-emerald-300"><Check className="h-4 w-4" /> AI filled title — review below.</div>
-                        : prodAnalyzeError ? <div className="text-sm text-red-300">{prodAnalyzeError}</div> : null}
+                        : prodAnalyzeError ? <div className="text-sm text-red-300">{prodAnalyzeError}</div> : null)}
+                      {prodUploadMode === 'manual' && prodAnalyzeError && (
+                        <div className="text-sm text-red-300">{prodAnalyzeError}</div>
+                      )}
                       {prodUploadingImg && <div className="mt-1 flex items-center gap-2 text-xs text-white/40"><Loader2 className="h-3 w-3 animate-spin" /> Uploading…</div>}
                       {addProdForm.image_url && !prodUploadingImg && <div className="mt-1 text-xs text-emerald-400/70">Image uploaded</div>}
                     </div>
@@ -2271,13 +2476,17 @@ export default function AdminPage() {
                     onClick={() => prodFileInputRef.current?.click()}
                     onDragOver={e => { e.preventDefault(); setProdDragOver(true); }}
                     onDragLeave={() => setProdDragOver(false)}
-                    onDrop={e => { e.preventDefault(); setProdDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) analyzeForForm(f, { setPreview: setProdImagePreview, setAnalyzing: setProdAnalyzing, setAnalyzed: setProdAnalyzed, setError: setProdAnalyzeError, setUploading: setProdUploadingImg, setForm: setAddProdForm, bucket: 'products' }); }}
+                    onDrop={e => { e.preventDefault(); setProdDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) analyzeForForm(f, { setPreview: setProdImagePreview, setAnalyzing: setProdAnalyzing, setAnalyzed: setProdAnalyzed, setError: setProdAnalyzeError, setUploading: setProdUploadingImg, setForm: setAddProdForm, bucket: 'products' }, { skipParse: prodUploadMode === 'manual' }); }}
                   >
                     <Upload className="h-6 w-6 text-cyan-300/50" />
-                    <div className="text-sm font-black uppercase tracking-[0.14em] text-white/50">Drop product image or click to upload</div>
-                    <div className="flex items-center gap-1.5 text-xs text-cyan-300/60">
-                      <Sparkles className="h-3 w-3" /> AI will read product name
+                    <div className="text-sm font-black uppercase tracking-[0.14em] text-white/50">
+                      {prodUploadMode === 'manual' ? 'Drop image here or click to upload' : 'Drop product image or click to upload'}
                     </div>
+                    {prodUploadMode === 'ai' && (
+                      <div className="flex items-center gap-1.5 text-xs text-cyan-300/60">
+                        <Sparkles className="h-3 w-3" /> AI will read product name
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -2421,11 +2630,18 @@ export default function AdminPage() {
                         </td>
 
                         <td className="px-4 py-3">
-                          <button onClick={() => { if (window.confirm(`Delete "${prod.title}"?`)) deleteDbProduct(prod.id); }}
-                            disabled={deletingProductId === prod.id}
-                            className="rounded-lg border border-red-400/25 bg-red-400/8 px-2.5 py-1 text-[10px] font-black uppercase text-red-300 hover:bg-red-400/15 disabled:opacity-40 transition">
-                            {deletingProductId === prod.id ? '…' : 'Delete'}
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            <button onClick={() => openEditRow('products', prod)}
+                              data-testid={`edit-product-${prod.id}`}
+                              className="rounded-lg border border-cyan-400/25 bg-cyan-400/8 px-2.5 py-1 text-[10px] font-black uppercase text-cyan-300 hover:bg-cyan-400/15 transition">
+                              Edit
+                            </button>
+                            <button onClick={() => { if (window.confirm(`Delete "${prod.title}"?`)) deleteDbProduct(prod.id); }}
+                              disabled={deletingProductId === prod.id}
+                              className="rounded-lg border border-red-400/25 bg-red-400/8 px-2.5 py-1 text-[10px] font-black uppercase text-red-300 hover:bg-red-400/15 disabled:opacity-40 transition">
+                              {deletingProductId === prod.id ? '…' : 'Delete'}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -2656,6 +2872,252 @@ export default function AdminPage() {
         })() : null}
 
         <p className="mt-8 text-center text-xs text-white/25">Changes apply to the live shop only when this deployment can read and write Supabase successfully.</p>
+      </div>
+
+      {editingRow && (
+        <EditRowModal
+          editingRow={editingRow}
+          saving={editingSaving}
+          error={editingError}
+          onChange={setEditField}
+          onSave={saveEditRow}
+          onCancel={closeEditRow}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Edit-row modal ───────────────────────────────────────────────────────────
+// Single modal that renders the right field set for whatever table's row is
+// currently being edited. Focus-trap + Escape/backdrop close mirror the
+// CardRequestModal pattern (same a11y guarantees, no framer-motion since
+// admin tooling doesn't need animation).
+function EditRowModal({ editingRow, saving, error, onChange, onSave, onCancel }) {
+  const panelRef = useRef(null);
+  const closeBtnRef = useRef(null);
+  const prevFocusRef = useRef(null);
+
+  // Block dismissal while a save is in flight so an accidental Escape /
+  // backdrop click can't drop a pending PATCH. The Save button itself is
+  // disabled in that state so the user can still wait.
+  const requestClose = () => { if (!saving) onCancel(); };
+
+  useEffect(() => {
+    function onKeyDown(e) {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        requestClose();
+      }
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saving]);
+
+  useEffect(() => {
+    prevFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const id = requestAnimationFrame(() => {
+      // Focus first editable input (skip readonly/disabled) so keyboard users
+      // land on a real form field, not the close button. Fall back to close
+      // button if none found (matches CardRequestModal pattern).
+      const panel = panelRef.current;
+      if (panel) {
+        const firstField = panel.querySelector(
+          'input:not([disabled]):not([readonly]), textarea:not([disabled]):not([readonly]), select:not([disabled])'
+        );
+        if (firstField && typeof firstField.focus === 'function') {
+          firstField.focus();
+          return;
+        }
+      }
+      closeBtnRef.current?.focus();
+    });
+    return () => {
+      cancelAnimationFrame(id);
+      const prev = prevFocusRef.current;
+      if (prev && typeof prev.focus === 'function' && document.contains(prev)) prev.focus();
+    };
+  }, []);
+
+  useEffect(() => {
+    function onTabKey(e) {
+      if (e.key !== 'Tab') return;
+      const panel = panelRef.current;
+      if (!panel) return;
+      const focusable = panel.querySelectorAll(
+        'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable.length === 0) { e.preventDefault(); return; }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (!panel.contains(active)) { e.preventDefault(); first.focus(); return; }
+      if (e.shiftKey && active === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && active === last) { e.preventDefault(); first.focus(); }
+    }
+    document.addEventListener('keydown', onTabKey, true);
+    return () => document.removeEventListener('keydown', onTabKey, true);
+  }, []);
+
+  const { table, row } = editingRow;
+  // Field definitions per table — mirrors BLANK_FORM / BLANK_PROD / BLANK_PO.
+  // type: text (default), number, textarea, select (with options[]), checkbox.
+  // readOnly: visible but not editable (primary keys for products/preorders).
+  const FIELDS = {
+    singles: [
+      { key: 'card_name',   label: 'Card Name *' },
+      { key: 'set_name',    label: 'Set Name *' },
+      { key: 'set_code',    label: 'Set Code' },
+      { key: 'card_number', label: 'Card Number' },
+      { key: 'game',        label: 'Game *',     type: 'select', options: ['One Piece', 'Pokemon', 'Dragon Ball', 'Yu-Gi-Oh!', 'Union Arena'] },
+      { key: 'language',    label: 'Language *', type: 'select', options: ['English', 'Japanese', 'Asian English', 'Chinese', 'Korean'] },
+      { key: 'condition',   label: 'Condition',  type: 'select', options: ['NM', 'LP', 'MP', 'HP', 'DMG'] },
+      { key: 'rarity',      label: 'Rarity' },
+      { key: 'price',       label: 'Price (CAD) *', type: 'number', step: '0.01', min: '0' },
+      { key: 'stock',       label: 'Stock',         type: 'number', step: '1', min: '0' },
+      { key: 'image_url',   label: 'Image URL',  fullWidth: true },
+    ],
+    products: [
+      { key: 'id',          label: 'ID', readOnly: true },
+      { key: 'title',       label: 'Title *',     fullWidth: true },
+      { key: 'subtitle',    label: 'Subtitle' },
+      { key: 'language',    label: 'Language',    type: 'select', options: ['English', 'Japanese', 'Asian English', 'N/A'] },
+      { key: 'price',       label: 'Price (CAD) *', type: 'number', step: '0.01', min: '0' },
+      { key: 'usd_price',   label: 'USD Price', type: 'number', step: '0.01', min: '0' },
+      { key: 'aud_price',   label: 'AUD Price', type: 'number', step: '0.01', min: '0' },
+      { key: 'eur_price',   label: 'EUR Price', type: 'number', step: '0.01', min: '0' },
+      { key: 'stock',       label: 'Stock',       type: 'number', step: '1', min: '0' },
+      { key: 'badge',       label: 'Badge' },
+      { key: 'in_stock',    label: 'In Stock',    type: 'checkbox' },
+      { key: 'tag',         label: 'Tag',         type: 'select', options: ['One Piece', 'Pokemon', 'Dragon Ball', 'Yu-Gi-Oh!', 'Accessories'] },
+      { key: 'image_url',   label: 'Image URL',   fullWidth: true },
+    ],
+    preorders: [
+      { key: 'id',           label: 'ID', readOnly: true },
+      { key: 'title',        label: 'Title *',     fullWidth: true },
+      { key: 'subtitle',     label: 'Subtitle' },
+      { key: 'sold_out',     label: 'Sold Out',    type: 'checkbox' },
+      { key: 'price_tba',    label: 'Price TBA',   type: 'checkbox' },
+      { key: 'price',        label: 'Price (CAD)', type: 'number', step: '0.01', min: '0' },
+      { key: 'usd_price',    label: 'USD Price', type: 'number', step: '0.01', min: '0' },
+      { key: 'aud_price',    label: 'AUD Price', type: 'number', step: '0.01', min: '0' },
+      { key: 'eur_price',    label: 'EUR Price', type: 'number', step: '0.01', min: '0' },
+      { key: 'currency',     label: 'Currency' },
+      { key: 'eta',          label: 'ETA (text)' },
+      { key: 'deadline',     label: 'Deadline (ISO)' },
+      { key: 'image_url',    label: 'Image URL',   fullWidth: true },
+      { key: 'hype',         label: 'Hype' },
+      { key: 'notes',        label: 'Notes',       type: 'textarea', rows: 4, fullWidth: true },
+      { key: 'display_order',label: 'Display Order', type: 'number', step: '1' },
+    ],
+  };
+
+  const fields = FIELDS[table] || [];
+  const titleByTable = { singles: 'Edit Single', products: 'Edit Product', preorders: 'Edit Pre-Order' };
+
+  function renderField(f) {
+    const value = row[f.key];
+    const safeValue = value == null ? '' : value;
+    const baseInput = 'w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-cyan-400/40';
+    if (f.readOnly) {
+      return (
+        <input value={safeValue} readOnly disabled
+          className={`${baseInput} cursor-not-allowed text-white/40`} />
+      );
+    }
+    if (f.type === 'checkbox') {
+      return (
+        <label className="flex items-center gap-2 cursor-pointer py-2">
+          <input type="checkbox" checked={!!value}
+            onChange={e => onChange(f.key, e.target.checked)}
+            className="h-4 w-4 accent-cyan-400" />
+          <span className="text-xs text-white/60">{!!value ? 'Yes' : 'No'}</span>
+        </label>
+      );
+    }
+    if (f.type === 'select') {
+      return (
+        <select value={safeValue} onChange={e => onChange(f.key, e.target.value)}
+          className="w-full rounded-xl border border-white/10 bg-white px-3 py-2 text-sm text-black outline-none">
+          {f.options.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+      );
+    }
+    if (f.type === 'textarea') {
+      return (
+        <textarea rows={f.rows || 3} value={safeValue}
+          onChange={e => onChange(f.key, e.target.value)}
+          className={`${baseInput} resize-none`} />
+      );
+    }
+    if (f.type === 'number') {
+      return (
+        <input type="number" step={f.step} min={f.min} value={safeValue}
+          onChange={e => onChange(f.key, e.target.value)}
+          className={baseInput} />
+      );
+    }
+    return (
+      <input type="text" value={safeValue}
+        onChange={e => onChange(f.key, e.target.value)}
+        className={baseInput} />
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4"
+      role="dialog" aria-modal="true" aria-labelledby="edit-row-heading">
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={requestClose} />
+      <div ref={panelRef}
+        onClick={e => e.stopPropagation()}
+        className="relative w-full max-w-2xl rounded-[28px] border border-white/10 bg-[#07030f] overflow-hidden max-h-[90vh] flex flex-col"
+        data-testid="edit-row-modal">
+        <button type="button" aria-label="Close" ref={closeBtnRef} onClick={requestClose}
+          disabled={saving}
+          className="absolute right-5 top-5 z-20 rounded-xl border border-white/10 bg-white/5 p-1.5 hover:bg-white/10 disabled:opacity-40">
+          <X className="h-4 w-4 text-white/60" />
+        </button>
+        <div className="h-1 w-full bg-gradient-to-r from-cyan-400 via-fuchsia-400 to-pink-400 shrink-0" />
+        <div className="p-6 overflow-y-auto">
+          <div className="mb-5">
+            <div className="text-xs font-black uppercase tracking-[0.2em] text-cyan-300/70 mb-1">{table}</div>
+            <div id="edit-row-heading" className="text-xl font-black leading-snug">
+              {titleByTable[table] || 'Edit Row'}
+            </div>
+            <p className="mt-1.5 text-xs text-white/45 leading-5">
+              Edit any field below. Only changed fields are sent.
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {fields.map(f => (
+              <div key={f.key} className={f.fullWidth ? 'sm:col-span-2' : ''}>
+                <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">{f.label}</label>
+                {renderField(f)}
+              </div>
+            ))}
+          </div>
+
+          {error && (
+            <div className="mt-4 rounded-2xl border border-red-400/30 bg-red-400/10 px-3 py-2 text-xs text-red-200" role="alert">
+              {error}
+            </div>
+          )}
+
+          <div className="mt-5 flex flex-wrap items-center justify-end gap-3">
+            <button type="button" onClick={requestClose} disabled={saving}
+              data-testid="edit-row-cancel"
+              className="rounded-2xl border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-black uppercase text-white/70 hover:bg-white/10 disabled:opacity-40">
+              Cancel
+            </button>
+            <button type="button" onClick={onSave} disabled={saving}
+              data-testid="edit-row-save"
+              className="rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-emerald-400 px-6 py-2.5 text-sm font-black uppercase text-black disabled:opacity-60">
+              {saving ? 'Saving…' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
