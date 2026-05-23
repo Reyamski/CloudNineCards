@@ -12,13 +12,17 @@ import { supabase, supabaseEnabled } from '../lib/supabase';
 
 // ── Shipping schedule — MUST mirror the published policy ─────────────────────
 // Canonical published copy (HomePage.tsx "Tracked Shipping" card):
-//   "Every order ships tracked. Canada $6 singles / $15+ sealed. USA $15+.
-//    International from $22. Free shipping in Canada on singles orders $100+
-//    and sealed orders $300+."
+//   "Every order ships tracked. Canada $10 singles and deck packs, $15 sealed.
+//    USA $15+. International from $22. Free shipping in Canada on singles or
+//    deck pack orders $150+ and sealed orders $300+."
 //
-// Canada is the only tier with a singles-vs-sealed split:
-//   - singles-only cart  → $6 ; FREE when the singles subtotal >= $100
-//   - any sealed in cart  → $15 ; FREE when the TOTAL in-stock subtotal >= $300
+// Canada is the only tier with a singles-vs-sealed split. Deck-builder packs
+// (source='products' with id prefix 'dbp-') ship like singles — they're small
+// PWE/light-parcel friendly — so they share the lighter "singles+decks" tier.
+// Booster boxes / ETBs / accessories (every other source='products') stay on
+// the heavier sealed tier.
+//   - singles+decks cart      → $10 ; FREE when singles+decks subtotal >= $150
+//   - any sealed in cart      → $15 ; FREE when the TOTAL in-stock subtotal >= $300
 // USA ($15) and International ($22/$22/$25/$28) are flat per the copy and
 // unchanged here. Non-Canada destinations never get free shipping.
 const SHIP_RATES = {
@@ -28,10 +32,10 @@ const SHIP_RATES = {
   'Europe / Middle East':           25,
   'Other International':            28,
 };
-const CANADA_SINGLES_RATE          = 6;
-const CANADA_SEALED_RATE           = 15;
-const FREE_SHIP_CA_SINGLES_THRESHOLD = 100; // singles-only carts
-const FREE_SHIP_CA_SEALED_THRESHOLD  = 300; // any cart containing sealed
+const CANADA_SINGLES_DECKS_RATE          = 10;
+const CANADA_SEALED_RATE                 = 15;
+const FREE_SHIP_CA_SINGLES_DECKS_THRESHOLD = 150; // singles-or-deck-pack-only carts
+const FREE_SHIP_CA_SEALED_THRESHOLD        = 300; // any cart containing sealed
 const PREORDER_DEPOSIT_RATE = 0.30; // 30% down at checkout, 70% on release
 
 const COUNTRIES = [
@@ -74,33 +78,38 @@ const EMAILJS_TEMPLATE_ONHAND   = import.meta.env.VITE_EMAILJS_TEMPLATE_ONHAND;
 const EMAILJS_TEMPLATE_PREORDER = import.meta.env.VITE_EMAILJS_TEMPLATE_PREORDER;
 const EMAILJS_PUBLIC_KEY    = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
 
-// Pure/deterministic. `singlesSubtotal` and `sealedSubtotal` are the in-stock
-// (non-preorder) line totals split by source ('singles' vs everything else,
-// which is sealed 'products' incl. deck-builder packs). Both are >= 0 numbers
-// using the same price*qty basis as totals.subtotalInStock so the math stays
-// consistent. Returns a non-negative number (never NaN/undefined).
-function calcShipping(country, singlesSubtotal, sealedSubtotal) {
+// Pure/deterministic. `singlesDecksSubtotal` and `sealedSubtotal` are the
+// in-stock (non-preorder) line totals split by category:
+//   - singles+decks → source==='singles' OR (source==='products' AND
+//     id startsWith 'dbp-'). Light-parcel friendly.
+//   - sealed        → every other source==='products' (booster boxes, ETBs,
+//     accessories — heavy parcel).
+// Both are >= 0 numbers using the same price*qty basis as
+// totals.subtotalInStock so the math stays consistent. Returns a non-negative
+// number (never NaN/undefined).
+function calcShipping(country, singlesDecksSubtotal, sealedSubtotal) {
   if (!country) return 0;
-  const singles = Number(singlesSubtotal) || 0;
-  const sealed  = Number(sealedSubtotal)  || 0;
-  const inStockSubtotal = singles + sealed;
+  const singlesDecks = Number(singlesDecksSubtotal) || 0;
+  const sealed       = Number(sealedSubtotal)        || 0;
+  const inStockSubtotal = singlesDecks + sealed;
   if (inStockSubtotal <= 0) return 0; // only pre-orders (or empty) → no shipping
 
   if (country === 'Canada') {
     if (sealed > 0) {
-      // Cart contains ANY sealed product (sealed-only OR mixed singles+sealed).
-      // OWNER-TUNABLE DECISION: the published copy only defines pure singles
-      // ($100+) and pure sealed ($300+) free thresholds — it is silent on
-      // mixed carts. We apply the sealed tier ($15, free at $300+ on the FULL
-      // in-stock subtotal) to any cart containing sealed. This is the
-      // conservative reading: it never charges LESS than the published copy
-      // promises for either pure case, and treats a mixed cart as "sealed".
+      // Cart contains ANY sealed product (sealed-only OR mixed with singles
+      // or deck packs). OWNER-TUNABLE DECISION: the published copy only
+      // defines pure singles+decks ($150+) and pure sealed ($300+) free
+      // thresholds — it is silent on mixed carts. We apply the sealed tier
+      // ($15, free at $300+ on the FULL in-stock subtotal) to any cart
+      // containing sealed. This is the conservative reading: it never
+      // charges LESS than the published copy promises for either pure case,
+      // and treats a mixed cart as "sealed".
       if (inStockSubtotal >= FREE_SHIP_CA_SEALED_THRESHOLD) return 0;
       return CANADA_SEALED_RATE;
     }
-    // Singles-only cart (sealed === 0, singles > 0).
-    if (singles >= FREE_SHIP_CA_SINGLES_THRESHOLD) return 0;
-    return CANADA_SINGLES_RATE;
+    // singles+decks-only cart (sealed === 0, singlesDecks > 0).
+    if (singlesDecks >= FREE_SHIP_CA_SINGLES_DECKS_THRESHOLD) return 0;
+    return CANADA_SINGLES_DECKS_RATE;
   }
 
   return SHIP_RATES[country] ?? 28;
@@ -268,21 +277,27 @@ export default function CartPage() {
   const inStockSubtotal   = totals.subtotalInStock;
   const preorderSubtotal  = totals.subtotalPreorder;
 
-  // Split the in-stock subtotal by source for the tiered Canada shipping rule.
-  // 'singles' → singles tier; everything else in-stock ('products', incl.
-  // deck-builder packs) → sealed tier. Same price*qty basis as
-  // totals.subtotalInStock (CartContext) so the numbers stay consistent.
-  const { singlesSubtotal, sealedSubtotal } = useMemo(() => {
-    let singlesS = 0, sealedS = 0;
+  // Split the in-stock subtotal by category for the tiered Canada shipping
+  // rule. Deck-builder packs (source='products' with id prefix 'dbp-') bundle
+  // with singles into the lighter "singles+decks" tier because they're small
+  // enough for the same light-parcel rate. Every other source='products' row
+  // (booster boxes, ETBs, accessories) stays on the heavier "sealed" tier.
+  // Same price*qty basis as totals.subtotalInStock (CartContext) so the
+  // numbers stay consistent. Guard against undefined ids.
+  const { singlesDecksSubtotal, sealedSubtotal } = useMemo(() => {
+    let singlesDecksS = 0, sealedS = 0;
     for (const it of inStockItems) {
       const line = (Number(it.price) || 0) * (Number(it.qty) || 0);
-      if (it.source === 'singles') singlesS += line;
+      const isDeckPack = it.source === 'products'
+        && typeof it.id === 'string'
+        && it.id.startsWith('dbp-');
+      if (it.source === 'singles' || isDeckPack) singlesDecksS += line;
       else sealedS += line;
     }
-    return { singlesSubtotal: singlesS, sealedSubtotal: sealedS };
+    return { singlesDecksSubtotal: singlesDecksS, sealedSubtotal: sealedS };
   }, [inStockItems]);
 
-  const shippingFee       = hasInStock ? calcShipping(country, singlesSubtotal, sealedSubtotal) : 0;
+  const shippingFee       = hasInStock ? calcShipping(country, singlesDecksSubtotal, sealedSubtotal) : 0;
   const taxRate           = country === 'Canada' && province ? (PROVINCE_TAX[province]?.rate ?? 0) : 0;
   const taxLabel          = country === 'Canada' && province ? (PROVINCE_TAX[province]?.label ?? '') : '';
   // Tax applied to in-stock subtotal + shipping (matches existing modal logic).
@@ -294,8 +309,8 @@ export default function CartPage() {
   const dueNow            = inStockTotal + preorderDeposit;
   // Derive from calcShipping (single source of truth) so the UI label can
   // never disagree with the charged fee: a Canadian in-stock cart whose
-  // computed fee is $0 hit a free-shipping threshold (singles $100+ or
-  // any-sealed $300+).
+  // computed fee is $0 hit a free-shipping threshold (singles+decks $150+
+  // or any-sealed $300+).
   const freeShipApplied   = hasInStock && country === 'Canada' && shippingFee === 0;
 
   function copyWise() {
@@ -985,7 +1000,7 @@ function OrderSummary({
               <Row label="Shipping" value="Select country" muted />
             )}
             {freeShipApplied && (
-              <div className="text-[11px] text-green-400 font-black">Free shipping in Canada — singles orders $100+ and sealed orders $300+</div>
+              <div className="text-[11px] text-green-400 font-black">Free shipping in Canada — singles or deck pack orders $150+ and sealed orders $300+</div>
             )}
             {country === 'Canada' && province && taxAmount > 0 ? (
               <Row label={`Tax (${taxLabel} — ${province})`} value={`CAD $${taxAmount.toFixed(2)}`} />
