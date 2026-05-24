@@ -439,7 +439,7 @@ export default function SinglesPage() {
           <div className="mt-12 grid gap-4 sm:grid-cols-3">
             {[
               { icon: Package,     title: 'Tracked Shipping',    desc: 'Sleeved in toploader, tracked mail. Canada $10 singles and deck packs, $15 sealed. USA $15+. International from $22.' },
-              { icon: Globe,       title: 'Ships Worldwide',     desc: 'Free shipping in Canada on singles or deck pack orders $150+ and sealed orders $300+.' },
+              { icon: Globe,       title: 'Ships Worldwide',     desc: 'Free shipping in Canada on in-stock orders $300+.' },
               { icon: ShieldCheck, title: 'Condition Guarantee', desc: 'NM means NM. If it shows up worse than described, we fix it.' },
             ].map(({ icon: Icon, title, desc }) => (
               <div key={title} className="rounded-[20px] border border-white/8 bg-white/3 p-4 flex gap-3">

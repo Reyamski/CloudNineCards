@@ -13,16 +13,21 @@ import { supabase, supabaseEnabled } from '../lib/supabase';
 // ── Shipping schedule — MUST mirror the published policy ─────────────────────
 // Canonical published copy (HomePage.tsx "Tracked Shipping" card):
 //   "Every order ships tracked. Canada $10 singles and deck packs, $15 sealed.
-//    USA $15+. International from $22. Free shipping in Canada on singles or
-//    deck pack orders $150+ and sealed orders $300+."
+//    USA $15+. International from $22. Free shipping in Canada on in-stock
+//    orders $300+. Pre-orders pay actual shipping at release."
 //
 // Canada is the only tier with a singles-vs-sealed split. Deck-builder packs
 // (source='products' with id prefix 'dbp-') ship like singles — they're small
 // PWE/light-parcel friendly — so they share the lighter "singles+decks" tier.
 // Booster boxes / ETBs / accessories (every other source='products') stay on
 // the heavier sealed tier.
-//   - singles+decks cart      → $10 ; FREE when singles+decks subtotal >= $150
-//   - any sealed in cart      → $15 ; FREE when the TOTAL in-stock subtotal >= $300
+//   - singles+decks cart      → $10
+//   - any sealed in cart      → $15 (sealed dominates mixed carts)
+//   - Free shipping in Canada when the TOTAL in-stock subtotal (singles +
+//     decks + sealed combined) is >= $300, regardless of item mix.
+// Pre-order line items never count toward the free-ship threshold — preorders
+// pay actual shipping when released (already filtered to in-stock-only here
+// via the singlesDecks/sealed split in CartPage's useMemo).
 // USA ($15) and International ($22/$22/$25/$28) are flat per the copy and
 // unchanged here. Non-Canada destinations never get free shipping.
 const SHIP_RATES = {
@@ -32,10 +37,9 @@ const SHIP_RATES = {
   'Europe / Middle East':           25,
   'Other International':            28,
 };
-const CANADA_SINGLES_DECKS_RATE          = 10;
-const CANADA_SEALED_RATE                 = 15;
-const FREE_SHIP_CA_SINGLES_DECKS_THRESHOLD = 150; // singles-or-deck-pack-only carts
-const FREE_SHIP_CA_SEALED_THRESHOLD        = 300; // any cart containing sealed
+const CANADA_SINGLES_DECKS_RATE = 10;
+const CANADA_SEALED_RATE        = 15;
+const FREE_SHIP_CA_THRESHOLD    = 300; // unified: any Canadian in-stock cart $300+ ships free
 const PREORDER_DEPOSIT_RATE = 0.30; // 30% down at checkout, 70% on release
 
 const COUNTRIES = [
@@ -94,25 +98,20 @@ function calcShipping(country, singlesDecksSubtotal, sealedSubtotal) {
   const inStockSubtotal = singlesDecks + sealed;
   if (inStockSubtotal <= 0) return 0; // only pre-orders (or empty) → no shipping
 
-  if (country === 'Canada') {
-    if (sealed > 0) {
-      // Cart contains ANY sealed product (sealed-only OR mixed with singles
-      // or deck packs). OWNER-TUNABLE DECISION: the published copy only
-      // defines pure singles+decks ($150+) and pure sealed ($300+) free
-      // thresholds — it is silent on mixed carts. We apply the sealed tier
-      // ($15, free at $300+ on the FULL in-stock subtotal) to any cart
-      // containing sealed. This is the conservative reading: it never
-      // charges LESS than the published copy promises for either pure case,
-      // and treats a mixed cart as "sealed".
-      if (inStockSubtotal >= FREE_SHIP_CA_SEALED_THRESHOLD) return 0;
-      return CANADA_SEALED_RATE;
-    }
-    // singles+decks-only cart (sealed === 0, singlesDecks > 0).
-    if (singlesDecks >= FREE_SHIP_CA_SINGLES_DECKS_THRESHOLD) return 0;
-    return CANADA_SINGLES_DECKS_RATE;
-  }
+  // Non-Canada: flat per tier from SHIP_RATES, no free-ship.
+  if (country !== 'Canada') return SHIP_RATES[country] ?? 28;
 
-  return SHIP_RATES[country] ?? 28;
+  // Canada: ONE unified free-ship threshold across all in-stock categories.
+  // Pre-order line items are already excluded upstream (singlesDecksSubtotal
+  // and sealedSubtotal only sum !isPreorder items) so they never contribute
+  // toward the threshold and never trigger free shipping.
+  if (inStockSubtotal >= FREE_SHIP_CA_THRESHOLD) return 0;
+
+  // Below threshold: tier by mix. Sealed dominates — any cart containing
+  // sealed pays the heavier $15 rate (conservative; sealed parcels are bulky
+  // and a mixed cart still needs the heavier box).
+  if (sealed > 0) return CANADA_SEALED_RATE;
+  return CANADA_SINGLES_DECKS_RATE;
 }
 
 function newOrderNumber(suffix = '') {
@@ -309,8 +308,7 @@ export default function CartPage() {
   const dueNow            = inStockTotal + preorderDeposit;
   // Derive from calcShipping (single source of truth) so the UI label can
   // never disagree with the charged fee: a Canadian in-stock cart whose
-  // computed fee is $0 hit a free-shipping threshold (singles+decks $150+
-  // or any-sealed $300+).
+  // computed fee is $0 hit the unified $300+ free-shipping threshold.
   const freeShipApplied   = hasInStock && country === 'Canada' && shippingFee === 0;
 
   function copyWise() {
@@ -1000,7 +998,7 @@ function OrderSummary({
               <Row label="Shipping" value="Select country" muted />
             )}
             {freeShipApplied && (
-              <div className="text-[11px] text-green-400 font-black">Free shipping in Canada — singles or deck pack orders $150+ and sealed orders $300+</div>
+              <div className="text-[11px] text-green-400 font-black">Free shipping in Canada on in-stock orders $300+</div>
             )}
             {country === 'Canada' && province && taxAmount > 0 ? (
               <Row label={`Tax (${taxLabel} — ${province})`} value={`CAD $${taxAmount.toFixed(2)}`} />
