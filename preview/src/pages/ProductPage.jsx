@@ -183,6 +183,9 @@ export default function ProductPage() {
               <img
                 src={product.image}
                 alt={product.title}
+                loading="eager"
+                decoding="async"
+                fetchPriority="high"
                 onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/product-fallback.svg'; }}
                 className="w-full object-cover"
               />

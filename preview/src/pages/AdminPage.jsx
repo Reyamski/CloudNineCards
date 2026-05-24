@@ -1189,6 +1189,7 @@ export default function AdminPage() {
               <div className="mb-1 text-cyan-200/80">Payment proof:</div>
               <a href={order.payment_proof} target="_blank" rel="noopener noreferrer">
                 <img src={order.payment_proof} alt="Payment proof"
+                  loading="lazy" decoding="async"
                   className="max-h-40 rounded-xl border border-white/10 cursor-zoom-in hover:opacity-80 transition" />
                 <div className="mt-1 text-[10px] text-white/30">Click to open full size</div>
               </a>
@@ -1666,7 +1667,7 @@ export default function AdminPage() {
                                       <td className="py-2 pr-2 text-white/80">
                                         <div className="flex items-center gap-2">
                                           {line.image_snapshot ? (
-                                            <img src={line.image_snapshot} alt="" className="h-10 w-8 rounded border border-white/10 object-cover bg-black/30" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                                            <img src={line.image_snapshot} alt="" loading="lazy" decoding="async" className="h-10 w-8 rounded border border-white/10 object-cover bg-black/30" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                                           ) : null}
                                           <div className="min-w-0">
                                             <div className="font-bold truncate max-w-[260px]">{line.title_snapshot}</div>
@@ -1894,7 +1895,7 @@ export default function AdminPage() {
                 {imagePreview ? (
                   <div className="mb-4 flex gap-4 items-start">
                     <div className="relative shrink-0">
-                      <img src={imagePreview} alt="Card preview" className="h-32 w-24 rounded-xl object-contain bg-black/40 border border-white/10" />
+                      <img src={imagePreview} alt="Card preview" loading="lazy" decoding="async" className="h-32 w-24 rounded-xl object-contain bg-black/40 border border-white/10" />
                       <button type="button" onClick={() => { resetImageState(); setAddForm(f => ({ ...f, image_url: '' })); }}
                         className="absolute -top-2 -right-2 rounded-full border border-white/20 bg-black/80 p-0.5 hover:bg-white/20">
                         <X className="h-3 w-3 text-white/60" />
@@ -2180,7 +2181,7 @@ export default function AdminPage() {
                 {poImagePreview ? (
                   <div className="mb-4 flex gap-4 items-start">
                     <div className="relative shrink-0">
-                      <img src={poImagePreview} alt="Preview" className="h-32 w-24 rounded-xl object-contain bg-black/40 border border-white/10" />
+                      <img src={poImagePreview} alt="Preview" loading="lazy" decoding="async" className="h-32 w-24 rounded-xl object-contain bg-black/40 border border-white/10" />
                       <button type="button" onClick={() => { setPoImagePreview(''); setPoAnalyzed(false); setPoAnalyzeError(''); setAddPoForm(f => ({ ...f, image_url: '' })); }}
                         className="absolute -top-2 -right-2 rounded-full border border-white/20 bg-black/80 p-0.5 hover:bg-white/20">
                         <X className="h-3 w-3 text-white/60" />
@@ -2453,7 +2454,7 @@ export default function AdminPage() {
                 {prodImagePreview ? (
                   <div className="mb-4 flex gap-4 items-start">
                     <div className="relative shrink-0">
-                      <img src={prodImagePreview} alt="Preview" className="h-32 w-24 rounded-xl object-contain bg-black/40 border border-white/10" />
+                      <img src={prodImagePreview} alt="Preview" loading="lazy" decoding="async" className="h-32 w-24 rounded-xl object-contain bg-black/40 border border-white/10" />
                       <button type="button" onClick={() => { setProdImagePreview(''); setProdAnalyzed(false); setProdAnalyzeError(''); setAddProdForm(f => ({ ...f, image_url: '' })); }}
                         className="absolute -top-2 -right-2 rounded-full border border-white/20 bg-black/80 p-0.5 hover:bg-white/20">
                         <X className="h-3 w-3 text-white/60" />

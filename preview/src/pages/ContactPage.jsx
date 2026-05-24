@@ -71,9 +71,12 @@ export default function ContactPage() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.18),transparent_40%),radial-gradient(circle_at_left,rgba(168,85,247,0.12),transparent_40%)]" />
         {/* Robin character art */}
         <img
-          src="/robin.png"
+          src="/robin.webp"
           alt=""
           aria-hidden="true"
+          loading="lazy"
+          decoding="async"
+          fetchPriority="low"
           className="pointer-events-none absolute right-0 bottom-0 h-[600px] w-auto select-none"
           style={{ opacity: 0.42, filter: 'drop-shadow(0 0 40px rgba(139,92,246,0.65)) drop-shadow(0 0 80px rgba(34,211,238,0.25))', zIndex: 0 }}
           onError={(e) => { e.currentTarget.style.display = 'none'; }}

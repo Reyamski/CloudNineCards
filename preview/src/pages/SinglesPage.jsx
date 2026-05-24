@@ -331,7 +331,9 @@ export default function SinglesPage() {
       {/* Hero */}
       <section className="relative overflow-hidden border-b border-cyan-500/15 bg-[#07030f] px-6 pb-10 pt-6 min-h-[360px] flex flex-col justify-center">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.18),transparent_40%),radial-gradient(circle_at_left,rgba(168,85,247,0.12),transparent_40%)]" />
-        <img src="/pikachu.png" alt="" aria-hidden="true"
+        <img src="/pikachu.webp" alt="" aria-hidden="true"
+          decoding="async"
+          fetchPriority="low"
           className="pointer-events-none absolute right-0 bottom-0 h-[440px] w-auto select-none"
           style={{ opacity: 0.38, filter: 'drop-shadow(0 0 40px rgba(250,204,21,0.55)) drop-shadow(0 0 80px rgba(250,204,21,0.2))', zIndex: 0 }}
           onError={e => { e.currentTarget.style.display = 'none'; }} />

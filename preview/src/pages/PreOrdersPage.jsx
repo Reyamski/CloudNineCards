@@ -21,7 +21,7 @@ const DP_PERCENT = 0.30;
 // ── SEED DATA (reference copy — now managed via Supabase Admin > Pre-Orders) ──
 // const SEED_PREORDERS = [
 //   { id: 'op17jp', title: 'One Piece Card Game OP-17 Booster Box [Japanese]', subtitle: '4th Anniversary Set – "World\'s Strongest Warrior"', soldOut: true, priceTba: false, price: 93, usdPrice: 68, audPrice: 96, currency: 'CAD', eta: 'Est. Aug 31, 2026', deadline: new Date('2026-04-13T11:00:00'), image: '/OP-17-JP.png', hype: '4th Anniversary Set', notes: ['Per Box — Case (12 Boxes): CAD $1,113 | USD $810 | AUD $1,148.', 'Pre-orders are not guaranteed and subject to allocation.', 'If allocation is cut, down payment will be refunded.', 'Buyer shoulders shipping fees, taxes, and import duties.'] },
-//   { id: 'ygo-cg2122ae', title: 'Yu-Gi-Oh! Creation Pack 12 [CG2122AE]', subtitle: 'Asian English · Per Case (24 Boxes)', soldOut: true, priceTba: false, price: 1650.55, usdPrice: 1196.08, audPrice: 1718.31, currency: 'CAD', eta: 'Est. July 11, 2026', deadline: new Date('2026-03-28T18:00:00'), image: '/Yu-Gi-Oh! Creation Pack 12.png', hype: 'Limited Allocation', notes: ['Limited allocation only. Pre-orders may be cut.', 'Orders released only after full payment cleared.', 'Buyer shoulders shipping fees, taxes, and import duties.'] },
+//   { id: 'ygo-cg2122ae', title: 'Yu-Gi-Oh! Creation Pack 12 [CG2122AE]', subtitle: 'Asian English · Per Case (24 Boxes)', soldOut: true, priceTba: false, price: 1650.55, usdPrice: 1196.08, audPrice: 1718.31, currency: 'CAD', eta: 'Est. July 11, 2026', deadline: new Date('2026-03-28T18:00:00'), image: '/Yu-Gi-Oh! Creation Pack 12.webp', hype: 'Limited Allocation', notes: ['Limited allocation only. Pre-orders may be cut.', 'Orders released only after full payment cleared.', 'Buyer shoulders shipping fees, taxes, and import duties.'] },
 //   { id: 'test-dummy', title: '[TEST ITEM — DO NOT ORDER]', subtitle: 'For internal testing only', soldOut: false, priceTba: false, price: 1.00, usdPrice: 0.73, audPrice: 1.10, currency: 'CAD', eta: 'N/A', deadline: new Date('2026-12-31T23:59:59'), image: 'https://placehold.co/400x560/1a0030/ff0000?text=TEST+ITEM%0ADO+NOT+ORDER&font=montserrat', hype: 'Internal test only', notes: ['This is a test item. Do not submit a real order.'] },
 //   { id: 'op17eng', title: 'One Piece Card Game OP-17 Booster Box [English]', subtitle: '4th Anniversary Set – "World\'s Strongest Warrior"', soldOut: true, priceTba: false, price: 130, usdPrice: 94, audPrice: 138, currency: 'CAD', eta: 'Est. Oct 31, 2026', deadline: new Date('2026-09-01T23:59:59'), image: '/OP-17-JP.png', hype: 'Open — Limited Slots', notes: ['Per Box. Case (12 Boxes): CAD $1,560 | USD $1,128 | AUD $1,656.', 'Pre-orders are not guaranteed and subject to allocation.', 'If allocation is cut, down payment will be refunded in full.', 'Buyer shoulders shipping fees, taxes, and import duties.'] },
 //   { id: 'op16eng', title: 'One Piece Card Game OP-16 Booster Box', subtitle: 'English',  soldOut: true, priceTba: false, currency: 'CAD', eta: 'TBD', image: 'https://placehold.co/400x560/0d0020/9333ea?text=OP-16%0AEnglish%0ABooster+Box&font=montserrat', hype: 'Stay tuned for updates.' },
@@ -195,9 +195,12 @@ export default function PreOrdersPage() {
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:30px_30px]" />
         {/* Goku character art */}
         <img
-          src="/goku.png"
+          src="/goku.webp"
           alt=""
           aria-hidden="true"
+          loading="lazy"
+          decoding="async"
+          fetchPriority="low"
           className="pointer-events-none absolute right-0 bottom-0 h-[520px] w-auto select-none"
           style={{ opacity: 0.38, filter: 'drop-shadow(0 0 40px rgba(250,204,21,0.6)) drop-shadow(0 0 80px rgba(251,146,60,0.3))', zIndex: 0 }}
           onError={(e) => { e.currentTarget.style.display = 'none'; }}

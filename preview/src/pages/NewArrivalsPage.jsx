@@ -87,9 +87,12 @@ export default function NewArrivalsPage() {
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:30px_30px]" />
         {/* Nami character art */}
         <img
-          src="/nami.png"
+          src="/nami.webp"
           alt=""
           aria-hidden="true"
+          loading="lazy"
+          decoding="async"
+          fetchPriority="low"
           className="pointer-events-none absolute right-0 top-0 h-full w-auto select-none"
           style={{ opacity: 0.42, filter: 'drop-shadow(0 0 40px rgba(250,204,21,0.65)) drop-shadow(0 0 80px rgba(250,204,21,0.25))', zIndex: 0 }}
           onError={(e) => { e.currentTarget.style.display = 'none'; }}

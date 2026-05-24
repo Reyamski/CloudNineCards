@@ -48,7 +48,7 @@ const BASE_STOCK_SPOTLIGHT = [
     badge: 'Pokemon',
     title: 'Ascended Heroes ETB',
     body: 'English ETB. In stock, ships from Canada.',
-    image: '/ascended.jpg',
+    image: '/ascended.webp',
     price: 'CAD $279.00',
     subtitle: 'English',
   },
@@ -398,9 +398,11 @@ export default function HomePage() {
 
         {/* Luffy hero art */}
         <img
-          src="/luffy.png"
+          src="/luffy.webp"
           alt=""
           aria-hidden="true"
+          decoding="async"
+          fetchPriority="low"
           className="pointer-events-none absolute bottom-0 right-4 hidden h-[96%] w-auto object-contain md:block"
           style={{
             zIndex: 0,
@@ -516,6 +518,7 @@ export default function HomePage() {
                         alt={heroCard.title}
                         loading="eager"
                         decoding="async"
+                        fetchPriority="high"
                         onError={(event) => {
                           event.currentTarget.onerror = null;
                           event.currentTarget.src = '/product-fallback.svg';
@@ -762,10 +765,11 @@ export default function HomePage() {
       <section className="relative mx-auto max-w-7xl px-6 py-10 md:py-14">
         <div className="pointer-events-none absolute inset-0 overflow-hidden hidden md:block" aria-hidden="true">
           <img
-            src="/nami.png"
+            src="/nami.webp"
             alt=""
             loading="lazy"
             decoding="async"
+            fetchPriority="low"
             className="absolute right-0 top-0 h-[560px] w-auto select-none"
             style={{ opacity: 0.35, filter: 'drop-shadow(0 0 40px rgba(250,204,21,0.6)) drop-shadow(0 0 80px rgba(250,204,21,0.25))' }}
             onError={(e) => { e.currentTarget.style.display = 'none'; }}

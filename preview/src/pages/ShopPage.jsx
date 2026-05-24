@@ -423,9 +423,12 @@ export default function ShopPage() {
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-[220px] bg-[radial-gradient(ellipse_at_bottom,rgba(168,85,247,0.22)_0%,rgba(34,211,238,0.10)_45%,transparent_70%)] pointer-events-none" />
         {/* Zoro character art */}
         <img
-          src="/zoro.png"
+          src="/zoro.webp"
           alt=""
           aria-hidden="true"
+          loading="lazy"
+          decoding="async"
+          fetchPriority="low"
           className="pointer-events-none absolute right-0 top-0 h-[520px] w-auto select-none"
           style={{ opacity: 0.45, filter: 'drop-shadow(0 0 40px rgba(52,211,153,0.6)) drop-shadow(0 0 80px rgba(52,211,153,0.25))', zIndex: 0 }}
           onError={(e) => { e.currentTarget.style.display = 'none'; }}

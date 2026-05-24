@@ -332,6 +332,7 @@ export default function DeckBuilderPacksPage() {
                     src={t.image}
                     alt={title}
                     loading="lazy"
+                    decoding="async"
                     onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/product-fallback.svg'; }}
                     className="absolute inset-0 h-full w-full object-contain transition duration-500 group-hover:scale-[1.03]"
                   />

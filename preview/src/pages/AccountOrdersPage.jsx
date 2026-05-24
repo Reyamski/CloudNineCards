@@ -104,9 +104,12 @@ export default function AccountOrdersPage() {
       <section className="relative overflow-hidden border-b border-fuchsia-500/15 bg-[#07030f] px-6 pb-12 pt-6 min-h-[420px] flex flex-col justify-center">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(168,85,247,0.18),transparent_40%),radial-gradient(circle_at_left,rgba(34,211,238,0.12),transparent_40%)]" />
         <img
-          src="/zoro.png"
+          src="/zoro.webp"
           alt=""
           aria-hidden="true"
+          loading="lazy"
+          decoding="async"
+          fetchPriority="low"
           className="pointer-events-none absolute right-0 top-0 h-[520px] w-auto select-none"
           style={{ opacity: 0.42, filter: 'drop-shadow(0 0 40px rgba(52,211,153,0.6)) drop-shadow(0 0 80px rgba(52,211,153,0.25))', zIndex: 0 }}
           onError={(e) => { e.currentTarget.style.display = 'none'; }}
