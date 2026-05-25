@@ -12,20 +12,17 @@ import { supabase, supabaseEnabled } from '../lib/supabase';
 
 // ── Shipping schedule — MUST mirror the published policy ─────────────────────
 // Canonical published copy (HomePage.tsx "Tracked Shipping" card):
-//   "Every order ships tracked. Canada $10 singles and deck packs, $24.99
-//    sealed. USA $15+. International from $22. Free shipping in Canada on
+//   "Every order ships tracked. Canada $24.99 flat (singles, deck packs,
+//    sealed). USA $15+. International from $22. Free shipping in Canada on
 //    in-stock orders $300+. Pre-orders pay actual shipping at release."
 //
-// Canada is the only tier with a singles-vs-sealed split. Deck-builder packs
-// (source='products' with id prefix 'dbp-') ship like singles — they're small
-// PWE/light-parcel friendly — so they share the lighter "singles+decks" tier.
-// Booster boxes / ETBs / accessories (every other source='products') stay on
-// the heavier sealed tier.
-//   - singles+decks cart      → $10
-//   - any sealed in cart      → $24.99 (sealed dominates mixed carts; covers
-//     real CA fulfillment cost ~$25 = Canada Post $22 + Wise withdrawal $3)
-//   - Free shipping in Canada when the TOTAL in-stock subtotal (singles +
-//     decks + sealed combined) is >= $300, regardless of item mix.
+// Final policy (2026-05): ONE unified CA flat rate of $24.99 for ALL in-stock
+// items (singles, decks, sealed — same), free at $300+. Empirical BC→Manitoba
+// ship cost ~$25 (Canada Post Expedited zone-3 + 37% fuel surcharge); the
+// prior $10 singles+decks tier was still losing on heavier deck-pack orders.
+// The singles-vs-sealed partitioner is kept as a no-op (function signature
+// preserved for future re-introduction of tiered pricing if needed) but the
+// returned fee is the same for both buckets below the free-ship threshold.
 // Pre-order line items never count toward the free-ship threshold — preorders
 // pay actual shipping when released (already filtered to in-stock-only here
 // via the singlesDecks/sealed split in CartPage's useMemo).
@@ -38,9 +35,8 @@ const SHIP_RATES = {
   'Europe / Middle East':           25,
   'Other International':            28,
 };
-const CANADA_SINGLES_DECKS_RATE = 10;
-const CANADA_SEALED_RATE        = 24.99;
-const FREE_SHIP_CA_THRESHOLD    = 300; // unified: any Canadian in-stock cart $300+ ships free
+const CANADA_RATE               = 24.99; // unified flat rate for all in-stock CA carts
+const FREE_SHIP_CA_THRESHOLD    = 300;   // any Canadian in-stock cart $300+ ships free
 const PREORDER_DEPOSIT_RATE = 0.30; // 30% down at checkout, 70% on release
 
 const COUNTRIES = [
@@ -108,11 +104,10 @@ function calcShipping(country, singlesDecksSubtotal, sealedSubtotal) {
   // toward the threshold and never trigger free shipping.
   if (inStockSubtotal >= FREE_SHIP_CA_THRESHOLD) return 0;
 
-  // Below threshold: tier by mix. Sealed dominates — any cart containing
-  // sealed pays the heavier $24.99 rate (conservative; sealed parcels are
-  // bulky and a mixed cart still needs the heavier box).
-  if (sealed > 0) return CANADA_SEALED_RATE;
-  return CANADA_SINGLES_DECKS_RATE;
+  // Below threshold: unified $24.99 flat for ALL in-stock CA carts (singles,
+  // decks, sealed — same). The partitioner is kept above as a no-op so the
+  // tiered path can be reintroduced later without re-plumbing call sites.
+  return CANADA_RATE;
 }
 
 function newOrderNumber(suffix = '') {

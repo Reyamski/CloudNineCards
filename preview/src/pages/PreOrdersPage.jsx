@@ -388,7 +388,7 @@ export default function PreOrdersPage() {
                   )}
                 </div>
 
-                <div className="mt-1 text-xs text-white/35">+ international shipping & taxes (buyer's account)</div>
+                <div className="mt-1 text-xs text-white/35">+ shipping & taxes (buyer's account)</div>
 
 
                 {item.deadline && !item.soldOut && <CountdownBlock deadline={item.deadline} />}
@@ -419,7 +419,7 @@ export default function PreOrdersPage() {
           <div className="font-black text-white/65 uppercase tracking-[0.12em] text-xs mb-2 pl-3 border-l-2 border-fuchsia-400" style={{ textShadow: '0 0 12px rgba(232,121,249,0.5)' }}>Pre-order Policy</div>
           <p>· <strong className="text-white/55">Downpayment:</strong> 30% of the total order price, sent via Wise to {WISE_HANDLE}. DP is non-refundable.</p>
           <p>· <strong className="text-white/55">Balance:</strong> Remaining 70% is collected before your order ships. We'll email you when ready.</p>
-          <p>· <strong className="text-white/55">Shipping:</strong> International shipping, customs duties, and import taxes are the buyer's responsibility.</p>
+          <p>· <strong className="text-white/55">Shipping:</strong> Shipping, customs duties (international orders), and import taxes are the buyer's responsibility.</p>
           <p>· <strong className="text-white/55">Confirmation:</strong> Email your payment screenshot to {CONTACT_EMAIL} with your name and order details.</p>
           <p>· <strong className="text-white/55">Delays:</strong> If a set release is delayed by the publisher, your pre-order is automatically held until the new date.</p>
         </div>
