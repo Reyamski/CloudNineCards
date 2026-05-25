@@ -607,7 +607,17 @@ export default function AdminPage() {
   // path so auth + write goes through the same service-role server).
   function openEditRow(table, row) {
     setEditingError('');
-    setEditingRow({ table, row: { ...row }, original: { ...row } });
+    // Preorders.notes is a Postgres text[] column. The edit modal renders it
+    // as a single multi-line <textarea>, so we need to join the array into a
+    // newline-delimited string for display. We snapshot the same joined
+    // string into `original` so the diff in saveEditRow compares apples to
+    // apples — if the user doesn't touch the field, the patch stays empty.
+    // saveEditRow re-splits the string back into an array before PATCH.
+    let displayRow = { ...row };
+    if (table === 'preorders' && Array.isArray(row.notes)) {
+      displayRow.notes = row.notes.join('\n');
+    }
+    setEditingRow({ table, row: displayRow, original: { ...displayRow } });
   }
   function closeEditRow() {
     setEditingRow(null);
@@ -673,15 +683,41 @@ export default function AdminPage() {
     // Singles writes have always tagged updated_at server-side — keep parity.
     if (table === 'singles') patch.updated_at = new Date().toISOString();
 
+    // Preorders.notes is a Postgres text[] column. The modal edits it as a
+    // newline-delimited string, but PATCHing a raw string against a text[]
+    // column 400s silently. Split the textarea content back into an array
+    // here, trimming whitespace and dropping empty lines. Empty input → null
+    // (matches addPreorder semantics).
+    if (table === 'preorders' && 'notes' in patch) {
+      const raw = patch.notes;
+      if (raw == null || raw === '') {
+        patch.notes = null;
+      } else if (Array.isArray(raw)) {
+        // defensive: shouldn't happen because openEditRow joins on open,
+        // but guard anyway so we never re-send an array as a string.
+        patch.notes = raw;
+      } else {
+        const arr = String(raw).split('\n').map(s => s.trim()).filter(Boolean);
+        patch.notes = arr.length ? arr : null;
+      }
+    }
+
     setEditingSaving(true);
     setEditingError('');
     const { data, error } = await adminFetch(`/api/admin/${table}`, 'PATCH', { id: row.id, patch });
     setEditingSaving(false);
     if (error) {
+      // TODO: surface via toast helper when one is wired into AdminPage.
+      // For now the inline error banner inside EditRowModal is the only UX
+      // signal — the modal stays open so the operator can retry.
+      console.error('[admin] saveEditRow PATCH failed', { table, id: row.id, error });
       setEditingError(`Update failed: ${error.message}`);
       return;
     }
     // Reconcile with server response when available; fall back to local merge.
+    // For preorders we want notes to live in component state as an array
+    // (parent tables consume it that way) — use the array we just built,
+    // not the textarea string still sitting on `row`.
     const merged = data ? data : { ...row, ...patch };
     if (table === 'singles')       setSingles(prev => prev.map(r => r.id === merged.id ? { ...r, ...merged } : r));
     else if (table === 'products') setDbProducts(prev => prev.map(r => r.id === merged.id ? { ...r, ...merged } : r));

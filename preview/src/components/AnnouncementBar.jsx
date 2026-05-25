@@ -3,22 +3,34 @@ import { Link } from 'react-router-dom';
 import { BellRing } from 'lucide-react';
 import { supabase, supabaseEnabled } from '../lib/supabase';
 
-const PO_OPEN_DATE  = new Date('2025-11-01T00:00:00');
-const PO_CLOSE_DATE = new Date('2026-04-30T23:59:59'); // fallback if DB not loaded
-
+// Banner state is derived from the live `preorders` table — not a stale
+// config date. If at least one row has `sold_out=false`, we treat pre-orders
+// as actively open and link to /pre-orders. Otherwise we show the "closed,
+// follow us for the next drop" state and link to /contact. Any fetch error
+// falls through to the closed state so the banner can never falsely claim
+// pre-orders are open.
 export default function AnnouncementBar() {
-  const [closeDate, setCloseDate] = useState(PO_CLOSE_DATE);
+  const [hasActivePreorder, setHasActivePreorder] = useState(false);
 
   useEffect(() => {
     if (!supabaseEnabled || !supabase) return;
-    supabase.from('config').select('value').eq('key', 'po_close_date').limit(1)
-      .then(({ data }) => {
-        if (data?.[0]?.value) setCloseDate(new Date(data[0].value));
+    let cancelled = false;
+    supabase
+      .from('preorders')
+      .select('id', { count: 'exact', head: true })
+      .eq('sold_out', false)
+      .then(({ count, error }) => {
+        if (cancelled) return;
+        if (error) {
+          setHasActivePreorder(false);
+          return;
+        }
+        setHasActivePreorder((count ?? 0) > 0);
       });
+    return () => { cancelled = true; };
   }, []);
 
-  const now    = new Date();
-  const isOpen = now >= PO_OPEN_DATE && now <= closeDate;
+  const isOpen = hasActivePreorder;
 
   return (
     <div className="relative z-50 overflow-hidden bg-gradient-to-r from-fuchsia-600 via-rose-500 to-fuchsia-600 py-2 text-center text-xs font-black uppercase tracking-[0.18em] text-white">
@@ -31,7 +43,7 @@ export default function AnnouncementBar() {
         <BellRing className="h-3.5 w-3.5 animate-pulse" />
         {isOpen ? (
           <>
-            Pre-orders now open - 30% DP via Wise - international shipping and taxes covered by buyer
+            Pre-orders open - reserve your slot - 30% DP via Wise
             <span className="ml-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px]">Reserve Now -&gt;</span>
           </>
         ) : (

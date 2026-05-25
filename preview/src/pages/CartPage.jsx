@@ -12,9 +12,9 @@ import { supabase, supabaseEnabled } from '../lib/supabase';
 
 // ── Shipping schedule — MUST mirror the published policy ─────────────────────
 // Canonical published copy (HomePage.tsx "Tracked Shipping" card):
-//   "Every order ships tracked. Canada $10 singles and deck packs, $15 sealed.
-//    USA $15+. International from $22. Free shipping in Canada on in-stock
-//    orders $300+. Pre-orders pay actual shipping at release."
+//   "Every order ships tracked. Canada $10 singles and deck packs, $24.99
+//    sealed. USA $15+. International from $22. Free shipping in Canada on
+//    in-stock orders $300+. Pre-orders pay actual shipping at release."
 //
 // Canada is the only tier with a singles-vs-sealed split. Deck-builder packs
 // (source='products' with id prefix 'dbp-') ship like singles — they're small
@@ -22,7 +22,8 @@ import { supabase, supabaseEnabled } from '../lib/supabase';
 // Booster boxes / ETBs / accessories (every other source='products') stay on
 // the heavier sealed tier.
 //   - singles+decks cart      → $10
-//   - any sealed in cart      → $15 (sealed dominates mixed carts)
+//   - any sealed in cart      → $24.99 (sealed dominates mixed carts; covers
+//     real CA fulfillment cost ~$25 = Canada Post $22 + Wise withdrawal $3)
 //   - Free shipping in Canada when the TOTAL in-stock subtotal (singles +
 //     decks + sealed combined) is >= $300, regardless of item mix.
 // Pre-order line items never count toward the free-ship threshold — preorders
@@ -38,7 +39,7 @@ const SHIP_RATES = {
   'Other International':            28,
 };
 const CANADA_SINGLES_DECKS_RATE = 10;
-const CANADA_SEALED_RATE        = 15;
+const CANADA_SEALED_RATE        = 24.99;
 const FREE_SHIP_CA_THRESHOLD    = 300; // unified: any Canadian in-stock cart $300+ ships free
 const PREORDER_DEPOSIT_RATE = 0.30; // 30% down at checkout, 70% on release
 
@@ -108,8 +109,8 @@ function calcShipping(country, singlesDecksSubtotal, sealedSubtotal) {
   if (inStockSubtotal >= FREE_SHIP_CA_THRESHOLD) return 0;
 
   // Below threshold: tier by mix. Sealed dominates — any cart containing
-  // sealed pays the heavier $15 rate (conservative; sealed parcels are bulky
-  // and a mixed cart still needs the heavier box).
+  // sealed pays the heavier $24.99 rate (conservative; sealed parcels are
+  // bulky and a mixed cart still needs the heavier box).
   if (sealed > 0) return CANADA_SEALED_RATE;
   return CANADA_SINGLES_DECKS_RATE;
 }
@@ -536,16 +537,16 @@ export default function CartPage() {
           items_html:        preorderHtml,
           items_text:        preorderText,
           has_preorder:      'YES',
-          preorder_note:     'Pre-order items ship internationally when released. 70% balance + shipping due at that time.',
+          preorder_note:     'Pre-order items ship when released. 70% balance + actual shipping due at that time.',
           subtotal:          `CAD $${preorderSubtotal.toFixed(2)}`,
           full_price:        `CAD $${preorderSubtotal.toFixed(2)}`,
           dp_amount:         `CAD $${preorderDeposit.toFixed(2)}`,
-          balance_due:       `CAD $${preorderBalance.toFixed(2)} + intl shipping`,
+          balance_due:       `CAD $${preorderBalance.toFixed(2)} + actual shipping`,
           eta:               etaValue,
           tax_amount:        'Calculated at release',
-          delivery_fee:      'Intl rates — calculated at release',
+          delivery_fee:      'Calculated at release',
           total_price:       `CAD $${preorderDeposit.toFixed(2)} (30% deposit)`,
-          due_on_release:    `CAD $${preorderBalance.toFixed(2)} + intl shipping`,
+          due_on_release:    `CAD $${preorderBalance.toFixed(2)} + actual shipping`,
         };
         const preorderTemplate = EMAILJS_TEMPLATE_PREORDER || EMAILJS_TEMPLATE_ONHAND;
         if (!EMAILJS_TEMPLATE_PREORDER) {
@@ -772,7 +773,7 @@ export default function CartPage() {
                 <label className={`flex items-start gap-2 rounded-xl border px-3 py-3 text-xs ${errors.preorderAck ? 'border-red-400/40 bg-red-400/10 text-red-200' : 'border-fuchsia-400/30 bg-fuchsia-400/8 text-fuchsia-100'}`}>
                   <input type="checkbox" checked={preorderAck} onChange={e => setPreorderAck(e.target.checked)} className="mt-0.5" data-form-error={errors.preorderAck ? 'true' : 'false'} />
                   <span>
-                    I understand pre-order items ship internationally when released. 70% balance + shipping due at that time.{' '}
+                    I understand pre-order items ship when released. 70% balance + actual shipping due at that time.{' '}
                     <Link to="/how-preorders-work" className="font-black text-cyan-300 underline hover:text-cyan-200">
                       How pre-orders work
                     </Link>
@@ -1023,7 +1024,7 @@ function OrderSummary({
                 <span>70% balance — Due on release</span>
                 <span className="tabular-nums font-black">CAD ${preorderBalance.toFixed(2)}</span>
               </div>
-              <div className="text-fuchsia-300/60">+ shipping (intl) at time of release</div>
+              <div className="text-fuchsia-300/60">+ actual shipping at release</div>
             </div>
           </div>
         </div>
@@ -1041,7 +1042,7 @@ function OrderSummary({
       {hasPreorder && (
         <div className="mt-2 flex justify-between text-[11px] text-fuchsia-300/80">
           <span>Due on release</span>
-          <span className="tabular-nums">CAD ${preorderBalance.toFixed(2)} + intl shipping</span>
+          <span className="tabular-nums">CAD ${preorderBalance.toFixed(2)} + actual shipping</span>
         </div>
       )}
     </div>
