@@ -13,7 +13,7 @@ import { supabase, supabaseEnabled } from '../lib/supabase';
 // ── Shipping schedule — MUST mirror the published policy ─────────────────────
 // Canonical published copy (HomePage.tsx "Tracked Shipping" card):
 //   "Every order ships tracked. Canada $24.99 flat (singles, deck packs,
-//    sealed). USA $15+. International from $22. Free shipping in Canada on
+//    sealed). USA $34.99. International from $22. Free shipping in Canada on
 //    in-stock orders $300+. Pre-orders pay actual shipping at release."
 //
 // Final policy (2026-05): ONE unified CA flat rate of $24.99 for ALL in-stock
@@ -26,10 +26,14 @@ import { supabase, supabaseEnabled } from '../lib/supabase';
 // Pre-order line items never count toward the free-ship threshold — preorders
 // pay actual shipping when released (already filtered to in-stock-only here
 // via the singlesDecks/sealed split in CartPage's useMemo).
-// USA ($15) and International ($22/$22/$25/$28) are flat per the copy and
-// unchanged here. Non-Canada destinations never get free shipping.
+// USA ($34.99 flat) covers real Canada Post Expedited Parcel USA cost (~$34
+// with $100 insurance + tracking) + Wise $3 + packaging $1 ≈ $38 real per
+// order; prior $15 was losing ~$23 per US sealed order. Sealed dominates
+// for a small-shop flat tier so a single US rate applies to all categories.
+// International ($22/$22/$25/$28) flat per the copy and unchanged here.
+// Non-Canada destinations never get free shipping.
 const SHIP_RATES = {
-  'United States':                  15,
+  'United States':                  34.99,
   'Japan / Korea / HK / Singapore': 22,
   'Australia / NZ / SE Asia':       22,
   'Europe / Middle East':           25,

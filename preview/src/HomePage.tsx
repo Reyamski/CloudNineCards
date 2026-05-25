@@ -990,7 +990,7 @@ export default function HomePage() {
             {
               icon: Truck,
               title: 'Tracked Shipping',
-              text: 'Every order ships tracked. Canada $24.99 flat (singles, deck packs, sealed). USA $15+. International from $22. Free shipping in Canada on in-stock orders $300+. Pre-orders pay actual shipping at release.',
+              text: 'Every order ships tracked. Canada $24.99 flat (singles, deck packs, sealed). USA $34.99. International from $22. Free shipping in Canada on in-stock orders $300+. Pre-orders pay actual shipping at release.',
             },
             {
               icon: Package,
