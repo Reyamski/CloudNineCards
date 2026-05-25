@@ -30,13 +30,17 @@ import { supabase, supabaseEnabled } from '../lib/supabase';
 // with $100 insurance + tracking) + Wise $3 + packaging $1 ≈ $38 real per
 // order; prior $15 was losing ~$23 per US sealed order. Sealed dominates
 // for a small-shop flat tier so a single US rate applies to all categories.
-// International ($22/$22/$25/$28) flat per the copy and unchanged here.
-// Non-Canada destinations never get free shipping.
+// International tiers (2026-05): Asia $22 / $22, Europe/ME $34.99 (matched to
+// US — real BC→EU Canada Post Tracked Packet International with intl fuel
+// surcharge lands ~$30-45 sealed + $3 Wise; prior $25 was losing on most EU
+// sealed orders), Other Intl $28. Asia stays $22 (cheaper Tracked Packet
+// zone + lower realised cost mix) so the "International from $22" public copy
+// remains truthful. Non-Canada destinations never get free shipping.
 const SHIP_RATES = {
   'United States':                  34.99,
   'Japan / Korea / HK / Singapore': 22,
   'Australia / NZ / SE Asia':       22,
-  'Europe / Middle East':           25,
+  'Europe / Middle East':           34.99,
   'Other International':            28,
 };
 const CANADA_RATE               = 24.99; // unified flat rate for all in-stock CA carts
