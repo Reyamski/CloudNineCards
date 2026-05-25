@@ -344,7 +344,7 @@ export default function AccountOrdersPage() {
                                 </div>
                                 {safeNum(sel.balance_due) > 0 && (
                                   <div className="mt-1.5 text-xs text-white/45">
-                                    Remaining balance <span className="font-black text-white/70">CAD ${safeNum(sel.balance_due).toFixed(2)}</span> + intl shipping due on release{sel.eta ? ` (${sel.eta})` : ''}.
+                                    Remaining balance <span className="font-black text-white/70">CAD ${safeNum(sel.balance_due).toFixed(2)}</span> + actual shipping due on release{sel.eta ? ` (${sel.eta})` : ''}.
                                   </div>
                                 )}
                               </div>
@@ -358,7 +358,7 @@ export default function AccountOrdersPage() {
                                 <div className="text-xs font-black uppercase tracking-[0.14em] text-fuchsia-300">Deposit received — balance due on release</div>
                                 <div className="mt-1 text-sm text-white/60">
                                   Balance <span className="font-black text-white">CAD ${safeNum(sel.balance_due).toFixed(2)}</span>{' '}
-                                  <span className="text-white/40">(70%)</span> + intl shipping due on release{sel.eta ? ` (${sel.eta})` : ''}.
+                                  <span className="text-white/40">(70%)</span> + actual shipping due on release{sel.eta ? ` (${sel.eta})` : ''}.
                                 </div>
                               </div>
                             );
@@ -372,7 +372,7 @@ export default function AccountOrdersPage() {
                                 <div className="text-xs font-black uppercase tracking-[0.14em] text-yellow-300">Action required — send balance via Wise</div>
                                 <div className="mt-1 text-sm text-white/60">
                                   Send <span className="font-black text-white">CAD ${bal.toFixed(2)}</span>{' '}
-                                  <span className="text-white/40">(70% balance + intl shipping)</span> to{' '}
+                                  <span className="text-white/40">(70% balance + actual shipping)</span> to{' '}
                                   <span className="font-black text-yellow-300">@cloudninecards</span> on Wise to finalize your order.
                                 </div>
                               </div>

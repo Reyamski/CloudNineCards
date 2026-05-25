@@ -71,7 +71,7 @@ export default function OrderConfirmationPage() {
                     CAD ${orders
                       .filter(o => o.kind === 'pre_order')
                       .reduce((s, o) => s + (Number(o.balanceDue) || 0), 0)
-                      .toFixed(2)} + intl shipping
+                      .toFixed(2)} + actual shipping
                   </span>
                 </div>
               )}
@@ -176,7 +176,7 @@ function OrderCard({ order, country }) {
                 <span className="tabular-nums font-black">CAD ${(Number(order.dpAmount) || 0).toFixed(2)}</span>
               </div>
               <div className="mt-1 flex justify-between text-fuchsia-200/80">
-                <span>70% balance + intl shipping</span>
+                <span>70% balance + actual shipping</span>
                 <span className="tabular-nums">CAD ${(Number(order.balanceDue) || 0).toFixed(2)} + ship</span>
               </div>
               <div className="mt-1 text-fuchsia-300/70 text-[10px]">Due on release{order.eta ? ` · ${order.eta}` : ''}</div>

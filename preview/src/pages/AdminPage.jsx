@@ -1653,7 +1653,7 @@ export default function AdminPage() {
                             </div>
                             <div className="text-white/50">Balance on release (70%)</div>
                             <div className="text-right font-black text-yellow-300 tabular-nums sm:col-span-2">
-                              {formatMoney(selectedOrder.balance_due ?? 0)} <span className="text-white/40 font-normal">+ intl ship</span>
+                              {formatMoney(selectedOrder.balance_due ?? 0)} <span className="text-white/40 font-normal">+ actual ship</span>
                             </div>
                           </div>
                         </div>
