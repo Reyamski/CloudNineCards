@@ -5,11 +5,22 @@ import { motion } from 'framer-motion';
 // Guest "Source an Item / Card Request" modal (F3). No login required.
 // Visually mirrors ShopPage's NotifyMeModal so it stays consistent. On submit
 // it POSTs to /api/card-request (service-role insert into card_requests).
+// Off-screen style for honeypot field. See note in HomePage.tsx EmailSignup.
+const HONEYPOT_STYLE = {
+  position: 'absolute',
+  left: '-10000px',
+  width: 1,
+  height: 1,
+  opacity: 0,
+  pointerEvents: 'none',
+};
+
 export default function CardRequestModal({ onClose, onSuccess }) {
   const [email, setEmail]       = useState('');
   const [cardName, setCardName] = useState('');
   const [setDetails, setSetDetails] = useState('');
   const [notes, setNotes]       = useState('');
+  const [website, setWebsite]   = useState(''); // honeypot — must stay empty
   const [submitted, setSubmitted] = useState(false);
   const [sending, setSending]   = useState(false);
   const [sendError, setSendError] = useState('');
@@ -112,6 +123,7 @@ export default function CardRequestModal({ onClose, onSuccess }) {
           card_name: cardName.trim(),
           set_or_details: setDetails.trim(),
           notes: notes.trim(),
+          website, // honeypot — non-empty = bot, server returns fake success
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -192,6 +204,17 @@ export default function CardRequestModal({ onClose, onSuccess }) {
                 </p>
               </div>
               <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+                {/* Honeypot — hidden off-screen. See HomePage.tsx EmailSignup. */}
+                <input
+                  type="text"
+                  name="website"
+                  value={website}
+                  onChange={e => setWebsite(e.target.value)}
+                  tabIndex={-1}
+                  autoComplete="off"
+                  aria-hidden="true"
+                  style={HONEYPOT_STYLE}
+                />
                 <input
                   type="text"
                   required

@@ -103,8 +103,21 @@ const trust = [
   {icon: Star, title: 'Packed Right', desc: 'Every order is inspected and packed carefully. Photos available on request.'},
 ];
 
+// Off-screen positioning style for honeypot fields. Avoid display:none — some
+// scrapers explicitly skip those. Render-but-offscreen catches naive bots
+// that auto-fill every input they see while staying invisible to humans.
+const HONEYPOT_STYLE: React.CSSProperties = {
+  position: 'absolute',
+  left: '-10000px',
+  width: 1,
+  height: 1,
+  opacity: 0,
+  pointerEvents: 'none',
+};
+
 function EmailSignup() {
   const [email, setEmail] = useState('');
+  const [website, setWebsite] = useState(''); // honeypot — must stay empty
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
   async function handleSubmit() {
@@ -116,7 +129,7 @@ function EmailSignup() {
       const res = await fetch('/api/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, website }),
       });
       if (!res.ok) {
         setStatus('error');
@@ -132,6 +145,19 @@ function EmailSignup() {
 
   return (
     <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+      {/* Honeypot field — hidden off-screen. Bots auto-filling every input
+          will set this; humans never see or focus it. Submissions with a
+          non-empty value are silently dropped server-side. */}
+      <input
+        type="text"
+        name="website"
+        value={website}
+        onChange={e => setWebsite(e.target.value)}
+        tabIndex={-1}
+        autoComplete="off"
+        aria-hidden="true"
+        style={HONEYPOT_STYLE}
+      />
       <input
         type="email"
         value={email}

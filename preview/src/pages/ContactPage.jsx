@@ -12,6 +12,16 @@ const CONTACT_EMAIL = 'papspective@gmail.com';
 
 const topics = ['Order Issue', 'Pre-order Question', 'Damaged Card / Missing Item', 'General Inquiry', 'Wholesale / Bulk'];
 
+// Off-screen style for honeypot field. See note in HomePage.tsx EmailSignup.
+const HONEYPOT_STYLE = {
+  position: 'absolute',
+  left: '-10000px',
+  width: 1,
+  height: 1,
+  opacity: 0,
+  pointerEvents: 'none',
+};
+
 export default function ContactPage() {
   useEffect(() => { document.title = 'Contact | CloudNineCards'; }, []);
 
@@ -23,6 +33,7 @@ export default function ContactPage() {
   const [topic, setTopic] = useState('');
   const [orderNum, setOrderNum] = useState('');
   const [message, setMessage] = useState('');
+  const [website, setWebsite] = useState(''); // honeypot — must stay empty
 
   function resetForm() {
     setSent(false);
@@ -38,6 +49,18 @@ export default function ContactPage() {
     e.preventDefault();
     setSending(true);
     setSendError('');
+
+    // Honeypot — `website` is a hidden off-screen input. Bots auto-filling
+    // every input will set this; humans never see or focus it. Skip the
+    // EmailJS call entirely and fake-succeed so the bot doesn't iterate.
+    // No /api/ endpoint exists for the contact form — it posts to EmailJS
+    // directly from the client, so the check has to live here.
+    if (website.trim() !== '') {
+      setSent(true);
+      setSending(false);
+      return;
+    }
+
     try {
       await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
         buyer_name:    name,
@@ -162,6 +185,17 @@ export default function ContactPage() {
               </motion.div>
             ) : (
               <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+                {/* Honeypot — hidden off-screen. See HomePage.tsx EmailSignup. */}
+                <input
+                  type="text"
+                  name="website"
+                  value={website}
+                  onChange={e => setWebsite(e.target.value)}
+                  tabIndex={-1}
+                  autoComplete="off"
+                  aria-hidden="true"
+                  style={HONEYPOT_STYLE}
+                />
                 <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-yellow-300 rounded-t-[32px]" style={{ position: 'relative', height: 3, borderRadius: 2, background: 'linear-gradient(to right, #67e8f9, #e879f9, #fde047)', marginBottom: 8 }} />
 
                 <div className="grid gap-4 sm:grid-cols-2">

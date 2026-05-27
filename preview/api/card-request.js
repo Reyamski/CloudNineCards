@@ -53,6 +53,14 @@ export default async function handler(req, res) {
   const set_or_details = String(body.set_or_details || '').trim() || null;
   const notes          = String(body.notes || '').trim() || null;
 
+  // Honeypot — `website` is a hidden off-screen input in the modal that humans
+  // never see. Non-empty value = bot. Return a fake 200 success (don't 4xx —
+  // a 4xx tells the bot to mutate and retry). Nothing is written to the DB.
+  if (String(body.website || '').trim() !== '') {
+    res.status(200).json({ data: { email, card_name }, error: null });
+    return;
+  }
+
   if (!email || !EMAIL_RE.test(email)) {
     res.status(400).json({ data: null, error: { message: 'Valid email required.' } });
     return;

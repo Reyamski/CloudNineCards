@@ -146,11 +146,12 @@ const server = http.createServer(async (req, res) => {
   } else if (url.pathname.startsWith('/api/analyze-card')) {
     const body = await readBody(req);
     handler  = analyzeCardHandler;
-    mockReq  = { body, method: req.method, url: req.url };
+    // Pass headers so the per-IP rate limit can read x-forwarded-for / origin.
+    mockReq  = { body, method: req.method, url: req.url, headers: req.headers, socket: req.socket };
   } else if (url.pathname.startsWith('/api/admin-auth')) {
     const body = await readBody(req);
     handler  = adminAuthHandler;
-    mockReq  = { body, method: req.method, url: req.url };
+    mockReq  = { body, method: req.method, url: req.url, headers: req.headers, socket: req.socket };
   } else if (url.pathname.startsWith('/api/subscribe')) {
     const body = await readBody(req);
     handler  = subscribeHandler;
@@ -171,11 +172,22 @@ const server = http.createServer(async (req, res) => {
 
   const mockRes = {
     _status: 200,
-    setHeader() {},
+    _headers: {},
+    setHeader(k, v) { this._headers[String(k)] = String(v); },
     status(code) { this._status = code; return this; },
-    end(data) { res.writeHead(this._status); res.end(data ?? ''); },
+    end(data) {
+      res.writeHead(this._status, this._headers);
+      res.end(data ?? '');
+    },
     json(data) {
-      res.writeHead(this._status, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      // Faithful to what the handler actually set — do NOT inject a fallback
+      // Access-Control-Allow-Origin, otherwise CORS-tightening can't be
+      // verified locally (the missing header is precisely what blocks the
+      // browser in prod).
+      res.writeHead(this._status, {
+        ...this._headers,
+        'Content-Type': 'application/json',
+      });
       res.end(JSON.stringify(data));
     },
   };

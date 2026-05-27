@@ -47,6 +47,15 @@ export default async function handler(req, res) {
   const body = req.body ?? {};
   const email = String(body.email || '').trim().toLowerCase();
 
+  // Honeypot — `website` is a hidden off-screen input in the homepage form
+  // that humans never see. Any value here = bot. Return a fake 200 success
+  // so bots don't iterate to find what's being filtered. Nothing is written
+  // to the DB. Same pattern in /api/card-request.
+  if (String(body.website || '').trim() !== '') {
+    res.status(200).json({ data: { email }, error: null });
+    return;
+  }
+
   if (!email || !EMAIL_RE.test(email)) {
     res.status(400).json({ data: null, error: { message: 'Valid email required.' } });
     return;
