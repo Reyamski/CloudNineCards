@@ -16,8 +16,22 @@
  * Response shape mirrors the Supabase JS client: { data, error }.
  */
 import { getServiceClient } from './_lib/db.js';
+import { createRateLimiter, clientIp } from './_lib/rate-limit.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Per-IP rate limit — newsletter signup is cheap to abuse (bots can fill the
+// subscribers table fast). 5 / 15min / IP is conservative; humans don't
+// legitimately hit subscribe 5+ times in 15 min. Mirrors /api/analyze-card.
+// IMPORTANT: rate-limit runs AFTER honeypot — bots get a fake-success 200
+// without incrementing the counter; only real over-rate scripts hit 429.
+const limiter = createRateLimiter({
+  maxHits: 5,
+  windowMs: 15 * 60 * 1000,
+  label: 'subscribe',
+});
+
+export function __resetRateLimitForTests() { limiter.reset(); }
 
 function setCors(req, res) {
   const origin = req.headers?.origin || '';
@@ -51,8 +65,24 @@ export default async function handler(req, res) {
   // that humans never see. Any value here = bot. Return a fake 200 success
   // so bots don't iterate to find what's being filtered. Nothing is written
   // to the DB. Same pattern in /api/card-request.
+  // ORDER MATTERS: honeypot runs BEFORE the rate limiter so bot spam doesn't
+  // count against the per-IP budget (and so bots stay convinced they "won").
   if (String(body.website || '').trim() !== '') {
     res.status(200).json({ data: { email }, error: null });
+    return;
+  }
+
+  // Per-IP rate limit. Excess → 429 with Retry-After + JSON body. We do NOT
+  // fake-success here (unlike honeypot) — subscribers-table pollution risk
+  // is real and a legit human won't realistically hit this.
+  const ip = clientIp(req);
+  const rl = limiter.check(ip);
+  if (!rl.allowed) {
+    res.setHeader('Retry-After', String(rl.retryAfterSec));
+    res.status(429).json({
+      error: 'Too many requests',
+      retry_after_seconds: rl.retryAfterSec,
+    });
     return;
   }
 

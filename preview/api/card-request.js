@@ -19,8 +19,21 @@
  * response shape as the Supabase JS client.
  */
 import { getServiceClient } from './_lib/db.js';
+import { createRateLimiter, clientIp } from './_lib/rate-limit.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Per-IP rate limit — card request is a deliberate human action, not
+// something legit buyers do in rapid succession. 3 / 15min / IP is
+// conservative. Mirrors /api/analyze-card pattern; rate limit runs AFTER the
+// honeypot so bots get fake-success 200 without burning the IP budget.
+const limiter = createRateLimiter({
+  maxHits: 3,
+  windowMs: 15 * 60 * 1000,
+  label: 'card-request',
+});
+
+export function __resetRateLimitForTests() { limiter.reset(); }
 
 function setCors(req, res) {
   const origin = req.headers?.origin || '';
@@ -56,8 +69,24 @@ export default async function handler(req, res) {
   // Honeypot — `website` is a hidden off-screen input in the modal that humans
   // never see. Non-empty value = bot. Return a fake 200 success (don't 4xx —
   // a 4xx tells the bot to mutate and retry). Nothing is written to the DB.
+  // ORDER MATTERS: honeypot runs BEFORE the rate limiter so bot spam doesn't
+  // count against the per-IP budget (and so bots stay convinced they "won").
   if (String(body.website || '').trim() !== '') {
     res.status(200).json({ data: { email, card_name }, error: null });
+    return;
+  }
+
+  // Per-IP rate limit. Excess → 429 with Retry-After + JSON body. We do NOT
+  // fake-success here (unlike honeypot) — card_requests table pollution risk
+  // is real, and legit buyers rarely hit 3+ requests in 15 min.
+  const ip = clientIp(req);
+  const rl = limiter.check(ip);
+  if (!rl.allowed) {
+    res.setHeader('Retry-After', String(rl.retryAfterSec));
+    res.status(429).json({
+      error: 'Too many requests',
+      retry_after_seconds: rl.retryAfterSec,
+    });
     return;
   }
 

@@ -155,7 +155,9 @@ const server = http.createServer(async (req, res) => {
   } else if (url.pathname.startsWith('/api/subscribe')) {
     const body = await readBody(req);
     handler  = subscribeHandler;
-    mockReq  = { body, method: req.method, url: req.url, headers: req.headers };
+    // Pass socket so the per-IP rate limit can read req.socket.remoteAddress
+    // when neither x-forwarded-for nor x-real-ip is present (local dev).
+    mockReq  = { body, method: req.method, url: req.url, headers: req.headers, socket: req.socket };
   } else if (url.pathname.startsWith('/api/waitlist')) {
     const body = await readBody(req);
     handler  = waitlistHandler;
@@ -163,7 +165,8 @@ const server = http.createServer(async (req, res) => {
   } else if (url.pathname.startsWith('/api/card-request')) {
     const body = await readBody(req);
     handler  = cardRequestHandler;
-    mockReq  = { body, method: req.method, url: req.url, headers: req.headers };
+    // Pass socket so the per-IP rate limit can read req.socket.remoteAddress.
+    mockReq  = { body, method: req.method, url: req.url, headers: req.headers, socket: req.socket };
   } else {
     res.writeHead(404);
     res.end('Not found');

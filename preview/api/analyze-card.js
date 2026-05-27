@@ -44,47 +44,21 @@
  */
 
 // ── Per-IP rate limit ──────────────────────────────────────────────────────
-// Sliding window: at most MAX_HITS requests per WINDOW_MS per source IP.
-// In-memory Map keyed by IP → array of recent hit timestamps. Older entries
-// are filtered out on each access. Serverless instances may have separate
-// memory across invocations, so this is a strong speed-bump rather than a
-// hard guarantee — back with Vercel KV / Upstash for absolute caps.
-const RL_MAX_HITS  = 10;
-const RL_WINDOW_MS = 15 * 60 * 1000; // 15 min
-const rlHits = new Map(); // ip -> number[] (timestamps)
+// Sliding window: at most 10 requests per 15 min per source IP. Backed by the
+// shared in-memory limiter in ./_lib/rate-limit.js (same pattern is reused by
+// /api/subscribe and /api/card-request). Serverless instances may have
+// separate memory, so this is a speed-bump not a hard cap — back with
+// Vercel KV / Upstash Redis for absolute caps.
+import { createRateLimiter, clientIp as rlClientIp } from './_lib/rate-limit.js';
 
-function rlClientIp(req) {
-  const xff = req.headers?.['x-forwarded-for'];
-  if (xff) return String(xff).split(',')[0].trim();
-  return req.headers?.['x-real-ip'] || req.socket?.remoteAddress || '';
-}
-
-/**
- * Returns { allowed, retryAfterSec, count }.
- * - If allowed, records the hit and returns count after recording.
- * - If denied, returns retryAfterSec = how long until the OLDEST hit expires.
- * Defensive: if no IP could be derived, allow the call (don't block legit
- * admin behind a misconfigured proxy) — log once.
- */
-function rlCheck(ip) {
-  if (!ip) {
-    console.warn('[analyze-card] no client IP available — skipping rate limit');
-    return { allowed: true, retryAfterSec: 0, count: 0 };
-  }
-  const now = Date.now();
-  const arr = (rlHits.get(ip) || []).filter(t => now - t < RL_WINDOW_MS);
-  if (arr.length >= RL_MAX_HITS) {
-    if (arr.length) rlHits.set(ip, arr);
-    const retryAfterMs = RL_WINDOW_MS - (now - arr[0]);
-    return { allowed: false, retryAfterSec: Math.max(1, Math.ceil(retryAfterMs / 1000)), count: arr.length };
-  }
-  arr.push(now);
-  rlHits.set(ip, arr);
-  return { allowed: true, retryAfterSec: 0, count: arr.length };
-}
+const limiter = createRateLimiter({
+  maxHits: 10,
+  windowMs: 15 * 60 * 1000,
+  label: 'analyze-card',
+});
 
 // Test-only helper to reset state between unit tests. Not exported to clients.
-export function __resetRateLimitForTests() { rlHits.clear(); }
+export function __resetRateLimitForTests() { limiter.reset(); }
 
 async function convertHeicToJpeg(base64Data) {
   const { default: convert } = await import('heic-convert');
@@ -177,7 +151,7 @@ export default async function handler(req, res) {
   // Per-IP rate limit — admin-only endpoint, ~10 cards/day max in practice,
   // 10/15min is generous slack. Cap above this is treated as cost-abuse.
   const ip = rlClientIp(req);
-  const rl = rlCheck(ip);
+  const rl = limiter.check(ip);
   if (!rl.allowed) {
     res.setHeader('Retry-After', String(rl.retryAfterSec));
     return res.status(429).json({
