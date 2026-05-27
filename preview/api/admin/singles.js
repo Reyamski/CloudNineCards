@@ -14,7 +14,7 @@ import { makeAdminTableHandler } from '../_lib/admin-route.js';
 // hardening on top of the bearer-token check).
 const ALLOWED = new Set([
   'card_name', 'set_name', 'set_code', 'card_number', 'game', 'language',
-  'condition', 'rarity', 'price', 'stock', 'in_stock', 'image_url',
+  'condition', 'rarity', 'price', 'php_price', 'stock', 'in_stock', 'image_url',
   'updated_at',
 ]);
 
@@ -23,7 +23,7 @@ function whitelistPatch(patch) {
   for (const k of Object.keys(patch || {})) {
     if (!ALLOWED.has(k)) continue;
     let v = patch[k];
-    if (k === 'price') v = v === '' || v == null ? null : Number(v);
+    if (k === 'price' || k === 'php_price') v = v === '' || v == null ? null : Number(v);
     else if (k === 'stock') v = Number(v) || 0;
     else if (k === 'in_stock') v = !!v;
     out[k] = v;

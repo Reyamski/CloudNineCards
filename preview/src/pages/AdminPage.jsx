@@ -207,7 +207,7 @@ export default function AdminPage() {
   const [deletingId, setDeletingId]         = useState('');
   const [editCell, setEditCell]             = useState({ id: '', field: '' });
   const [editVal, setEditVal]               = useState('');
-  const BLANK_FORM = { card_name: '', set_name: '', set_code: '', card_number: '', game: 'One Piece', language: 'English', condition: 'NM', rarity: '', price: '', stock: '1', image_url: '' };
+  const BLANK_FORM = { card_name: '', set_name: '', set_code: '', card_number: '', game: 'One Piece', language: 'English', condition: 'NM', rarity: '', php_price: '', price: '', stock: '1', image_url: '' };
   const [addForm, setAddForm]               = useState(BLANK_FORM);
   // ── AI image analysis state (singles) ────────────────────────────────────
   const [imagePreview, setImagePreview]     = useState('');
@@ -232,7 +232,7 @@ export default function AdminPage() {
   const [poEditCell, setPoEditCell]                 = useState({ id: '', field: '' });
   const [poEditVal, setPoEditVal]                   = useState('');
   const DEFAULT_PO_NOTES = 'Pre-orders are not guaranteed and subject to allocation.\nIf allocation is cut, down payment will be refunded in full.\nBuyer shoulders shipping fees, taxes, and import duties.';
-  const BLANK_PO = { id: '', title: '', subtitle: '', sold_out: false, price_tba: false, price: '', usd_price: '', aud_price: '', eur_price: '', currency: 'CAD', eta: '', deadline: '', image_url: '', hype: '', notes: DEFAULT_PO_NOTES, display_order: '0' };
+  const BLANK_PO = { id: '', title: '', subtitle: '', sold_out: false, price_tba: false, php_price: '', price: '', usd_price: '', aud_price: '', eur_price: '', currency: 'CAD', eta: '', deadline: '', image_url: '', hype: '', notes: DEFAULT_PO_NOTES, display_order: '0' };
 
   // Exchange rates → CAD (1 foreign unit = X CAD). Add 20% buffer to protect margins.
   // Update these rates periodically to stay current.
@@ -240,6 +240,36 @@ export default function AdminPage() {
   function cadToForeign(cad, currency) {
     if (!cad || isNaN(cad)) return '';
     return (parseFloat(cad) / FX[currency] * 1.20).toFixed(2);
+  }
+
+  // PHP-source price markup formula (owner's spec, Google FX rates 2026-05-27).
+  // CAD = PHP × FX × 1.40 (40% markup baseline).
+  // USD/AUD/EUR = PHP × FX × 1.40 × 1.20 = PHP × FX × 1.68 (extra 20%).
+  // Update these constants when FX moves; admin-config UI is a future follow-up.
+  // PHP is internal-only and NEVER rendered to customers.
+  const FX_PHP = { CAD: 0.0225, USD: 0.0162, AUD: 0.0226, EUR: 0.0140 };
+  const MARKUP_CAD = 1.40;
+  const MARKUP_OTHER = 1.68; // 1.40 * 1.20
+  function deriveFromPhp(phpValue) {
+    const php = Number(phpValue);
+    if (!Number.isFinite(php) || php <= 0) return null;
+    return {
+      price:     (php * FX_PHP.CAD * MARKUP_CAD).toFixed(2),
+      usd_price: (php * FX_PHP.USD * MARKUP_OTHER).toFixed(2),
+      aud_price: (php * FX_PHP.AUD * MARKUP_OTHER).toFixed(2),
+      eur_price: (php * FX_PHP.EUR * MARKUP_OTHER).toFixed(2),
+    };
+  }
+  // When admin types a PHP value, overwrite the 4 currency fields. When PHP
+  // is cleared (empty/zero), leave the currency fields untouched so manual
+  // edits aren't wiped on blur.
+  function handlePhpChange(setForm, phpValue) {
+    const derived = deriveFromPhp(phpValue);
+    if (derived) {
+      setForm(f => ({ ...f, php_price: phpValue, ...derived }));
+    } else {
+      setForm(f => ({ ...f, php_price: phpValue }));
+    }
   }
   function handleCadChange(val) {
     setAddPoForm(f => ({
@@ -284,7 +314,7 @@ export default function AdminPage() {
   const [deletingProductId, setDeletingProductId]       = useState('');
   const [prodEditCell, setProdEditCell]                 = useState({ id: '', field: '' });
   const [prodEditVal, setProdEditVal]                   = useState('');
-  const BLANK_PROD = { id: '', title: '', subtitle: '', language: 'English', price: '', usd_price: '', aud_price: '', eur_price: '', stock: '0', badge: 'In Stock', in_stock: true, image_url: '', tag: 'One Piece' };
+  const BLANK_PROD = { id: '', title: '', subtitle: '', language: 'English', php_price: '', price: '', usd_price: '', aud_price: '', eur_price: '', stock: '0', badge: 'In Stock', in_stock: true, image_url: '', tag: 'One Piece' };
   const [addProdForm, setAddProdForm]                   = useState(BLANK_PROD);
   // AI state for products form
   const [prodImagePreview, setProdImagePreview]         = useState('');
@@ -445,6 +475,7 @@ export default function AdminPage() {
       sold_out:      addPoForm.sold_out,
       price_tba:     addPoForm.price_tba,
       price:         parseFloat(addPoForm.price) || null,
+      php_price:     addPoForm.php_price === '' || addPoForm.php_price == null ? null : Number(addPoForm.php_price),
       usd_price:     parseFloat(addPoForm.usd_price) || null,
       aud_price:     parseFloat(addPoForm.aud_price) || null,
       currency:      addPoForm.currency || 'CAD',
@@ -542,6 +573,7 @@ export default function AdminPage() {
       subtitle:  addProdForm.subtitle.trim() || null,
       language:  addProdForm.language || 'English',
       price:     parseFloat(addProdForm.price) || 0,
+      php_price: addProdForm.php_price === '' || addProdForm.php_price == null ? null : Number(addProdForm.php_price),
       stock:     parseInt(addProdForm.stock, 10) || 0,
       badge:     addProdForm.in_stock ? 'In Stock' : 'Sold Out',
       in_stock:  addProdForm.in_stock,
@@ -625,16 +657,30 @@ export default function AdminPage() {
     setEditingSaving(false);
   }
   function setEditField(field, value) {
-    setEditingRow(curr => curr ? { ...curr, row: { ...curr.row, [field]: value } } : curr);
+    setEditingRow(curr => {
+      if (!curr) return curr;
+      // When the admin types a PHP source price in the edit modal, overwrite
+      // the 4 currency fields with the derived values (CAD/USD/AUD/EUR). When
+      // they clear PHP back to empty, leave the currency fields alone so the
+      // last computed/manual values stick (matches the add-form behavior).
+      if (field === 'php_price') {
+        const derived = deriveFromPhp(value);
+        if (derived) {
+          return { ...curr, row: { ...curr.row, php_price: value, ...derived } };
+        }
+        return { ...curr, row: { ...curr.row, php_price: value } };
+      }
+      return { ...curr, row: { ...curr.row, [field]: value } };
+    });
   }
   // Coerce form-string inputs back to the column type expected by the table.
   // Mirrors the parsing done in addSingle/addDbProduct/addPreorder and the
   // existing inline updateSingle/updateDbProduct/updatePreorder paths.
   function coerceEditValue(table, field, value) {
     const numFields = {
-      singles:   new Set(['price', 'stock']),
-      products:  new Set(['price', 'usd_price', 'aud_price', 'eur_price', 'stock']),
-      preorders: new Set(['price', 'usd_price', 'aud_price', 'eur_price', 'display_order']),
+      singles:   new Set(['php_price', 'price', 'stock']),
+      products:  new Set(['php_price', 'price', 'usd_price', 'aud_price', 'eur_price', 'stock']),
+      preorders: new Set(['php_price', 'price', 'usd_price', 'aud_price', 'eur_price', 'display_order']),
     }[table] || new Set();
     if (numFields.has(field)) {
       if (value === '' || value === null || value === undefined) {
@@ -1141,6 +1187,7 @@ export default function AdminPage() {
       condition:   addForm.condition,
       rarity:      addForm.rarity.trim() || null,
       price:       parseFloat(addForm.price) || 0,
+      php_price:   addForm.php_price === '' || addForm.php_price == null ? null : Number(addForm.php_price),
       stock:       parseInt(addForm.stock, 10) || 1,
       in_stock:    (parseInt(addForm.stock, 10) || 1) > 0,
       image_url:   addForm.image_url.trim() || null,
@@ -2029,10 +2076,19 @@ export default function AdminPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/30">Price (CAD) * — set manually</label>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">PHP Price <span className="text-white/25 normal-case font-normal">(source, internal only)</span></label>
+                    <input type="number" step="0.01" min="0" value={addForm.php_price}
+                      onChange={e => handlePhpChange(setAddForm, e.target.value)}
+                      placeholder="25000"
+                      data-testid="single-php-price"
+                      className="w-full rounded-xl border border-emerald-400/30 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-emerald-400/50" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/30">Price (CAD) * {addForm.php_price ? <span className="text-emerald-300/70 normal-case font-normal">(auto from PHP)</span> : <span className="text-white/30 normal-case font-normal">— set manually</span>}</label>
                     <input type="number" step="0.01" min="0" required value={addForm.price}
                       onChange={e => setAddForm(f => ({ ...f, price: e.target.value }))}
                       placeholder="25.00"
+                      data-testid="single-cad-price"
                       className="w-full rounded-xl border border-yellow-400/30 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-yellow-400/50" />
                   </div>
                   <div>
@@ -2274,26 +2330,43 @@ export default function AdminPage() {
                     <input type="date" value={addPoForm.deadline ? addPoForm.deadline.toString().slice(0,10) : ''} onChange={e => setAddPoForm(f => ({ ...f, deadline: e.target.value ? e.target.value + 'T23:59:59' : '' }))}
                       className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-pink-400/40" />
                   </div>
-                  {/* Prices — USD/AUD/EUR auto-calculate from CAD with 20% buffer */}
+                  {/* PHP source price (internal only) — typing it overwrites all 4 currency fields */}
                   <div>
-                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Price (CAD) *</label>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">PHP Price <span className="text-white/25 normal-case font-normal">(source, internal only)</span></label>
+                    <input type="number" step="0.01" min="0" value={addPoForm.php_price}
+                      onChange={e => handlePhpChange(setAddPoForm, e.target.value)}
+                      placeholder="93000"
+                      data-testid="po-php-price"
+                      className="w-full rounded-xl border border-emerald-400/30 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-emerald-400/50" />
+                  </div>
+                  {/* CAD/USD/AUD/EUR — derived from PHP if present, else fall back to CAD-typing → USD/AUD/EUR via cadToForeign */}
+                  <div>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Price (CAD) * {addPoForm.php_price ? <span className="text-emerald-300/70 normal-case font-normal">(auto from PHP)</span> : null}</label>
                     <input type="number" step="0.01" min="0" value={addPoForm.price} onChange={e => handleCadChange(e.target.value)}
-                      placeholder="93.00" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
+                      placeholder="93.00"
+                      data-testid="po-cad-price"
+                      className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
                   </div>
                   <div>
-                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">USD Price <span className="text-white/25 normal-case font-normal">(auto +20%)</span></label>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">USD Price <span className="text-white/25 normal-case font-normal">{addPoForm.php_price ? '(auto from PHP)' : '(auto +20%)'}</span></label>
                     <input type="number" step="0.01" min="0" value={addPoForm.usd_price} onChange={e => setAddPoForm(f => ({ ...f, usd_price: e.target.value }))}
-                      placeholder="auto" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
+                      placeholder="auto"
+                      data-testid="po-usd-price"
+                      className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
                   </div>
                   <div>
-                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">AUD Price <span className="text-white/25 normal-case font-normal">(auto +20%)</span></label>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">AUD Price <span className="text-white/25 normal-case font-normal">{addPoForm.php_price ? '(auto from PHP)' : '(auto +20%)'}</span></label>
                     <input type="number" step="0.01" min="0" value={addPoForm.aud_price} onChange={e => setAddPoForm(f => ({ ...f, aud_price: e.target.value }))}
-                      placeholder="auto" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
+                      placeholder="auto"
+                      data-testid="po-aud-price"
+                      className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
                   </div>
                   <div>
-                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">EUR Price <span className="text-white/25 normal-case font-normal">(auto +20%)</span></label>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">EUR Price <span className="text-white/25 normal-case font-normal">{addPoForm.php_price ? '(auto from PHP)' : '(auto +20%)'}</span></label>
                     <input type="number" step="0.01" min="0" value={addPoForm.eur_price} onChange={e => setAddPoForm(f => ({ ...f, eur_price: e.target.value }))}
-                      placeholder="auto" className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
+                      placeholder="auto"
+                      data-testid="po-eur-price"
+                      className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-pink-400/40" />
                   </div>
                   {/* Row 4: Image URL + Sold Out toggle */}
                   <div className="sm:col-span-2">
@@ -2559,14 +2632,26 @@ export default function AdminPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/30">Price (CAD) *</label>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">PHP Price <span className="text-white/25 normal-case font-normal">(source, internal only)</span></label>
+                    <input type="number" step="0.01" min="0" value={addProdForm.php_price}
+                      onChange={e => handlePhpChange(setAddProdForm, e.target.value)}
+                      placeholder="129000"
+                      data-testid="prod-php-price"
+                      className="w-full rounded-xl border border-emerald-400/30 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-emerald-400/50" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/30">Price (CAD) * {addProdForm.php_price ? <span className="text-emerald-300/70 normal-case font-normal">(auto from PHP)</span> : null}</label>
                     <input type="number" step="0.01" min="0" required value={addProdForm.price}
                       onChange={e => setAddProdForm(f => ({ ...f, price: e.target.value }))}
                       placeholder="129.00"
+                      data-testid="prod-cad-price"
                       className="w-full rounded-xl border border-yellow-400/30 bg-black/30 px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-yellow-400/50" />
                   </div>
-                  {/* Multi-currency price fields removed — the products table doesn't
-                      expose usd_price / aud_price / eur_price (only preorders do). */}
+                  {/* Multi-currency price fields not surfaced in this products add
+                      form — the live `products` schema cache rejects writes to
+                      usd_price/aud_price/eur_price (only preorders does). PHP entry
+                      still updates the in-state values for parity with BLANK_PROD
+                      but they are NOT included in the INSERT payload below. */}
                   <div>
                     <label className="mb-1 block text-[10px] font-black uppercase tracking-[0.14em] text-white/40">Image URL</label>
                     <input value={addProdForm.image_url} onChange={e => setAddProdForm(f => ({ ...f, image_url: e.target.value }))}
@@ -3011,6 +3096,7 @@ function EditRowModal({ editingRow, saving, error, onChange, onSave, onCancel })
       { key: 'language',    label: 'Language *', type: 'select', options: ['English', 'Japanese', 'Asian English', 'Chinese', 'Korean'] },
       { key: 'condition',   label: 'Condition',  type: 'select', options: ['NM', 'LP', 'MP', 'HP', 'DMG'] },
       { key: 'rarity',      label: 'Rarity' },
+      { key: 'php_price',   label: 'PHP Price (source, internal only)', type: 'number', step: '0.01', min: '0' },
       { key: 'price',       label: 'Price (CAD) *', type: 'number', step: '0.01', min: '0' },
       { key: 'stock',       label: 'Stock',         type: 'number', step: '1', min: '0' },
       { key: 'image_url',   label: 'Image URL',  fullWidth: true },
@@ -3020,6 +3106,7 @@ function EditRowModal({ editingRow, saving, error, onChange, onSave, onCancel })
       { key: 'title',       label: 'Title *',     fullWidth: true },
       { key: 'subtitle',    label: 'Subtitle' },
       { key: 'language',    label: 'Language',    type: 'select', options: ['English', 'Japanese', 'Asian English', 'N/A'] },
+      { key: 'php_price',   label: 'PHP Price (source, internal only)', type: 'number', step: '0.01', min: '0' },
       { key: 'price',       label: 'Price (CAD) *', type: 'number', step: '0.01', min: '0' },
       { key: 'usd_price',   label: 'USD Price', type: 'number', step: '0.01', min: '0' },
       { key: 'aud_price',   label: 'AUD Price', type: 'number', step: '0.01', min: '0' },
@@ -3036,6 +3123,7 @@ function EditRowModal({ editingRow, saving, error, onChange, onSave, onCancel })
       { key: 'subtitle',     label: 'Subtitle' },
       { key: 'sold_out',     label: 'Sold Out',    type: 'checkbox' },
       { key: 'price_tba',    label: 'Price TBA',   type: 'checkbox' },
+      { key: 'php_price',    label: 'PHP Price (source, internal only)', type: 'number', step: '0.01', min: '0' },
       { key: 'price',        label: 'Price (CAD)', type: 'number', step: '0.01', min: '0' },
       { key: 'usd_price',    label: 'USD Price', type: 'number', step: '0.01', min: '0' },
       { key: 'aud_price',    label: 'AUD Price', type: 'number', step: '0.01', min: '0' },

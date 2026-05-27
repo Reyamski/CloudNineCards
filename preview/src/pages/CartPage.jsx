@@ -13,8 +13,9 @@ import { supabase, supabaseEnabled } from '../lib/supabase';
 // ── Shipping schedule — MUST mirror the published policy ─────────────────────
 // Canonical published copy (HomePage.tsx "Tracked Shipping" card):
 //   "Every order ships tracked. Canada $24.99 flat (singles, deck packs,
-//    sealed). USA $34.99. International from $22. Free shipping in Canada on
-//    in-stock orders $300+. Pre-orders pay actual shipping at release."
+//    sealed). USA $34.99. International $34.99 (Asia, Europe), $44.99 (other).
+//    Free shipping in Canada on in-stock orders $300+. Pre-orders pay actual
+//    shipping at release."
 //
 // Final policy (2026-05): ONE unified CA flat rate of $24.99 for ALL in-stock
 // items (singles, decks, sealed — same), free at $300+. Empirical BC→Manitoba
@@ -30,18 +31,24 @@ import { supabase, supabaseEnabled } from '../lib/supabase';
 // with $100 insurance + tracking) + Wise $3 + packaging $1 ≈ $38 real per
 // order; prior $15 was losing ~$23 per US sealed order. Sealed dominates
 // for a small-shop flat tier so a single US rate applies to all categories.
-// International tiers (2026-05): Asia $22 / $22, Europe/ME $34.99 (matched to
-// US — real BC→EU Canada Post Tracked Packet International with intl fuel
-// surcharge lands ~$30-45 sealed + $3 Wise; prior $25 was losing on most EU
-// sealed orders), Other Intl $28. Asia stays $22 (cheaper Tracked Packet
-// zone + lower realised cost mix) so the "International from $22" public copy
-// remains truthful. Non-Canada destinations never get free shipping.
+// International tiers (2026-05 zero-loss raise):
+//   • Japan / Korea / HK / Singapore: $34.99 (was $22 — Tracked Packet Intl
+//     to Asia + fuel surcharge now lands ~$30-38 sealed + $3 Wise + packaging,
+//     so $22 was losing ~$13 on every sealed Asia order).
+//   • Australia / NZ / SE Asia:       $34.99 (was $22 — same physics; SE Asia
+//     remote-area surcharges hit small parcels harder than the old rate).
+//   • Europe / Middle East:           $34.99 (unchanged — already at zero-loss
+//     after the 2026-05 lift from $25 → $34.99).
+//   • Other International:            $44.99 (was $28 — long-tail destinations
+//     consistently overran $28; $44.99 matches real cost on the slowest zones).
+// Non-Canada destinations never get free shipping. SHIP_RATES keys are matched
+// verbatim against the country dropdown — labels must stay in sync.
 const SHIP_RATES = {
   'United States':                  34.99,
-  'Japan / Korea / HK / Singapore': 22,
-  'Australia / NZ / SE Asia':       22,
+  'Japan / Korea / HK / Singapore': 34.99,
+  'Australia / NZ / SE Asia':       34.99,
   'Europe / Middle East':           34.99,
-  'Other International':            28,
+  'Other International':            44.99,
 };
 const CANADA_RATE               = 24.99; // unified flat rate for all in-stock CA carts
 const FREE_SHIP_CA_THRESHOLD    = 300;   // any Canadian in-stock cart $300+ ships free

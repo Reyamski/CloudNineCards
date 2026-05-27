@@ -440,7 +440,7 @@ export default function SinglesPage() {
         {!loading && (
           <div className="mt-12 grid gap-4 sm:grid-cols-3">
             {[
-              { icon: Package,     title: 'Tracked Shipping',    desc: 'Sleeved in toploader, tracked mail. Canada $24.99 flat. USA $34.99. International from $22.' },
+              { icon: Package,     title: 'Tracked Shipping',    desc: 'Sleeved in toploader, tracked mail. Canada $24.99 flat. USA $34.99. International $34.99 (Asia, Europe), $44.99 (other).' },
               { icon: Globe,       title: 'Ships Worldwide',     desc: 'Free shipping in Canada on in-stock orders $300+.' },
               { icon: ShieldCheck, title: 'Condition Guarantee', desc: 'NM means NM. If it shows up worse than described, we fix it.' },
             ].map(({ icon: Icon, title, desc }) => (
