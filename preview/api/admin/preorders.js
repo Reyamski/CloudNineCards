@@ -26,6 +26,12 @@ function whitelistPatch(patch) {
       v = Number(v) || 0;
     } else if (k === 'sold_out' || k === 'price_tba') {
       v = !!v;
+    } else if (k === 'deadline') {
+      // timestamptz column. Pass ISO strings through (Postgres parses
+      // them). Empty string ⇒ null so blanking the field in the admin
+      // Edit modal clears the deadline instead of returning a 400
+      // "invalid input syntax for type timestamp with time zone".
+      v = v === '' || v == null ? null : v;
     }
     out[k] = v;
   }

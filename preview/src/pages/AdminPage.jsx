@@ -3130,7 +3130,7 @@ function EditRowModal({ editingRow, saving, error, onChange, onSave, onCancel })
       { key: 'eur_price',    label: 'EUR Price', type: 'number', step: '0.01', min: '0' },
       { key: 'currency',     label: 'Currency' },
       { key: 'eta',          label: 'ETA (text)' },
-      { key: 'deadline',     label: 'Deadline (ISO)' },
+      { key: 'deadline',     label: 'Deadline', type: 'datetime-local' },
       { key: 'image_url',    label: 'Image URL',   fullWidth: true },
       { key: 'hype',         label: 'Hype' },
       { key: 'notes',        label: 'Notes',       type: 'textarea', rows: 4, fullWidth: true },
@@ -3180,6 +3180,23 @@ function EditRowModal({ editingRow, saving, error, onChange, onSave, onCancel })
       return (
         <input type="number" step={f.step} min={f.min} value={safeValue}
           onChange={e => onChange(f.key, e.target.value)}
+          className={baseInput} />
+      );
+    }
+    if (f.type === 'datetime-local') {
+      // Postgres timestamptz comes back like "2026-09-30T23:59:59+00:00".
+      // <input type="datetime-local"> only accepts "YYYY-MM-DDTHH:MM".
+      // Slice on render and re-append :59 seconds on change so the round-trip
+      // stays valid ISO for Supabase. Empty string → empty (saveEditRow's
+      // diff + server allow-list both coerce '' → null so the deadline clears
+      // instead of 400-ing.)
+      const dtLocal = safeValue ? String(safeValue).slice(0, 16) : '';
+      return (
+        <input type="datetime-local" value={dtLocal}
+          onChange={e => {
+            const v = e.target.value;
+            onChange(f.key, v ? v + ':00' : '');
+          }}
           className={baseInput} />
       );
     }
