@@ -243,13 +243,13 @@ export default function AdminPage() {
   }
 
   // PHP-source price markup formula (owner's spec, Google FX rates 2026-05-27).
-  // CAD = PHP × FX × 1.40 (40% markup baseline).
-  // USD/AUD/EUR = PHP × FX × 1.40 × 1.20 = PHP × FX × 1.68 (extra 20%).
+  // CAD = PHP × FX × 1.40 (40% markup, unchanged).
+  // USD/AUD/EUR = PHP × FX × 1.50 (flat 50% markup per owner spec 2026-05-27).
   // Update these constants when FX moves; admin-config UI is a future follow-up.
   // PHP is internal-only and NEVER rendered to customers.
   const FX_PHP = { CAD: 0.0225, USD: 0.0162, AUD: 0.0226, EUR: 0.0140 };
   const MARKUP_CAD = 1.40;
-  const MARKUP_OTHER = 1.68; // 1.40 * 1.20
+  const MARKUP_OTHER = 1.50; // 50% markup (was 40% baseline + extra 20% = 1.68; flattened to 50% per owner spec 2026-05-27)
   function deriveFromPhp(phpValue) {
     const php = Number(phpValue);
     if (!Number.isFinite(php) || php <= 0) return null;
