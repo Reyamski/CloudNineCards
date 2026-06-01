@@ -7,6 +7,7 @@ import { supabase, supabaseEnabled } from '../lib/supabase';
 import { useCart } from '../contexts/CartContext';
 import { useToast } from '../components/Toast';
 import CardRequestModal from '../components/CardRequestModal';
+import MakeAnOfferModal from '../components/MakeAnOfferModal';
 import { ControlsBar, RequestCardBanner } from '../components/CatalogControls';
 
 const GAMES      = ['All', 'One Piece', 'Pokemon', 'Dragon Ball', 'Yu-Gi-Oh!', 'Union Arena'];
@@ -39,7 +40,7 @@ const STATIC_SINGLES = [
 ];
 
 // ── Card Tile ─────────────────────────────────────────────────────────────────
-function SingleCard({ card, onBuy }) {
+function SingleCard({ card, onBuy, onOffer }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
@@ -75,23 +76,34 @@ function SingleCard({ card, onBuy }) {
         </div>
         <div className="text-sm font-black leading-snug text-white">{card.card_name}</div>
         <div className="mt-1 text-xs text-white/40">{card.set_name}{card.card_number ? ` · ${card.card_number}` : ''}</div>
-        <div className="mt-auto pt-3 flex items-end justify-between">
-          <div>
-            <div className="text-2xl font-black text-white">
-              {Number(card.price) > 0 ? `CAD $${Number(card.price).toFixed(2)}` : <span className="text-white/40 text-lg">TBD</span>}
+        <div className="mt-auto pt-3 flex flex-col gap-2">
+          <div className="flex items-end justify-between">
+            <div>
+              <div className="text-2xl font-black text-white">
+                {Number(card.price) > 0 ? `CAD $${Number(card.price).toFixed(2)}` : <span className="text-white/40 text-lg">TBD</span>}
+              </div>
+              <div className="text-[10px] text-white/30 mt-0.5">{card.stock > 0 ? `${card.stock} in stock` : 'Out of stock'}</div>
             </div>
-            <div className="text-[10px] text-white/30 mt-0.5">{card.stock > 0 ? `${card.stock} in stock` : 'Out of stock'}</div>
+            {card.in_stock && Number(card.price) > 0 ? (
+              <button onClick={() => onBuy(card)}
+                className="rounded-xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 px-4 py-2 text-xs font-black uppercase tracking-[0.08em] text-black transition hover:opacity-90">
+                Add to Cart
+              </button>
+            ) : (
+              <button disabled className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.08em] text-white/25 cursor-not-allowed">
+                {!card.in_stock ? 'Sold Out' : 'Price TBD'}
+              </button>
+            )}
           </div>
-          {card.in_stock && Number(card.price) > 0 ? (
-            <button onClick={() => onBuy(card)}
-              className="rounded-xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 px-4 py-2 text-xs font-black uppercase tracking-[0.08em] text-black transition hover:opacity-90">
-              Add to Cart
-            </button>
-          ) : (
-            <button disabled className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.08em] text-white/25 cursor-not-allowed">
-              {!card.in_stock ? 'Sold Out' : 'Price TBD'}
-            </button>
-          )}
+          {/* Make-an-Offer is offered on EVERY single — sold-out, TBD, or
+              in-stock — per owner spec 2026-05-28. Stocked secondary so the
+              primary Add-to-Cart still wins the tap. */}
+          <button
+            onClick={() => onOffer(card)}
+            className="w-full rounded-xl border border-fuchsia-400/30 bg-fuchsia-400/5 px-4 py-2 text-xs font-black uppercase tracking-[0.08em] text-fuchsia-200 transition hover:bg-fuchsia-400/15"
+          >
+            Make an Offer
+          </button>
         </div>
       </div>
     </motion.div>
@@ -265,6 +277,10 @@ export default function SinglesPage() {
   const [sort, setSort]               = useState('price_asc');
   const [showFilters, setShowFilters] = useState(false);
   const [showRequest, setShowRequest] = useState(false);
+  // offerCard: the single the buyer is offering on (null = modal closed).
+  // We keep the card object so the modal can render its title + listed
+  // price without a re-lookup.
+  const [offerCard, setOfferCard]     = useState(null);
 
   useEffect(() => { document.title = 'Singles | CloudNineCards'; }, []);
 
@@ -332,6 +348,7 @@ export default function SinglesPage() {
       <section className="relative overflow-hidden border-b border-cyan-500/15 bg-[#07030f] px-6 pb-10 pt-6 min-h-[360px] flex flex-col justify-center">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.18),transparent_40%),radial-gradient(circle_at_left,rgba(168,85,247,0.12),transparent_40%)]" />
         <img src="/pikachu.webp" alt="" aria-hidden="true"
+          loading="lazy"
           decoding="async"
           fetchPriority="low"
           className="pointer-events-none absolute right-0 bottom-0 h-[440px] w-auto select-none"
@@ -355,6 +372,16 @@ export default function SinglesPage() {
           <CardRequestModal
             onClose={() => setShowRequest(false)}
             onSuccess={() => showToast('Request received — we\'ll email you')}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {offerCard && (
+          <MakeAnOfferModal
+            card={offerCard}
+            onClose={() => setOfferCard(null)}
+            onSuccess={() => showToast('Offer sent — we\'ll email you within 24h')}
           />
         )}
       </AnimatePresence>
@@ -433,7 +460,7 @@ export default function SinglesPage() {
           </div>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {filtered.map(card => <SingleCard key={card.id} card={card} onBuy={handleBuy} />)}
+            {filtered.map(card => <SingleCard key={card.id} card={card} onBuy={handleBuy} onOffer={setOfferCard} />)}
           </div>
         )}
 

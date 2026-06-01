@@ -75,6 +75,22 @@ async function uploadToImgbb(base64Data, imgbbKey) {
   return json.success ? json.data.url : null;
 }
 
+// Downscale an uploaded image to a web-friendly WebP before it's hosted, so
+// card images stay small (~50-90KB) no matter the source phone-photo size
+// (raw 12MP shots were ~1.5MB each and tanked page load). Lazily imports sharp
+// so the dependency only loads when an image is actually present. Returns the
+// original base64 unchanged if sharp/resize fails — never blocks an upload.
+async function downscaleForWeb(base64Data) {
+  const { default: sharp } = await import('sharp');
+  const input = Buffer.from(base64Data, 'base64');
+  const out = await sharp(input)
+    .rotate() // honor EXIF orientation from phone cameras
+    .resize({ width: 800, height: 800, fit: 'inside', withoutEnlargement: true })
+    .webp({ quality: 82 })
+    .toBuffer();
+  return out.toString('base64');
+}
+
 /**
  * Extract a single card object from Claude's text response.
  *
@@ -185,6 +201,18 @@ export default async function handler(req, res) {
       } catch (err) {
         return res.status(400).json({ error: 'HEIC conversion failed on server', detail: err.message });
       }
+    }
+  }
+
+  // Shrink the image to web size before hosting + sending to Claude. Keeps
+  // newly-added card images small at the source so the oversized-photo problem
+  // can't recur. Non-fatal: on failure we keep the original bytes.
+  if (imageBase64) {
+    try {
+      imageBase64 = await downscaleForWeb(imageBase64);
+      mediaType = 'image/webp';
+    } catch (err) {
+      console.warn('downscaleForWeb failed, using original:', err.message);
     }
   }
 

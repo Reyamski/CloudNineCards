@@ -16,7 +16,7 @@ const BASE_NEW_ARRIVALS = [
     price: 129.0,
     badge: 'In Stock',
     daysAgo: 'Live now',
-    image: 'https://i.ibb.co/4R6DL8Vt/8cc175339fbf.webp',
+    image: 'https://fxbrjlzgczwxeiiraudy.supabase.co/storage/v1/object/public/card-images/static/8cc175339fbf.webp',
   },
   {
     id: 'eb03jp',
@@ -25,7 +25,7 @@ const BASE_NEW_ARRIVALS = [
     price: 259.0,
     badge: 'In Stock',
     daysAgo: 'Live now',
-    image: 'https://i.ibb.co/cS1CLgXf/259dbef5f466.webp',
+    image: 'https://fxbrjlzgczwxeiiraudy.supabase.co/storage/v1/object/public/card-images/static/259dbef5f466.webp',
   },
   {
     id: 'ac1',
@@ -34,7 +34,7 @@ const BASE_NEW_ARRIVALS = [
     price: 279.0,
     badge: 'In Stock',
     daysAgo: 'Live now',
-    image: 'https://i.ibb.co/ZzmyRcFX/aac4c203bf03.webp',
+    image: 'https://fxbrjlzgczwxeiiraudy.supabase.co/storage/v1/object/public/card-images/static/aac4c203bf03.webp',
   },
   {
     id: 'poke-ah',
@@ -43,7 +43,7 @@ const BASE_NEW_ARRIVALS = [
     price: 279.0,
     badge: 'In Stock',
     daysAgo: 'Live now',
-    image: 'https://i.ibb.co/5WbMqZTR/41faa72453fe.jpg',
+    image: 'https://fxbrjlzgczwxeiiraudy.supabase.co/storage/v1/object/public/card-images/static/41faa72453fe.webp',
   },
 ];
 

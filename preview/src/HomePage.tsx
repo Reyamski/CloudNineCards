@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
 import {Link} from 'react-router-dom';
-import {BellRing, ChevronLeft, ChevronRight, Clock, Flame, Package, ShieldCheck, Sparkles, Star, Truck, Zap, Globe} from 'lucide-react';
+import {BellRing, ChevronLeft, ChevronRight, Clock, Flame, Gavel, Package, ShieldCheck, Sparkles, Star, Truck, Zap, Globe} from 'lucide-react';
 import {motion} from 'framer-motion';
 import {supabase, supabaseEnabled} from './lib/supabase';
 import Footer from './components/Footer';
@@ -28,7 +28,7 @@ const BASE_STOCK_SPOTLIGHT = [
     badge: 'Hot Drop',
     title: 'Heroines Edition EB-03',
     body: 'Current on-hand One Piece release, shown here only while inventory is actually available.',
-    image: 'https://i.ibb.co/cS1CLgXf/259dbef5f466.webp',
+    image: 'https://fxbrjlzgczwxeiiraudy.supabase.co/storage/v1/object/public/card-images/static/259dbef5f466.webp',
     price: 'CAD $259.00',
     subtitle: 'Japanese',
   },
@@ -427,6 +427,7 @@ export default function HomePage() {
           src="/luffy.webp"
           alt=""
           aria-hidden="true"
+          loading="lazy"
           decoding="async"
           fetchPriority="low"
           className="pointer-events-none absolute bottom-0 right-4 hidden h-[96%] w-auto object-contain md:block"
@@ -977,6 +978,48 @@ export default function HomePage() {
                 </Link>
               ))}
             </div>
+          </div>
+        </motion.div>
+      </section>
+
+      {/* Live Auctions teaser — coming-soon lead capture. No real auction
+          logic here, just a CTA into /auctions-soon. Kept small so it reads
+          as a teaser, not a takeover. Matches the deck-pack hero gradient. */}
+      <section className="mx-auto max-w-7xl px-6 py-6 md:py-10">
+        <motion.div
+          initial={{opacity: 0, y: 18}}
+          whileInView={{opacity: 1, y: 0}}
+          viewport={{once: true}}
+          transition={{duration: 0.5}}
+          className="relative overflow-hidden rounded-[28px] border border-fuchsia-400/20 bg-[linear-gradient(135deg,rgba(168,85,247,0.14),rgba(34,211,238,0.10))]"
+        >
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-fuchsia-400 via-cyan-300 to-yellow-300" />
+          <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-fuchsia-500/15 blur-3xl" />
+          <div className="absolute -left-16 -bottom-16 h-56 w-56 rounded-full bg-cyan-400/10 blur-3xl" />
+          <div className="relative flex flex-col gap-5 px-6 py-7 md:flex-row md:items-center md:justify-between md:px-10 md:py-9">
+            <div className="flex items-start gap-4">
+              <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-fuchsia-300/30 bg-fuchsia-300/10">
+                <Gavel className="h-5 w-5 text-fuchsia-200" />
+              </div>
+              <div>
+                <div className="text-[11px] font-black uppercase tracking-[0.22em] text-fuchsia-300/80">Coming soon</div>
+                <h2 className="mt-1 text-2xl font-black uppercase leading-tight md:text-3xl">
+                  Live Auctions —{' '}
+                  <span className="bg-gradient-to-r from-cyan-300 via-fuchsia-300 to-yellow-300 bg-clip-text text-transparent">
+                    Coming soon
+                  </span>
+                </h2>
+                <p className="mt-2 max-w-xl text-sm leading-6 text-white/60">
+                  Real-time bidding on rare singles and sealed product. Sign up to be first in the room when we launch.
+                </p>
+              </div>
+            </div>
+            <Link
+              to="/auctions-soon"
+              className="shrink-0 self-start inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-400 px-6 py-3 text-sm font-black uppercase tracking-[0.1em] text-black transition hover:opacity-95 md:self-auto"
+            >
+              Get Early Access <ChevronRight className="h-4 w-4" />
+            </Link>
           </div>
         </motion.div>
       </section>
