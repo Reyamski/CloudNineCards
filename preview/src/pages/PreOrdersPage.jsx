@@ -13,6 +13,9 @@ import { useToast } from '../components/Toast';
 const PO_OPEN_DATE  = new Date('2025-11-01T00:00:00');
 const PO_CLOSE_DATE = new Date('2026-12-31T23:59:59');
 const isOpen = () => { const now = new Date(); return now >= PO_OPEN_DATE && now <= PO_CLOSE_DATE; };
+// True once an individual item's deadline has passed. Null/invalid deadline
+// (no deadline set) never counts as past.
+const isPast = (deadline) => deadline instanceof Date && !isNaN(deadline.getTime()) && deadline.getTime() <= Date.now();
 
 const WISE_HANDLE = '@cloudninecards';
 const CONTACT_EMAIL = 'papspective@gmail.com';
@@ -115,6 +118,12 @@ export default function PreOrdersPage() {
   const { showToast } = useToast();
 
   function addPreorderToCart(item) {
+    // Hard stop: never add a closed/expired/sold-out item even if the button
+    // was reached via a stale render or programmatic call.
+    if (!isOpen() || isPast(item.deadline) || item.soldOut || item.priceTba) {
+      showToast('Pre-order window for this item has closed.');
+      return;
+    }
     // Prefer the human-written eta string; fall back to a "closes <date>"
     // derived from the deadline so the cart line still surfaces a useful
     // hint when an admin forgot to fill the eta column.
@@ -394,7 +403,11 @@ export default function PreOrdersPage() {
                 {item.deadline && !item.soldOut && <CountdownBlock deadline={item.deadline} />}
 
                 {(() => {
-                  const canReserve = isOpen() && !item.soldOut && !item.priceTba;
+                  // Per-item deadline gate: a passed deadline closes ordering
+                  // even while the global window is open. Without this, expired
+                  // items stayed reservable (the global isOpen() runs to 2026).
+                  const expired = isPast(item.deadline);
+                  const canReserve = isOpen() && !expired && !item.soldOut && !item.priceTba;
                   return (
                     <button
                       disabled={!canReserve}
@@ -405,7 +418,7 @@ export default function PreOrdersPage() {
                           : 'bg-white/5 border border-white/10 text-white/30 cursor-not-allowed'
                       }`}
                     >
-                      {item.soldOut ? 'Sold Out' : item.priceTba ? 'Price TBA' : !isOpen() ? 'Pre-orders Closed' : <>Add to Cart <ChevronRight className="h-4 w-4" /></>}
+                      {item.soldOut ? 'Sold Out' : item.priceTba ? 'Price TBA' : (!isOpen() || expired) ? 'Pre-orders Closed' : <>Add to Cart <ChevronRight className="h-4 w-4" /></>}
                     </button>
                   );
                 })()}

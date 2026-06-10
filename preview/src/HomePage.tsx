@@ -263,6 +263,8 @@ export default function HomePage() {
           .from('preorders')
           .select('*')
           .eq('sold_out', false)
+          // Hide items whose deadline has passed; keep ones with no deadline set.
+          .or(`deadline.is.null,deadline.gt.${new Date().toISOString()}`)
           .order('created_at', { ascending: false })
           .limit(3),
       ]);

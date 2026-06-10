@@ -376,6 +376,29 @@ export default function CartPage() {
     try {
       if (!supabaseEnabled || !supabase) throw new Error('Live orders are not configured yet.');
 
+      // Re-validate pre-order deadlines against the DB at submit time. Cart
+      // items may have been added while open, then sat in the cart past the
+      // deadline — block those here so a closed window can't be ordered. The
+      // page-level button guard alone is bypassable via a stale cart.
+      if (hasPreorder) {
+        const preIds = preorderItems.map(it => it.id);
+        const { data: livePre, error: preErr } = await supabase
+          .from('preorders')
+          .select('id, title, deadline, sold_out')
+          .in('id', preIds);
+        if (preErr) throw preErr;
+        const now = Date.now();
+        const blocked = (livePre || []).filter(
+          r => r.sold_out || (r.deadline && new Date(r.deadline).getTime() <= now)
+        );
+        if (blocked.length) {
+          const names = blocked.map(r => r.title).join(', ');
+          setSending(false);
+          setSendError(`Pre-order window closed for: ${names}. Remove ${blocked.length > 1 ? 'these items' : 'this item'} to continue.`);
+          return;
+        }
+      }
+
       const sharedBuyerFields = {
         buyer_name:        name,
         buyer_email:       email.trim().toLowerCase(),
