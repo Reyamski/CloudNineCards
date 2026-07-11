@@ -6,16 +6,23 @@ import { createContext, useContext, useEffect, useMemo, useReducer } from 'react
 const STORAGE_KEY = 'cnc_cart_v1';
 
 // Item shape:
-//   { key, source, id, title, image, price, qty, isPreorder, etaText?, currency }
+//   { key, source, id, title, image, price, qty, isPreorder, etaText?, currency,
+//     usd_price?, aud_price?, eur_price? }
 // Where:
 //   key        = `${source}:${id}` — merge target for addItem
 //   source     = 'singles' | 'products' | 'preorders'
 //   id         = the source-table primary key
-//   price      = unit price in CAD (number)
+//   price      = unit price in CAD (number) — canonical, used for DB/emails
 //   qty        = integer >= 1
 //   isPreorder = boolean (visual flag + shipping caveat)
 //   etaText    = optional pre-order ETA string for cart line
 //   currency   = always 'CAD' for now — kept for future multi-currency carts
+//   usd_price / aud_price / eur_price
+//              = optional per-currency unit price (number or null). Populated
+//                for preorders when the owner sets a PHP-source markup in Admin.
+//                Consumed by /cart's Option A display layer to show buyer-local
+//                pricing on the Order Summary. Singles / in-stock products /
+//                decks are CAD-only for now and pass null here.
 
 function loadInitial() {
   if (typeof window === 'undefined') return [];

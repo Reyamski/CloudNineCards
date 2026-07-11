@@ -311,6 +311,11 @@ export default function ShopPage() {
         subtitle:  po.subtitle ?? '',
         language:  null,
         price:     Number(po.price) || 0,
+        // Per-currency prices — plumbed to the cart for Option A multi-currency
+        // display. Only used on /cart; ShopPage listing itself still renders CAD.
+        usdPrice:  po.usd_price != null ? Number(po.usd_price) : null,
+        audPrice:  po.aud_price != null ? Number(po.aud_price) : null,
+        eurPrice:  po.eur_price != null ? Number(po.eur_price) : null,
         priceTba:  po.price_tba || false,
         badge:     po.sold_out ? 'Sold Out' : po.price_tba ? 'Price TBA' : 'Pre-order',
         inStock:   !po.sold_out,
@@ -556,6 +561,10 @@ export default function ShopPage() {
                         title:      item.title,
                         image:      item.image,
                         price:      Number(item.price) || 0,
+                        // Per-currency prices for cart-side Option A display.
+                        usd_price:  item.usdPrice != null ? Number(item.usdPrice) : null,
+                        aud_price:  item.audPrice != null ? Number(item.audPrice) : null,
+                        eur_price:  item.eurPrice != null ? Number(item.eurPrice) : null,
                         qty:        1,
                         isPreorder: true,
                         etaText:    item.eta ?? '',

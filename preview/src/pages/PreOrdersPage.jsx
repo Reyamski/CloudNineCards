@@ -138,6 +138,13 @@ export default function PreOrdersPage() {
       title:      item.title,
       image:      item.image,
       price:      Number(item.price) || 0,
+      // Per-currency prices for the /cart multi-currency display (Option A).
+      // Owner enters these in Admin (PHP-source × 1.50 markup or manual). Null
+      // when the preorder was created before the columns were populated — cart
+      // falls back to CAD in that case.
+      usd_price:  item.usdPrice != null ? Number(item.usdPrice) : null,
+      aud_price:  item.audPrice != null ? Number(item.audPrice) : null,
+      eur_price:  item.eurPrice != null ? Number(item.eurPrice) : null,
       qty:        1,
       isPreorder: true,
       etaText,

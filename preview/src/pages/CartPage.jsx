@@ -79,6 +79,78 @@ const PROVINCE_TAX = {
   'Yukon':                   { rate: 0.05,    label: 'GST'       },
 };
 
+// ── Multi-currency display (Option A — MVP, preorder-only) ─────────────────
+// Owner sets PHP-source prices with a currency-specific markup: CAD × 1.40,
+// USD/AUD/EUR × 1.50. Preorder rows carry usd_price / aud_price / eur_price
+// pre-computed by AdminPage. Singles / products / decks are currently CAD-only
+// (Option B will add per-currency prices to those tables).
+//
+// Display rules:
+//   • Country dictates display currency (no separate currency selector).
+//   • CA / JP-KR-HK-SG / Other Intl → CAD (no stored per-currency data for
+//     those regions; JPY / KRW would need their own columns).
+//   • US → USD, AU/NZ/SE Asia → AUD, EU/ME → EUR — sourced from the item's
+//     per-currency column when present.
+//   • Mixed cart (any item lacking per-currency data for the display currency)
+//     forces the entire cart to CAD with a "Multi-currency display unavailable"
+//     banner — never sum two different currencies.
+//   • Shipping is set in CAD (SHIP_RATES). Convert CAD → display currency
+//     using the fixed FX_TO_CAD table below. These rates are hardcoded and
+//     will drift; owner should promote them to an admin-config table (see
+//     limitations note in the PR body).
+// This currency layer is display-only — the DB payload and EmailJS receipts
+// remain in CAD (owner internal accounting). Payment is via Wise, which
+// converts at real-time rates when the buyer executes the transfer.
+const CURRENCY_BY_COUNTRY = {
+  'Canada':                          'CAD',
+  'United States':                   'USD',
+  'Australia / NZ / SE Asia':        'AUD',
+  'Europe / Middle East':            'EUR',
+  'Japan / Korea / HK / Singapore':  'CAD',  // no stored JPY/KRW columns — fallback CAD
+  'Other International':             'CAD',  // long-tail — fallback CAD
+};
+
+// 1 unit of target = X CAD (Google mid-market rates, mid-2026 approximate).
+// USD 1.39, AUD 0.99, EUR 1.61. These are inverse of AdminPage FX_PHP
+// (1/PHP-CAD gives ≈44 PHP per CAD; USD/AUD/EUR values here are direct FX
+// pairs, not routed through PHP). Bump when the market has drifted meaningfully.
+const FX_TO_CAD = { CAD: 1.0, USD: 1.39, AUD: 0.99, EUR: 1.61 };
+
+function cadTo(target, cadAmount) {
+  if (target === 'CAD') return cadAmount;
+  const rate = FX_TO_CAD[target];
+  if (!rate || rate <= 0) return cadAmount;
+  return cadAmount / rate;
+}
+
+// Per-item price lookup. For preorders with a stored per-currency value we
+// return that value directly (owner-set with 50% markup baked in). Everything
+// else falls back to the CAD price with a flag so the caller can decide
+// whether to display CAD or hide/convert.
+function itemPrice(item, displayCurrency) {
+  if (item.source === 'preorders' && displayCurrency !== 'CAD') {
+    const field = { USD: 'usd_price', AUD: 'aud_price', EUR: 'eur_price' }[displayCurrency];
+    const val = Number(item[field] ?? 0);
+    if (val > 0) return { amount: val, currency: displayCurrency, fallback: false };
+  }
+  // Fallback: CAD unit price (singles, in-stock products, decks, or preorder
+  // with no per-currency data).
+  return { amount: Number(item.price) || 0, currency: 'CAD', fallback: true };
+}
+
+// True if ANY item in `items` lacks per-currency data for `displayCurrency`.
+// Used to decide whether to force the entire cart back to CAD with a banner.
+function anyItemFallsBack(items, displayCurrency) {
+  if (displayCurrency === 'CAD') return false;
+  return items.some(it => itemPrice(it, displayCurrency).fallback);
+}
+
+// "CAD $12.34" — 3-letter code prefix so the buyer always sees the currency.
+function fmtMoney(amount, currency) {
+  const n = Number.isFinite(amount) ? amount : 0;
+  return `${currency} $${n.toFixed(2)}`;
+}
+
 const WISE_HANDLE   = '@cloudninecards';
 const CONTACT_EMAIL = 'papspective@gmail.com';
 
@@ -307,20 +379,51 @@ export default function CartPage() {
     return { singlesDecksSubtotal: singlesDecksS, sealedSubtotal: sealedS };
   }, [inStockItems]);
 
-  const shippingFee       = hasInStock ? calcShipping(country, singlesDecksSubtotal, sealedSubtotal) : 0;
+  const shippingFeeCad    = hasInStock ? calcShipping(country, singlesDecksSubtotal, sealedSubtotal) : 0;
   const taxRate           = country === 'Canada' && province ? (PROVINCE_TAX[province]?.rate ?? 0) : 0;
   const taxLabel          = country === 'Canada' && province ? (PROVINCE_TAX[province]?.label ?? '') : '';
   // Tax applied to in-stock subtotal + shipping (matches existing modal logic).
   // Pre-orders are NOT taxed at checkout — that's collected on release.
-  const taxAmount         = hasInStock && country === 'Canada' && province ? (inStockSubtotal + shippingFee) * taxRate : 0;
-  const inStockTotal      = hasInStock ? inStockSubtotal + shippingFee + taxAmount : 0;
+  // Tax is Canada-only, so it never needs currency conversion (CAD by definition).
+  const taxAmount         = hasInStock && country === 'Canada' && province ? (inStockSubtotal + shippingFeeCad) * taxRate : 0;
+  // CAD baseline totals — kept for DB payload + email receipts (unchanged).
+  const inStockTotalCad   = hasInStock ? inStockSubtotal + shippingFeeCad + taxAmount : 0;
   const preorderDeposit   = preorderSubtotal * PREORDER_DEPOSIT_RATE;
   const preorderBalance   = preorderSubtotal - preorderDeposit;
-  const dueNow            = inStockTotal + preorderDeposit;
+  const dueNowCad         = inStockTotalCad + preorderDeposit;
   // Derive from calcShipping (single source of truth) so the UI label can
   // never disagree with the charged fee: a Canadian in-stock cart whose
   // computed fee is $0 hit the unified $300+ free-shipping threshold.
-  const freeShipApplied   = hasInStock && country === 'Canada' && shippingFee === 0;
+  const freeShipApplied   = hasInStock && country === 'Canada' && shippingFeeCad === 0;
+
+  // ── Display-currency layer ────────────────────────────────────────────────
+  // Country → currency. Empty country (buyer hasn't picked yet) → CAD so the
+  // summary panel has something to render without waiting on the dropdown.
+  const targetCurrency = country ? (CURRENCY_BY_COUNTRY[country] ?? 'CAD') : 'CAD';
+  // Force-fallback to CAD if any item lacks per-currency data — the alternative
+  // is summing two different currencies in one Subtotal row, which is worse.
+  const mixedCurrencyFallback = anyItemFallsBack(items, targetCurrency);
+  const displayCurrency = mixedCurrencyFallback ? 'CAD' : targetCurrency;
+
+  // Recompute subtotals in the display currency. When displayCurrency === 'CAD'
+  // this returns the same numbers as inStockSubtotal / preorderSubtotal above.
+  const inStockSubtotalDisplay = useMemo(() => (
+    inStockItems.reduce((s, it) => s + itemPrice(it, displayCurrency).amount * it.qty, 0)
+  ), [inStockItems, displayCurrency]);
+  const preorderSubtotalDisplay = useMemo(() => (
+    preorderItems.reduce((s, it) => s + itemPrice(it, displayCurrency).amount * it.qty, 0)
+  ), [preorderItems, displayCurrency]);
+
+  // Shipping is set in CAD (SHIP_RATES) — convert to display currency for UI.
+  // The actual charged amount stays CAD in the DB.
+  const shippingFeeDisplay = displayCurrency === 'CAD'
+    ? shippingFeeCad
+    : cadTo(displayCurrency, shippingFeeCad);
+  // Tax is Canada-only → always CAD → no conversion needed.
+  const inStockTotalDisplay = hasInStock ? inStockSubtotalDisplay + shippingFeeDisplay + taxAmount : 0;
+  const preorderDepositDisplay = preorderSubtotalDisplay * PREORDER_DEPOSIT_RATE;
+  const preorderBalanceDisplay = preorderSubtotalDisplay - preorderDepositDisplay;
+  const dueNowDisplay = inStockTotalDisplay + preorderDepositDisplay;
 
   function copyWise() {
     navigator.clipboard.writeText(WISE_HANDLE);
@@ -430,9 +533,9 @@ export default function CartPage() {
           quantity:        inStockQty,
           subtotal:        inStockSubtotal,
           tax_amount:      taxAmount,
-          delivery_fee:    shippingFee,
-          total_price:     inStockTotal,
-          full_price:      inStockTotal,
+          delivery_fee:    shippingFeeCad,
+          total_price:     inStockTotalCad,
+          full_price:      inStockTotalCad,
         };
         inStockItemsPayload = inStockItems.map(it => ({
           source_table:   it.source,
@@ -515,6 +618,10 @@ export default function CartPage() {
       // (see docs/vuln-rpc-hardening.sql) — nothing to do here.
 
       // ── EmailJS receipts (one per order, dual templates) ─────────────
+      // Receipts stay CAD-only. The cart's multi-currency layer is a
+      // buyer-facing display convenience on /cart — owner accounting +
+      // EmailJS templates remain CAD-native and are not updated as part
+      // of this feature.
       const baseSharedVars = {
         buyer_name:        name,
         buyer_email:       email,
@@ -545,8 +652,8 @@ export default function CartPage() {
           instock_subtotal:  `CAD $${inStockSubtotal.toFixed(2)}`,
           preorder_subtotal: 'N/A',
           tax_amount:        taxAmount > 0 ? `CAD $${taxAmount.toFixed(2)} (${taxLabel})` : 'N/A',
-          delivery_fee:      freeShipApplied ? 'FREE (Canada free-ship threshold met)' : `CAD $${shippingFee.toFixed(2)}`,
-          total_price:       `CAD $${inStockTotal.toFixed(2)}`,
+          delivery_fee:      freeShipApplied ? 'FREE (Canada free-ship threshold met)' : `CAD $${shippingFeeCad.toFixed(2)}`,
+          total_price:       `CAD $${inStockTotalCad.toFixed(2)}`,
           due_on_release:    'N/A',
         };
         await sendEmailSafe(EMAILJS_TEMPLATE_ONHAND, { ...inStockVars, to_email: CONTACT_EMAIL });
@@ -590,24 +697,25 @@ export default function CartPage() {
       }
 
       // ── Hand off to confirmation page ────────────────────────────────
+      // Confirmation page is CAD-only (owner reverted the multi-currency
+      // display there). Cart's multi-currency layer is /cart-only.
       const buildLines = (arr) => arr.map(it => ({
         title: it.title, qty: it.qty, price: it.price, isPreorder: !!it.isPreorder,
       }));
       clear();
       navigate('/order-confirmation', {
         state: {
-          // Multi-order hand-off
           orders: [
             hasInStock && {
               kind: 'in_stock',
               orderNumber: orderNumberInStock,
               lines: buildLines(inStockItems),
               subtotal: inStockSubtotal,
-              shippingFee,
+              shippingFee: shippingFeeCad,
               freeShipApplied,
               taxAmount,
               taxLabel,
-              total: inStockTotal,
+              total: inStockTotalCad,
             },
             hasPreorder && {
               kind: 'pre_order',
@@ -625,8 +733,8 @@ export default function CartPage() {
           ].filter(Boolean),
           email,
           country,
-          dueNow,
-          // Backward-compat fields for older direct visits / shape:
+          dueNow: dueNowCad,
+          // Backward-compat field for older direct visits / shape:
           orderNumber: orderNumberInStock || orderNumberPreorder,
         },
       });
@@ -684,7 +792,7 @@ export default function CartPage() {
           <div>
             <div className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-300/70">Order Summary</div>
             <div className="text-sm font-black text-white">
-              {items.length} {items.length === 1 ? 'item' : 'items'} · CAD ${(inStockSubtotal + preorderSubtotal).toFixed(2)}
+              {items.length} {items.length === 1 ? 'item' : 'items'} · {fmtMoney(inStockSubtotalDisplay + preorderSubtotalDisplay, displayCurrency)}
             </div>
           </div>
           {mobileSummaryOpen ? <ChevronUp className="h-4 w-4 text-white/60" /> : <ChevronDown className="h-4 w-4 text-white/60" />}
@@ -695,15 +803,18 @@ export default function CartPage() {
               <OrderSummary
                 country={country}
                 province={province}
-                shippingFee={shippingFee}
+                displayCurrency={displayCurrency}
+                targetCurrency={targetCurrency}
+                mixedCurrencyFallback={mixedCurrencyFallback}
+                shippingFee={shippingFeeDisplay}
                 taxAmount={taxAmount}
                 taxLabel={taxLabel}
-                inStockSubtotal={inStockSubtotal}
-                preorderSubtotal={preorderSubtotal}
-                preorderDeposit={preorderDeposit}
-                preorderBalance={preorderBalance}
-                inStockTotal={inStockTotal}
-                dueNow={dueNow}
+                inStockSubtotal={inStockSubtotalDisplay}
+                preorderSubtotal={preorderSubtotalDisplay}
+                preorderDeposit={preorderDepositDisplay}
+                preorderBalance={preorderBalanceDisplay}
+                inStockTotal={inStockTotalDisplay}
+                dueNow={dueNowDisplay}
                 hasInStock={hasInStock}
                 hasPreorder={hasPreorder}
                 freeShipApplied={freeShipApplied}
@@ -737,6 +848,7 @@ export default function CartPage() {
                 liveStock={liveStock}
                 updateQty={updateQty}
                 removeItem={removeItem}
+                displayCurrency={displayCurrency}
               />
             )}
 
@@ -749,6 +861,7 @@ export default function CartPage() {
                 liveStock={liveStock}
                 updateQty={updateQty}
                 removeItem={removeItem}
+                displayCurrency={displayCurrency}
               />
             )}
 
@@ -868,15 +981,18 @@ export default function CartPage() {
               <OrderSummary
                 country={country}
                 province={province}
-                shippingFee={shippingFee}
+                displayCurrency={displayCurrency}
+                targetCurrency={targetCurrency}
+                mixedCurrencyFallback={mixedCurrencyFallback}
+                shippingFee={shippingFeeDisplay}
                 taxAmount={taxAmount}
                 taxLabel={taxLabel}
-                inStockSubtotal={inStockSubtotal}
-                preorderSubtotal={preorderSubtotal}
-                preorderDeposit={preorderDeposit}
-                preorderBalance={preorderBalance}
-                inStockTotal={inStockTotal}
-                dueNow={dueNow}
+                inStockSubtotal={inStockSubtotalDisplay}
+                preorderSubtotal={preorderSubtotalDisplay}
+                preorderDeposit={preorderDepositDisplay}
+                preorderBalance={preorderBalanceDisplay}
+                inStockTotal={inStockTotalDisplay}
+                dueNow={dueNowDisplay}
                 hasInStock={hasInStock}
                 hasPreorder={hasPreorder}
                 freeShipApplied={freeShipApplied}
@@ -915,20 +1031,23 @@ function Field({ label, children, required, error }) {
 }
 
 // ── Cart items panel (one per business flow) ───────────────────────────────
-function CartItemsPanel({ title, accent, items, liveStock, updateQty, removeItem }) {
+// `displayCurrency` is the currency picked by the country dropdown; per-line
+// prices use itemPrice() so preorder rows with usd_price/aud_price/eur_price
+// render in target currency and everything else falls back to CAD.
+function CartItemsPanel({ title, accent, items, liveStock, updateQty, removeItem, displayCurrency }) {
   const isPreorderPanel = accent === 'fuchsia';
   const accentBadge = isPreorderPanel
     ? 'border-fuchsia-400/40 bg-fuchsia-400/10 text-fuchsia-300'
     : 'border-cyan-300/30 bg-cyan-300/10 text-cyan-200';
   const panelQty = items.reduce((s, it) => s + it.qty, 0);
-  const panelSubtotal = items.reduce((s, it) => s + Number(it.price) * it.qty, 0);
+  const panelSubtotal = items.reduce((s, it) => s + itemPrice(it, displayCurrency).amount * it.qty, 0);
   return (
     <div className={`rounded-[24px] border ${isPreorderPanel ? 'border-fuchsia-400/20' : 'border-white/10'} bg-[#0a061a] overflow-hidden`}>
       <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between gap-3">
         <div className="text-xs font-black uppercase tracking-[0.14em] text-white/65">
           {title} <span className="text-white/30">· {panelQty} {panelQty === 1 ? 'unit' : 'units'}</span>
         </div>
-        <div className="text-sm font-black text-white tabular-nums">CAD ${panelSubtotal.toFixed(2)}</div>
+        <div className="text-sm font-black text-white tabular-nums">{fmtMoney(panelSubtotal, displayCurrency)}</div>
       </div>
       <ul className="divide-y divide-white/8">
         {items.map(it => {
@@ -989,8 +1108,8 @@ function CartItemsPanel({ title, accent, items, liveStock, updateQty, removeItem
                     >+</button>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm font-black text-white tabular-nums">CAD ${(it.price * it.qty).toFixed(2)}</div>
-                    <div className="text-[10px] text-white/35 tabular-nums">CAD ${Number(it.price).toFixed(2)} ea</div>
+                    <div className="text-sm font-black text-white tabular-nums">{fmtMoney(itemPrice(it, displayCurrency).amount * it.qty, displayCurrency)}</div>
+                    <div className="text-[10px] text-white/35 tabular-nums">{fmtMoney(itemPrice(it, displayCurrency).amount, displayCurrency)} ea</div>
                   </div>
                   <button
                     onClick={() => removeItem(it.key)}
@@ -1010,23 +1129,37 @@ function CartItemsPanel({ title, accent, items, liveStock, updateQty, removeItem
 }
 
 // ── Order summary panel ────────────────────────────────────────────────────
+// All money amounts passed in are already in `displayCurrency`. When the cart
+// couldn't be fully priced in the target currency (some items lack per-currency
+// data), `mixedCurrencyFallback` is true and `displayCurrency` will be 'CAD' —
+// we surface a banner so the buyer knows the country dropdown didn't take.
 function OrderSummary({
-  country, province, shippingFee, taxAmount, taxLabel,
+  country, province, displayCurrency, targetCurrency, mixedCurrencyFallback,
+  shippingFee, taxAmount, taxLabel,
   inStockSubtotal, preorderSubtotal, preorderDeposit, preorderBalance, inStockTotal,
   dueNow, hasInStock, hasPreorder, freeShipApplied, compact,
 }) {
+  const cur = displayCurrency;
   return (
     <div className={`rounded-[24px] border border-cyan-300/25 bg-[linear-gradient(180deg,#0c0820,#100426)] p-5 ${compact ? 'mt-3' : ''}`}>
       <div className="text-xs font-black uppercase tracking-[0.14em] text-cyan-300/70 mb-3">Order Summary</div>
+
+      {mixedCurrencyFallback && (
+        <div className="mb-3 rounded-xl border border-amber-400/30 bg-amber-400/8 px-3 py-2 text-[11px] leading-snug text-amber-100">
+          Multi-currency display unavailable — some items only priced in CAD.
+          Prices below are shown in CAD; Wise converts to {targetCurrency} at
+          payment time.
+        </div>
+      )}
 
       {hasInStock && (
         <div className="mb-3">
           <div className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300/60 mb-1.5">In-Stock</div>
           <div className="space-y-1.5 text-sm">
-            <Row label="Subtotal" value={`CAD $${inStockSubtotal.toFixed(2)}`} />
+            <Row label="Subtotal" value={fmtMoney(inStockSubtotal, cur)} />
             {country ? (
               <Row label={`Shipping (${country})`}
-                   value={freeShipApplied ? 'FREE' : `CAD $${shippingFee.toFixed(2)}`}
+                   value={freeShipApplied ? 'FREE' : fmtMoney(shippingFee, cur)}
                    valueClass={freeShipApplied ? 'text-green-400 font-black' : ''} />
             ) : (
               <Row label="Shipping" value="Select country" muted />
@@ -1035,11 +1168,11 @@ function OrderSummary({
               <div className="text-[11px] text-green-400 font-black">Free shipping in Canada on in-stock orders $300+</div>
             )}
             {country === 'Canada' && province && taxAmount > 0 ? (
-              <Row label={`Tax (${taxLabel} — ${province})`} value={`CAD $${taxAmount.toFixed(2)}`} />
+              <Row label={`Tax (${taxLabel} — ${province})`} value={fmtMoney(taxAmount, 'CAD')} />
             ) : country === 'Canada' && !province ? (
               <Row label="Tax" value="Select province" muted />
             ) : null}
-            <Row label="In-stock total" value={`CAD $${inStockTotal.toFixed(2)}`} valueClass="font-black text-white" />
+            <Row label="In-stock total" value={fmtMoney(inStockTotal, cur)} valueClass="font-black text-white" />
           </div>
         </div>
       )}
@@ -1048,14 +1181,14 @@ function OrderSummary({
         <div className={`${hasInStock ? 'mt-4 pt-4 border-t border-white/10' : ''}`}>
           <div className="text-[10px] font-black uppercase tracking-[0.18em] text-fuchsia-300/70 mb-1.5">Pre-Orders</div>
           <div className="space-y-1.5 text-sm">
-            <Row label="Pre-order subtotal" value={`CAD $${preorderSubtotal.toFixed(2)}`} accent="fuchsia" />
+            <Row label="Pre-order subtotal" value={fmtMoney(preorderSubtotal, cur)} accent="fuchsia" />
             <Row label="Down payment (30%) — Due Now"
-                 value={`CAD $${preorderDeposit.toFixed(2)}`}
+                 value={fmtMoney(preorderDeposit, cur)}
                  valueClass="font-black text-fuchsia-200" accent="fuchsia" />
             <div className="rounded-lg border border-fuchsia-400/20 bg-fuchsia-400/8 px-2.5 py-2 mt-1 text-[11px] text-fuchsia-100/85 space-y-0.5">
               <div className="flex justify-between gap-2">
                 <span>70% balance — Due on release</span>
-                <span className="tabular-nums font-black">CAD ${preorderBalance.toFixed(2)}</span>
+                <span className="tabular-nums font-black">{fmtMoney(preorderBalance, cur)}</span>
               </div>
               <div className="text-fuchsia-300/60">+ actual shipping at release</div>
             </div>
@@ -1065,7 +1198,7 @@ function OrderSummary({
 
       <div className="border-t border-white/15 pt-3 mt-4 flex justify-between items-end">
         <span className="text-xs font-black uppercase tracking-[0.12em] text-white/70">Due Now</span>
-        <span className="text-2xl font-black text-cyan-200 tabular-nums">CAD ${dueNow.toFixed(2)}</span>
+        <span className="text-2xl font-black text-cyan-200 tabular-nums">{fmtMoney(dueNow, cur)}</span>
       </div>
       {hasInStock && hasPreorder && (
         <div className="mt-1 text-[10px] text-white/40">
@@ -1075,7 +1208,7 @@ function OrderSummary({
       {hasPreorder && (
         <div className="mt-2 flex justify-between text-[11px] text-fuchsia-300/80">
           <span>Due on release</span>
-          <span className="tabular-nums">CAD ${preorderBalance.toFixed(2)} + actual shipping</span>
+          <span className="tabular-nums">{fmtMoney(preorderBalance, cur)} + actual shipping</span>
         </div>
       )}
     </div>

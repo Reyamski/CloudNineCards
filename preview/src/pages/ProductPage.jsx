@@ -34,6 +34,10 @@ function normalizePreorder(po) {
     subtitle:  po.subtitle ?? '',
     language:  null,
     price:     Number(po.price) || 0,
+    // Per-currency prices for cart-side Option A display.
+    usdPrice:  po.usd_price != null ? Number(po.usd_price) : null,
+    audPrice:  po.aud_price != null ? Number(po.aud_price) : null,
+    eurPrice:  po.eur_price != null ? Number(po.eur_price) : null,
     priceTba:  po.price_tba || false,
     badge:     po.sold_out ? 'Sold Out' : po.price_tba ? 'Price TBA' : 'Pre-order',
     inStock:   !po.sold_out,
@@ -64,6 +68,11 @@ export default function ProductPage() {
       title:      product.title,
       image:      product.image,
       price:      Number(product.price) || 0,
+      // Per-currency prices for cart-side Option A display (preorder only —
+      // products/singles/decks pass null and fall back to CAD in the cart).
+      usd_price:  product.usdPrice != null ? Number(product.usdPrice) : null,
+      aud_price:  product.audPrice != null ? Number(product.audPrice) : null,
+      eur_price:  product.eurPrice != null ? Number(product.eurPrice) : null,
       qty,
       isPreorder: !!product.isPreorder,
       etaText:    product.eta ?? '',
