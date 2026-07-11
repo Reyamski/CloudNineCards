@@ -1344,15 +1344,53 @@ export default function AdminPage() {
     return true;
   });
 
-  function exportOrdersCSV() {
+  async function exportOrdersCSV() {
+    const { data, error } = await adminFetch('/api/admin/order-items', 'GET');
+    if (error) {
+      setDbError(`CSV export failed: ${error.message}`);
+      return;
+    }
+    const byOrder = new Map();
+    for (const it of (data ?? [])) {
+      if (!byOrder.has(it.order_id)) byOrder.set(it.order_id, []);
+      byOrder.get(it.order_id).push(it);
+    }
     const rows = [
-      ['Order #', 'Buyer', 'Email', 'Product', 'Variant', 'Qty', 'Total (CAD)', 'Type', 'Status', 'Payment', 'Created'],
-      ...filteredOrders.map(o => [
-        o.order_number, o.buyer_name, o.buyer_email, o.product_title, o.product_variant,
-        o.quantity, o.total_price, o.order_type, o.status, o.payment_status,
-        o.created_at ? new Date(o.created_at).toLocaleDateString() : '',
-      ]),
+      ['Order #', 'Created', 'Buyer', 'Email', 'Phone', 'Address', 'Product', 'Type', 'Qty', 'Unit Price (CAD)', 'Line Total (CAD)', 'DP Owed (CAD)', 'Order Total (CAD)', 'Order DP (CAD)', 'Status', 'Payment'],
     ];
+    for (const o of filteredOrders) {
+      const created = o.created_at ? new Date(o.created_at).toLocaleDateString() : '';
+      const orderTotal = Number(o.total_price || 0).toFixed(2);
+      const orderDp = Number(o.dp_amount || 0).toFixed(2);
+      const items = byOrder.get(o.id) || [];
+      if (items.length) {
+        for (const it of items) {
+          const unit = Number(it.unit_price);
+          const qty = Number(it.qty);
+          const lineTotal = unit * qty;
+          const dpOwed = it.is_preorder ? lineTotal * 0.30 : lineTotal;
+          rows.push([
+            o.order_number, created, o.buyer_name, o.buyer_email, o.buyer_phone, o.buyer_address,
+            it.title_snapshot, it.is_preorder ? 'Pre-order' : 'In-Stock',
+            qty, unit.toFixed(2), lineTotal.toFixed(2), dpOwed.toFixed(2),
+            orderTotal, orderDp, o.status, o.payment_status,
+          ]);
+        }
+      } else {
+        // Legacy orders predate order_items backfill; fall back to order-level fields.
+        const isPre = o.order_type === 'pre_order';
+        const lineTotal = Number(o.total_price || 0);
+        const dpOwed = isPre ? lineTotal * 0.30 : lineTotal;
+        const qty = Number(o.quantity || 0);
+        const unit = qty ? (lineTotal / qty) : lineTotal;
+        rows.push([
+          o.order_number, created, o.buyer_name, o.buyer_email, o.buyer_phone, o.buyer_address,
+          o.product_title, isPre ? 'Pre-order' : 'In-Stock',
+          qty, unit.toFixed(2), lineTotal.toFixed(2), dpOwed.toFixed(2),
+          orderTotal, orderDp, o.status, o.payment_status,
+        ]);
+      }
+    }
     const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
