@@ -37,7 +37,6 @@ for (const envFile of envFiles) {
   } catch { /* file missing = ok */ }
 }
 
-import fetchPricesHandler from './api/fetch-prices.js';
 import analyzeCardHandler from './api/analyze-card.js';
 import subscribeHandler   from './api/subscribe.js';
 import waitlistHandler    from './api/waitlist.js';
@@ -139,10 +138,6 @@ const server = http.createServer(async (req, res) => {
     const body = await readBody(req);
     handler = adminTableMap[url.pathname];
     mockReq = { body, method: req.method, url: req.url, headers: req.headers };
-  } else if (url.pathname.startsWith('/api/fetch-prices')) {
-    const query = Object.fromEntries(url.searchParams.entries());
-    handler  = fetchPricesHandler;
-    mockReq  = { query, method: req.method, url: req.url };
   } else if (url.pathname.startsWith('/api/analyze-card')) {
     const body = await readBody(req);
     handler  = analyzeCardHandler;
